@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
 
 const EscanearQR = lazy(() => import('./modules/visitas/pages/EscanearQR'));
@@ -27,8 +27,10 @@ function App() {
   const [errorPerfil, setErrorPerfil] = useState('');
   const [openMenu, setOpenMenu] = useState(false);
   const [modulo, setModulo] = useState('');
+  const menuRef = useRef(null);
 
   const menuBtn = "w-full text-left p-2 rounded hover:bg-gray-700";
+  const ROLES_VALIDOS = ['admin', 'vigilancia', 'residente'];
 
   // 🔔 permisos
   useEffect(() => {
@@ -38,6 +40,17 @@ function App() {
   // 🔥 sesión
   useEffect(() => {
 
+    let isMounted = true;
+
+    const withTimeout = (promise, timeoutMs = 8000) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('timeout')), timeoutMs);
+        })
+      ]);
+    };
+
     const obtenerUsuario = async (userId) => {
       const { data, error } = await supabase
         .from('usuarios_app')
@@ -46,24 +59,44 @@ function App() {
         .single();
 
       if (error) {
-        setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
-        setUsuarioApp(null);
+        if (isMounted) {
+          setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
+          setUsuarioApp(null);
+        }
         return;
       }
 
-      setErrorPerfil('');
-      setUsuarioApp(data);
+      if (isMounted) {
+        setErrorPerfil('');
+        setUsuarioApp(data);
+      }
     };
 
     const obtenerSesion = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
+      try {
+        const { data, error } = await withTimeout(supabase.auth.getUser());
+        if (error) {
+          throw error;
+        }
 
-      if (data.user) {
-        await obtenerUsuario(data.user.id);
+        if (!isMounted) return;
+        setUser(data.user);
+
+        if (data.user) {
+          await obtenerUsuario(data.user.id);
+        }
+      } catch {
+        if (isMounted) {
+          setErrorPerfil('No pudimos verificar tu sesión. Revisa tu conexión e intenta nuevamente.');
+          setUser(null);
+          setUsuarioApp(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsBootstrapping(false);
+        }
       }
 
-      setIsBootstrapping(false);
     };
 
     obtenerSesion();
@@ -71,6 +104,8 @@ function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         const user = session?.user || null;
+        if (!isMounted) return;
+
         setUser(user);
 
         if (user) {
@@ -83,10 +118,34 @@ function App() {
     );
 
     return () => {
+      isMounted = false;
       listener.subscription.unsubscribe();
     };
 
   }, []);
+
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      if (!openMenu) return;
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenu(false);
+      }
+    };
+
+    const onEscape = (event) => {
+      if (event.key === 'Escape') {
+        setOpenMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [openMenu]);
 
   const moduloPorRol = {
     admin: 'dashboard',
@@ -95,6 +154,7 @@ function App() {
   };
 
   const moduloActual = modulo || moduloPorRol[usuarioApp?.rol_id] || '';
+  const rolNoAutorizado = Boolean(usuarioApp) && !ROLES_VALIDOS.includes(usuarioApp?.rol_id);
 
   if (isBootstrapping) {
     return (
@@ -198,7 +258,7 @@ function App() {
           </h2>
 
           {/* 👤 MENU */}
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
 
             <button
               onClick={() => setOpenMenu(!openMenu)}
@@ -246,6 +306,12 @@ function App() {
           {errorPerfil && (
             <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
               {errorPerfil}
+            </div>
+          )}
+
+          {rolNoAutorizado && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-700 px-4 py-3 text-sm">
+              Tu rol actual no está autorizado para este panel. Contacta al administrador del conjunto.
             </div>
           )}
 
