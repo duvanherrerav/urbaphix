@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { crearPago } from '../services/contabilidadService';
+import toast from 'react-hot-toast';
 
 export default function CrearCobro({ usuarioApp }) {
 
@@ -19,21 +20,8 @@ export default function CrearCobro({ usuarioApp }) {
 
   const [loading, setLoading] = useState(false);
 
-  // 🔥 CARGA INICIAL
-  useEffect(() => {
-    if (usuarioApp?.conjunto_id) {
-      obtenerTorres();
-    }
-  }, [usuarioApp]);
-
-  // 🔥 TORRES
-  const obtenerTorres = async () => {
-    const { data } = await supabase
-      .from('torres')
-      .select('id, nombre')
-      .eq('conjunto_id', usuarioApp.conjunto_id);
-
-    setTorres(data || []);
+  const notificarError = (codigo, detalle) => {
+    toast.error(`${codigo}: ${detalle}`);
   };
 
   // 🔥 APARTAMENTOS
@@ -52,11 +40,27 @@ export default function CrearCobro({ usuarioApp }) {
     obtenerApartamentos(id);
   };
 
+  // 🔥 CARGA INICIAL
+  useEffect(() => {
+    const cargarTorres = async () => {
+      if (!usuarioApp?.conjunto_id) return;
+
+      const { data } = await supabase
+        .from('torres')
+        .select('id, nombre')
+        .eq('conjunto_id', usuarioApp.conjunto_id);
+
+      setTorres(data || []);
+    };
+
+    cargarTorres();
+  }, [usuarioApp]);
+
   // 🔥 INDIVIDUAL
   const crearIndividual = async () => {
 
     if (!form.concepto || !form.valor || !apartamentoSeleccionado) {
-      alert('Selecciona apartamento y completa los campos');
+      notificarError('COBRO-001', 'Selecciona apartamento y completa los campos');
       return;
     }
 
@@ -70,39 +74,42 @@ export default function CrearCobro({ usuarioApp }) {
       .single();
 
     if (!residente) {
-      alert('Este apartamento no tiene residente');
+      notificarError('COBRO-002', 'Este apartamento no tiene residente');
       setLoading(false);
       return;
     }
 
-    const { error } = await supabase
-      .from('pagos')
-      .insert([{
-        residente_id: residente.id,
-        concepto: form.concepto,
-        valor: Number(form.valor),
-        conjunto_id: usuarioApp.conjunto_id,
-        estado: 'pendiente'
-      }]);
+    const { data: authData, error: errorAuth } = await supabase.auth.getUser();
 
-    setLoading(false);
-
-    if (error) {
-      console.log(error);
-      alert('Error al crear cobro');
+    if (errorAuth || !authData?.user) {
+      notificarError('COBRO-003', 'No se pudo validar la sesión');
+      setLoading(false);
       return;
     }
 
-    alert('💰 Cobro creado');
+    const { error } = await crearPago({
+      residente_id: residente.id,
+      concepto: form.concepto,
+      valor: Number(form.valor)
+    }, authData.user);
+
+    if (error) {
+      notificarError('COBRO-004', error);
+      setLoading(false);
+      return;
+    }
+
+    toast.success('💰 Cobro creado');
 
     limpiar();
+    setLoading(false);
   };
 
   // 🔥 MASIVO POR TORRE/APTO
   const crearMasivo = async () => {
 
     if (!form.concepto || !form.valor || !torreSeleccionada) {
-      alert('Selecciona torre y completa los campos');
+      notificarError('COBRO-005', 'Selecciona torre y completa los campos');
       return;
     }
 
@@ -116,10 +123,16 @@ export default function CrearCobro({ usuarioApp }) {
       .select('id')
       .eq('torre_id', torreSeleccionada);
 
-    let apartamentosFiltrados = aptos;
+    let apartamentosFiltrados = aptos || [];
 
     if (apartamentoSeleccionado) {
-      apartamentosFiltrados = aptos.filter(a => a.id === apartamentoSeleccionado);
+      apartamentosFiltrados = apartamentosFiltrados.filter(a => a.id === apartamentoSeleccionado);
+    }
+
+    if (!apartamentosFiltrados.length) {
+      notificarError('COBRO-006', 'No se encontraron apartamentos para procesar');
+      setLoading(false);
+      return;
     }
 
     // 🔥 residentes por apto
@@ -128,32 +141,50 @@ export default function CrearCobro({ usuarioApp }) {
       .select('id, apartamento_id')
       .in('apartamento_id', apartamentosFiltrados.map(a => a.id));
 
-    const pagos = residentesFiltrados.map(r => ({
+    const pagos = (residentesFiltrados || []).map(r => ({
       residente_id: r.id,
       concepto: form.concepto,
-      valor: Number(form.valor),
-      conjunto_id: usuarioApp.conjunto_id,
-      estado: 'pendiente'
+      valor: Number(form.valor)
     }));
 
-    const { error } = await supabase.from('pagos').insert(pagos);
-
-    setLoading(false);
-
-    if (error) {
-      console.log(error);
-      alert('Error en cobro masivo');
+    if (!pagos.length) {
+      notificarError('COBRO-007', 'No hay residentes asociados a los apartamentos seleccionados');
+      setLoading(false);
       return;
     }
 
-    alert(`💰 Cobro generado (${pagos.length} pagos)`);
+    const { data: authData, error: errorAuth } = await supabase.auth.getUser();
+    if (errorAuth || !authData?.user) {
+      notificarError('COBRO-008', 'No se pudo validar la sesión');
+      setLoading(false);
+      return;
+    }
+
+    let errores = 0;
+    for (const pago of pagos) {
+      const { error: errorPago } = await crearPago({
+        residente_id: pago.residente_id,
+        concepto: pago.concepto,
+        valor: pago.valor
+      }, authData.user);
+
+      if (errorPago) {
+        errores += 1;
+      }
+    }
+
+    if (errores > 0) {
+      notificarError('COBRO-009', `Se generaron ${pagos.length - errores} cobros y ${errores} fallaron`);
+    } else {
+      toast.success(`💰 Cobro generado (${pagos.length} pagos)`);
+    }
 
     limpiar();
+    setLoading(false);
   };
 
   const limpiar = () => {
     setForm({ concepto: '', valor: '' });
-    setResidenteSeleccionado('');
     setTorreSeleccionada('');
     setApartamentoSeleccionado('');
   };
