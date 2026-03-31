@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { crearIncidente } from '../services/seguridadService';
+import toast from 'react-hot-toast';
 
 export default function ReportarIncidente({ user }) {
 
@@ -9,8 +10,13 @@ export default function ReportarIncidente({ user }) {
   });
 
   const handleSubmit = async () => {
-    await crearIncidente(form, user);
-    alert('Incidente reportado');
+    const { error } = await crearIncidente(form, user);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    toast.success('Incidente reportado');
+    setForm({ descripcion: '', nivel: 'bajo' });
   };
 
   return (
@@ -19,10 +25,11 @@ export default function ReportarIncidente({ user }) {
 
       <input
         placeholder="Descripción"
-        onChange={e => setForm({...form, descripcion: e.target.value})}
+        value={form.descripcion}
+        onChange={e => setForm({ ...form, descripcion: e.target.value })}
       />
 
-      <select onChange={e => setForm({...form, nivel: e.target.value})}>
+      <select value={form.nivel} onChange={e => setForm({ ...form, nivel: e.target.value })}>
         <option value="bajo">Bajo</option>
         <option value="medio">Medio</option>
         <option value="alto">Alto</option>

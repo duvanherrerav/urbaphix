@@ -86,7 +86,11 @@ export const calcularSLA = (visitas) => {
   }
 
   const minutos = muestras.map((v) => {
-    const inicio = new Date(v.created_at).getTime();
+    const fechaProgramada = v.fecha_visita || new Date(v.created_at).toISOString().slice(0, 10);
+    const horaProgramada = v.hora_inicio || '00:00';
+    const inicioProgramado = new Date(`${fechaProgramada}T${horaProgramada}:00`).getTime();
+    const inicioCreacion = new Date(v.created_at).getTime();
+    const inicio = Math.max(inicioCreacion, inicioProgramado);
     const ingreso = new Date(v.hora_ingreso).getTime();
     return Math.max(0, Math.round((ingreso - inicio) / 60000));
   });
