@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
-import { actualizarEstadoIncidente } from '../services/seguridadService';
+import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal } from '../services/seguridadService';
 
 const ESTADOS = ['nuevo', 'en_gestion', 'resuelto', 'cerrado'];
 
@@ -9,6 +9,7 @@ export default function ListaIncidentes({ usuarioApp }) {
 
   const [incidentes, setIncidentes] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [estadosLocal, setEstadosLocal] = useState({});
 
   useEffect(() => {
     const cargar = async () => {
@@ -26,6 +27,7 @@ export default function ListaIncidentes({ usuarioApp }) {
       }
 
       setIncidentes(data || []);
+      setEstadosLocal(obtenerEstadosIncidentesLocal());
     };
 
     cargar();
@@ -43,11 +45,15 @@ export default function ListaIncidentes({ usuarioApp }) {
       return;
     }
 
-    setIncidentes((prev) => prev.map((i) => (i.id === incidente.id ? { ...i, estado, asignado_a: usuarioApp?.id } : i)));
+    const nuevosEstados = obtenerEstadosIncidentesLocal();
+    setEstadosLocal(nuevosEstados);
     toast.success(`Incidente actualizado a ${estado}`);
   };
 
-  const lista = incidentes.filter((i) => (filtroEstado === 'todos' ? true : i.estado === filtroEstado));
+  const lista = incidentes.filter((i) => {
+    const estadoActual = estadosLocal[i.id]?.estado || 'nuevo';
+    return filtroEstado === 'todos' ? true : estadoActual === filtroEstado;
+  });
 
   return (
     <div className="bg-white p-4 rounded-xl shadow space-y-4">
@@ -69,7 +75,7 @@ export default function ListaIncidentes({ usuarioApp }) {
         <div key={i.id} className="border rounded-lg p-3 space-y-2">
           <p><b>Descripción:</b> {i.descripcion}</p>
           <p><b>Nivel:</b> {i.nivel}</p>
-          <p><b>Estado:</b> {i.estado || 'nuevo'}</p>
+          <p><b>Estado:</b> {estadosLocal[i.id]?.estado || 'nuevo'}</p>
           <p className="text-xs text-gray-500"><b>Fecha:</b> {i.created_at ? new Date(i.created_at).toLocaleString() : '-'}</p>
 
           {usuarioApp?.rol_id === 'admin' && (

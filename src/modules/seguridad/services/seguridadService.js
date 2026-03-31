@@ -1,4 +1,18 @@
 import { supabase } from '../../../services/supabaseClient';
+const INCIDENTE_ESTADOS_KEY = 'urbaphix_incidentes_estado_local_v1';
+
+const getEstadoLocal = () => {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(INCIDENTE_ESTADOS_KEY) || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const setEstadoLocal = (map) => {
+    localStorage.setItem(INCIDENTE_ESTADOS_KEY, JSON.stringify(map));
+};
 
 export const crearIncidente = async (data, user) => {
     try {
@@ -29,8 +43,7 @@ export const crearIncidente = async (data, user) => {
                 conjunto_id: conjuntoId,
                 reportado_por: user.id,
                 descripcion: data.descripcion,
-                nivel: data.nivel || 'bajo',
-                estado: 'nuevo'
+                nivel: data.nivel || 'bajo'
             }])
             .select()
             .single();
@@ -53,19 +66,18 @@ export const crearIncidente = async (data, user) => {
 
 export const actualizarEstadoIncidente = async ({ incidenteId, estado, usuarioId }) => {
     try {
-        const { error } = await supabase
-            .from('incidentes')
-            .update({
-                estado,
-                asignado_a: usuarioId || null,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', incidenteId);
-
-        if (error) throw error;
+        const estados = getEstadoLocal();
+        estados[incidenteId] = {
+            estado,
+            asignado_a: usuarioId || null,
+            updated_at: new Date().toISOString()
+        };
+        setEstadoLocal(estados);
         return { ok: true, error: null };
     } catch (error) {
         console.error('actualizarEstadoIncidente error:', error);
         return { ok: false, error: error?.message || 'No se pudo actualizar el incidente' };
     }
 };
+
+export const obtenerEstadosIncidentesLocal = () => getEstadoLocal();
