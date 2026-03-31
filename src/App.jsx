@@ -4,7 +4,6 @@ import { supabase } from './services/supabaseClient';
 import Login from './modules/auth/Login';
 import { pedirPermiso } from './utils/push';
 
-const EscanearQR = lazy(() => import('./modules/visitas/pages/EscanearQR'));
 const MisPagos = lazy(() => import('./modules/contabilidad/pages/MisPagos'));
 const CrearCobro = lazy(() => import('./modules/contabilidad/pages/CrearCobro'));
 const CrearVisita = lazy(() => import('./modules/visitas/pages/CrearVisita'));
@@ -339,7 +338,6 @@ function App() {
                 {moduloActual === 'visitas' && (
                   <>
                     <PanelVigilancia usuarioApp={usuarioApp} />
-                    <EscanearQR usuarioApp={usuarioApp} />
                   </>
                 )}
 
