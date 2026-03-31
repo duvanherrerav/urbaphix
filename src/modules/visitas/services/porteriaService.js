@@ -13,6 +13,32 @@ const parseJson = (value, fallback) => {
   }
 };
 
+const sanitizeArrayStorage = (key) => {
+  const parsed = parseJson(localStorage.getItem(key), []);
+  const safe = Array.isArray(parsed) ? parsed : [];
+  localStorage.setItem(key, JSON.stringify(safe));
+  return safe;
+};
+
+const sanitizeObjectStorage = (key) => {
+  const parsed = parseJson(localStorage.getItem(key), {});
+  const safe = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  localStorage.setItem(key, JSON.stringify(safe));
+  return safe;
+};
+
+export const migrarStoragePorteria = () => {
+  try {
+    sanitizeArrayStorage(QUEUE_KEY);
+    sanitizeArrayStorage(BITACORA_LOCAL_KEY);
+    sanitizeObjectStorage(INVALID_QR_KEY);
+    return { ok: true };
+  } catch (error) {
+    console.error('migrarStoragePorteria error:', error);
+    return { ok: false, error: error?.message || 'No se pudo migrar el storage local de portería' };
+  }
+};
+
 export const enqueueOfflineAction = (action) => {
   const actual = parseJson(localStorage.getItem(QUEUE_KEY), []);
   const payload = [...actual, { ...action, queued_at: new Date().toISOString() }];
