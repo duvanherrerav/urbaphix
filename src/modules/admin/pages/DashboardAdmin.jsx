@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
 import GraficaVisitas from '../components/GraficaVisitas';
@@ -28,36 +28,30 @@ export default function DashboardAdmin({ usuarioApp }) {
     torreTop: '-'
   });
 
-  useEffect(() => {
+  const resumenFinanciero = useMemo(() => {
+    const pendientes = pagos.filter((p) => p.estado === 'pendiente');
+    const pagados = pagos.filter((p) => p.estado === 'pagado');
 
-    if (!usuarioApp?.conjunto_id) return;
+    const pendienteMonto = pendientes.reduce((acc, p) => acc + Number(p.valor || 0), 0);
+    const pagadoMonto = pagados.reduce((acc, p) => acc + Number(p.valor || 0), 0);
 
-    obtenerVisitas();
-    obtenerPagos();
-
-    const channel = supabase
-      .channel('admin-visitas')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'visitas'
-        },
-        () => {
-          obtenerVisitas();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    return {
+      pendientesCantidad: pendientes.length,
+      pendienteMonto,
+      pagadoMonto
     };
+  }, [pagos]);
 
-  }, [usuarioApp]);
+  const saludOperativa = useMemo(() => {
+    const totalVisitas = Math.max(stats.total, 1);
+    const ocupacion = Math.round((stats.ingresados / totalVisitas) * 100);
+    const finalizacion = Math.round((stats.salidos / totalVisitas) * 100);
+
+    return { ocupacion, finalizacion };
+  }, [stats]);
 
   // 🔥 VISITAS
-  const obtenerVisitas = async () => {
+  async function obtenerVisitas() {
 
     const hoy = new Date();
     const hace7dias = new Date();
@@ -82,10 +76,10 @@ export default function DashboardAdmin({ usuarioApp }) {
       pendientes: data.filter(v => v.estado === 'pendiente').length,
       salidos: data.filter(v => v.estado === 'salido').length
     });
-  };
+  }
 
   // 🔥 PAGOS
-  const obtenerPagos = async () => {
+  async function obtenerPagos() {
 
     const { data, error } = await supabase
       .from('pagos')
@@ -95,7 +89,38 @@ export default function DashboardAdmin({ usuarioApp }) {
     if (error) return;
 
     setPagos(data || []);
-  };
+  }
+
+  useEffect(() => {
+
+    if (!usuarioApp?.conjunto_id) return;
+
+    const timer = setTimeout(() => {
+      obtenerVisitas();
+      obtenerPagos();
+    }, 0);
+
+    const channel = supabase
+      .channel('admin-visitas')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'visitas'
+        },
+        () => {
+          obtenerVisitas();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+
+  }, [usuarioApp]);
 
   return (
     <div className="space-y-6">
@@ -115,7 +140,7 @@ export default function DashboardAdmin({ usuarioApp }) {
 
           <div>🚗 {stats.ingresados} visitas activas</div>
           <div>📦 {kpis.paquetesPendientes} paquetes</div>
-          <div>💰 {pagos.filter(p => p.estado === 'pendiente').length} pagos pendientes</div>
+          <div>💰 {resumenFinanciero.pendientesCantidad} pagos pendientes</div>
 
         </div>
 
@@ -128,26 +153,67 @@ export default function DashboardAdmin({ usuarioApp }) {
       {/* 🔥 CARDS MEJORADAS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
-        <div className="bg-yellow-400 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="bg-gradient-to-br from-amber-400 to-amber-500 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
           🟡 Pendientes
           <div className="text-2xl font-bold">{stats.pendientes}</div>
         </div>
 
-        <div className="bg-blue-500 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="bg-gradient-to-br from-sky-500 to-blue-600 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
           🔵 Ingresados
           <div className="text-2xl font-bold">{stats.ingresados}</div>
         </div>
 
-        <div className="bg-green-500 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="bg-gradient-to-br from-emerald-500 to-green-600 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
           🟢 Salidos
           <div className="text-2xl font-bold">{stats.salidos}</div>
         </div>
 
-        <div className="bg-gray-900 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="bg-gradient-to-br from-slate-800 to-gray-900 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
           📦 Total
           <div className="text-2xl font-bold">{stats.total}</div>
         </div>
 
+      </div>
+
+      {/* 🔥 NUEVOS MINI DASHBOARDS (sin saturar) */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+          <h3 className="font-semibold text-slate-800 mb-3">⚙️ Salud operativa</h3>
+          <div className="space-y-3">
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span>Ocupación de visitas</span>
+                <span className="font-semibold">{saludOperativa.ocupacion}%</span>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${saludOperativa.ocupacion}%` }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span>Visitas finalizadas</span>
+                <span className="font-semibold">{saludOperativa.finalizacion}%</span>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-emerald-500 to-lime-400" style={{ width: `${saludOperativa.finalizacion}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+          <h3 className="font-semibold text-slate-800 mb-3">💼 Pulso financiero</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl bg-emerald-50 p-3">
+              <p className="text-emerald-700 font-medium">Recaudado</p>
+              <p className="text-lg font-bold text-emerald-800">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-3">
+              <p className="text-amber-700 font-medium">Pendiente</p>
+              <p className="text-lg font-bold text-amber-800">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 🔥 ALERTA CARTERA */}
@@ -181,7 +247,7 @@ export default function DashboardAdmin({ usuarioApp }) {
         </div>
 
         {/* 🔥 CARTERA ANALÍTICA */}
-        <div className="bg-white p-4">
+        <div className="bg-white p-4 rounded-2xl shadow">
           <h3 className="font-semibold mb-2">📊 Análisis de cartera</h3>
           <GraficaCartera pagos={pagos} />
         </div>
