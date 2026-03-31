@@ -3,7 +3,11 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal } from '../services/seguridadService';
 
-const ESTADOS = ['nuevo', 'en_gestion', 'resuelto', 'cerrado'];
+const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
+const formatBogota = (value) =>
+  value
+    ? new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short' })
+    : '-';
 
 export default function ListaIncidentes({ usuarioApp }) {
 
@@ -65,7 +69,7 @@ export default function ListaIncidentes({ usuarioApp }) {
           onChange={(e) => setFiltroEstado(e.target.value)}
         >
           <option value="todos">Todos</option>
-          {ESTADOS.map((e) => (
+          {['nuevo', ...ESTADOS_GESTION].map((e) => (
             <option key={e} value={e}>{e}</option>
           ))}
         </select>
@@ -75,20 +79,23 @@ export default function ListaIncidentes({ usuarioApp }) {
         <div key={i.id} className="border rounded-lg p-3 space-y-2">
           <p><b>Descripción:</b> {i.descripcion}</p>
           <p><b>Nivel:</b> {i.nivel}</p>
-          <p><b>Estado:</b> {estadosLocal[i.id]?.estado || 'nuevo'}</p>
-          <p className="text-xs text-gray-500"><b>Fecha:</b> {i.created_at ? new Date(i.created_at).toLocaleString() : '-'}</p>
+          <p><b>Estado:</b> <span className="capitalize">{estadosLocal[i.id]?.estado || 'nuevo'}</span></p>
+          <p className="text-xs text-gray-500"><b>Fecha (Bogotá):</b> {formatBogota(i.created_at)}</p>
 
           {usuarioApp?.rol_id === 'admin' && (
-            <div className="flex flex-wrap gap-2">
-              {ESTADOS.map((estado) => (
-                <button
-                  key={estado}
-                  className="px-2 py-1 border rounded text-xs hover:bg-gray-50"
-                  onClick={() => cambiarEstado(i, estado)}
-                >
-                  {estado}
-                </button>
-              ))}
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">Gestión administrativa</p>
+              <div className="flex flex-wrap gap-2">
+                {ESTADOS_GESTION.map((estado) => (
+                  <button
+                    key={estado}
+                    className={`px-2 py-1 border rounded text-xs hover:bg-gray-50 ${estadosLocal[i.id]?.estado === estado ? 'bg-gray-900 text-white' : ''}`}
+                    onClick={() => cambiarEstado(i, estado)}
+                  >
+                    {estado}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
