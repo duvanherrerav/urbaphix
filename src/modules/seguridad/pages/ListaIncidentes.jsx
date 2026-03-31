@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechasIncidentesLocal } from '../services/seguridadService';
 
-const ESTADOS_GESTION = ['En gestion', 'Resuelto', 'Cerrado'];
+const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
 const formatBogota = (value, localEpoch) => {
   if (localEpoch) {
     return new Date(localEpoch).toLocaleString('es-CO', {
