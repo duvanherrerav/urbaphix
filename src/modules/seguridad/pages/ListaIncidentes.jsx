@@ -4,28 +4,6 @@ import { supabase } from '../../../services/supabaseClient';
 import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechasIncidentesLocal } from '../services/seguridadService';
 
 const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
-const normalizarEstado = (estado) => {
-  const raw = String(estado || 'nuevo')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '_');
-
-  if (raw === 'en_gestion' || raw === 'engestion') return 'en_gestion';
-  if (raw === 'resuelto') return 'resuelto';
-  if (raw === 'cerrado') return 'cerrado';
-  return 'nuevo';
-};
-
-const estadoLabel = (estado) => {
-  const normalized = normalizarEstado(estado);
-  if (normalized === 'en_gestion') return 'En gestión';
-  if (normalized === 'resuelto') return 'Resuelto';
-  if (normalized === 'cerrado') return 'Cerrado';
-  return 'Nuevo';
-};
-
 const formatBogota = (value, localEpoch) => {
   if (localEpoch) {
     return new Date(localEpoch).toLocaleString('es-CO', {
@@ -120,19 +98,19 @@ export default function ListaIncidentes({ usuarioApp }) {
     const term = busqueda.trim().toLowerCase();
 
     const filtered = incidentes.filter((i) => {
-      const estadoActual = normalizarEstado(estadosLocal[i.id]?.estado);
+      const estadoActual = estadosLocal[i.id]?.estado || 'nuevo';
       const matchEstado = filtroEstado === 'todos' ? true : estadoActual === filtroEstado;
       const matchBusqueda = !term
         || i.descripcion?.toLowerCase().includes(term)
         || i.nivel?.toLowerCase().includes(term)
-        || estadoLabel(estadoActual).toLowerCase().includes(term);
+        || estadoActual.toLowerCase().includes(term);
       return matchEstado && matchBusqueda;
     });
 
     // Priorizamos lo no cerrado al inicio
     return filtered.sort((a, b) => {
-      const ea = normalizarEstado(estadosLocal[a.id]?.estado);
-      const eb = normalizarEstado(estadosLocal[b.id]?.estado);
+      const ea = estadosLocal[a.id]?.estado || 'nuevo';
+      const eb = estadosLocal[b.id]?.estado || 'nuevo';
       if (ea === 'cerrado' && eb !== 'cerrado') return 1;
       if (ea !== 'cerrado' && eb === 'cerrado') return -1;
       return 0;
@@ -145,10 +123,10 @@ export default function ListaIncidentes({ usuarioApp }) {
 
   const resumen = {
     total: lista.length,
-    nuevos: lista.filter((i) => normalizarEstado(estadosLocal[i.id]?.estado) === 'nuevo').length,
-    enGestion: lista.filter((i) => normalizarEstado(estadosLocal[i.id]?.estado) === 'en_gestion').length,
-    resueltos: lista.filter((i) => normalizarEstado(estadosLocal[i.id]?.estado) === 'resuelto').length,
-    cerrados: lista.filter((i) => normalizarEstado(estadosLocal[i.id]?.estado) === 'cerrado').length
+    nuevos: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'nuevo').length,
+    enGestion: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'en_gestion').length,
+    resueltos: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'resuelto').length,
+    cerrados: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'cerrado').length
   };
 
   return (
@@ -193,7 +171,7 @@ export default function ListaIncidentes({ usuarioApp }) {
         <div key={i.id} className="border rounded-lg p-3 space-y-2">
           <p><b>Descripción:</b> {i.descripcion}</p>
           <p><b>Nivel:</b> {i.nivel}</p>
-          <p><b>Estado:</b> <span>{estadoLabel(estadosLocal[i.id]?.estado)}</span></p>
+          <p><b>Estado:</b> <span className="capitalize">{estadosLocal[i.id]?.estado || 'nuevo'}</span></p>
           <p className="text-xs text-gray-500"><b>Fecha (Bogotá):</b> {formatBogota(i.created_at, fechasLocal[i.id])}</p>
 
           {usuarioApp?.rol_id === 'admin' && (
@@ -203,10 +181,10 @@ export default function ListaIncidentes({ usuarioApp }) {
                 {ESTADOS_GESTION.map((estado) => (
                   <button
                     key={estado}
-                    className={`px-2 py-1 border rounded text-xs hover:bg-gray-50 ${normalizarEstado(estadosLocal[i.id]?.estado) === estado ? 'bg-gray-900 text-white' : ''}`}
+                    className={`px-2 py-1 border rounded text-xs hover:bg-gray-50 ${estadosLocal[i.id]?.estado === estado ? 'bg-gray-900 text-white' : ''}`}
                     onClick={() => cambiarEstado(i, estado)}
                   >
-                    {estadoLabel(estado)}
+                    {estado}
                   </button>
                 ))}
               </div>
