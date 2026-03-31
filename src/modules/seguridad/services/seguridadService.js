@@ -1,5 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 const INCIDENTE_ESTADOS_KEY = 'urbaphix_incidentes_estado_local_v1';
+const INCIDENTE_FECHAS_KEY = 'urbaphix_incidentes_fecha_local_v1';
 
 const getEstadoLocal = () => {
     try {
@@ -12,6 +13,19 @@ const getEstadoLocal = () => {
 
 const setEstadoLocal = (map) => {
     localStorage.setItem(INCIDENTE_ESTADOS_KEY, JSON.stringify(map));
+};
+
+const getFechasLocal = () => {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(INCIDENTE_FECHAS_KEY) || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const setFechasLocal = (map) => {
+    localStorage.setItem(INCIDENTE_FECHAS_KEY, JSON.stringify(map));
 };
 
 export const crearIncidente = async (data, user) => {
@@ -50,6 +64,10 @@ export const crearIncidente = async (data, user) => {
 
         if (error) throw error;
 
+        const fechas = getFechasLocal();
+        fechas[incidente.id] = Date.now();
+        setFechasLocal(fechas);
+
         // 🔔 Notificación a admin
         await supabase.from('notificaciones').insert([{
             tipo: 'incidente',
@@ -81,3 +99,4 @@ export const actualizarEstadoIncidente = async ({ incidenteId, estado, usuarioId
 };
 
 export const obtenerEstadosIncidentesLocal = () => getEstadoLocal();
+export const obtenerFechasIncidentesLocal = () => getFechasLocal();

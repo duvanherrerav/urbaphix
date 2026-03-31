@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
-import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal } from '../services/seguridadService';
+import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechasIncidentesLocal } from '../services/seguridadService';
 
 const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
-const formatBogota = (value) => {
+const formatBogota = (value, localEpoch) => {
+  if (localEpoch) {
+    return new Date(localEpoch).toLocaleString('es-CO', {
+      timeZone: 'America/Bogota',
+      dateStyle: 'short',
+      timeStyle: 'short'
+    });
+  }
   if (!value) return '-';
   const raw = String(value).trim().replace(' ', 'T');
   const baseDate = new Date(raw);
@@ -28,6 +35,7 @@ export default function ListaIncidentes({ usuarioApp }) {
   const [incidentes, setIncidentes] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [estadosLocal, setEstadosLocal] = useState({});
+  const [fechasLocal, setFechasLocal] = useState({});
 
   useEffect(() => {
     const cargar = async () => {
@@ -46,6 +54,7 @@ export default function ListaIncidentes({ usuarioApp }) {
 
       setIncidentes(data || []);
       setEstadosLocal(obtenerEstadosIncidentesLocal());
+      setFechasLocal(obtenerFechasIncidentesLocal());
     };
 
     cargar();
@@ -107,7 +116,7 @@ export default function ListaIncidentes({ usuarioApp }) {
           <p><b>Descripción:</b> {i.descripcion}</p>
           <p><b>Nivel:</b> {i.nivel}</p>
           <p><b>Estado:</b> <span className="capitalize">{estadosLocal[i.id]?.estado || 'nuevo'}</span></p>
-          <p className="text-xs text-gray-500"><b>Fecha (Bogotá):</b> {formatBogota(i.created_at)}</p>
+          <p className="text-xs text-gray-500"><b>Fecha (Bogotá):</b> {formatBogota(i.created_at, fechasLocal[i.id])}</p>
 
           {usuarioApp?.rol_id === 'admin' && (
             <div className="space-y-2">
