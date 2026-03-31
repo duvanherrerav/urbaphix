@@ -25,6 +25,7 @@ export default function PanelVigilancia({ usuarioApp }) {
     const [loading, setLoading] = useState(false);
     const [busqueda, setBusqueda] = useState('');
     const [vista, setVista] = useState('pendientes');
+    const [pagina, setPagina] = useState(1);
     const [seguridad, setSeguridad] = useState({ visitasHoy: 0, incidentesHoy: 0, paquetesPendientes: 0, porTurno: { mañana: 0, tarde: 0, noche: 0 } });
     const [offlinePendientes, setOfflinePendientes] = useState(0);
 
@@ -153,6 +154,10 @@ export default function PanelVigilancia({ usuarioApp }) {
             return true;
         });
     }, [visitas, busqueda, vista]);
+    const PAGE_SIZE = 8;
+    const totalPaginas = Math.max(1, Math.ceil(filtradas.length / PAGE_SIZE));
+    const paginaActual = Math.min(pagina, totalPaginas);
+    const filtradasPaginadas = filtradas.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
     const resumen = {
         pendientes: visitas.filter((v) => v.estado === 'pendiente').length,
@@ -166,10 +171,10 @@ export default function PanelVigilancia({ usuarioApp }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-bold">Control Visitas 👮‍♂️</h2>
                 <div className="flex gap-2 text-xs">
-                    <button className={`px-3 py-1 rounded-full ${vista === 'pendientes' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100'}`} onClick={() => setVista('pendientes')}>Pendientes ({resumen.pendientes})</button>
-                    <button className={`px-3 py-1 rounded-full ${vista === 'ingresadas' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`} onClick={() => setVista('ingresadas')}>En curso ({resumen.ingresadas})</button>
-                    <button className={`px-3 py-1 rounded-full ${vista === 'hoy' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'}`} onClick={() => setVista('hoy')}>Hoy</button>
-                    <button className={`px-3 py-1 rounded-full ${vista === 'finalizadas' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`} onClick={() => setVista('finalizadas')}>Finalizadas</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'pendientes' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100'}`} onClick={() => { setVista('pendientes'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'ingresadas' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`} onClick={() => { setVista('ingresadas'); setPagina(1); }}>En curso ({resumen.ingresadas})</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'hoy' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'}`} onClick={() => { setVista('hoy'); setPagina(1); }}>Hoy</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'finalizadas' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`} onClick={() => { setVista('finalizadas'); setPagina(1); }}>Finalizadas</button>
                 </div>
             </div>
 
@@ -197,14 +202,17 @@ export default function PanelVigilancia({ usuarioApp }) {
                 className="w-full border rounded-lg px-3 py-2 text-sm"
                 placeholder="Buscar por nombre, documento o placa"
                 value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
+                onChange={(e) => {
+                    setBusqueda(e.target.value);
+                    setPagina(1);
+                }}
             />
 
             {loading && <p className="text-sm text-gray-500">Cargando visitas...</p>}
             {!loading && filtradas.length === 0 && <p className="text-sm text-gray-500">No hay visitas para esta vista.</p>}
 
             <div className="space-y-3">
-                {filtradas.map((v) => (
+                {filtradasPaginadas.map((v) => (
                     <div key={v.id} className="border rounded-xl p-3">
                         <div className="flex flex-col md:flex-row md:justify-between gap-2">
                             <div className="space-y-1 text-sm">
@@ -235,10 +243,32 @@ export default function PanelVigilancia({ usuarioApp }) {
                 ))}
             </div>
 
+            {filtradas.length > 0 && (
+                <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500">Página {paginaActual} de {totalPaginas}</p>
+                    <div className="flex gap-2">
+                        <button
+                            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
+                            disabled={paginaActual === 1}
+                            onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
+                            disabled={paginaActual === totalPaginas}
+                            onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {resumen.pendientes > 0 && vista !== 'pendientes' && (
                 <button
                     className="fixed bottom-8 right-8 px-4 py-2 rounded-full bg-amber-500 text-white shadow-lg"
-                    onClick={() => setVista('pendientes')}
+                    onClick={() => { setVista('pendientes'); setPagina(1); }}
                 >
                     🔔 Ver pendientes ({resumen.pendientes})
                 </button>
