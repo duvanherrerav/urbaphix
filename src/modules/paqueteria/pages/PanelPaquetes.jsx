@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { entregarPaquete as entregarPaqueteService } from '../services/paquetesService';
+import toast from 'react-hot-toast';
 
 export default function PanelPaquetes({ usuarioApp }) {
 
     const [paquetes, setPaquetes] = useState([]);
-
-    useEffect(() => {
-        if (usuarioApp?.conjunto_id) {
-            obtenerPaquetes();
-        }
-    }, [usuarioApp]);
 
     const obtenerPaquetes = async () => {
 
@@ -28,51 +24,38 @@ export default function PanelPaquetes({ usuarioApp }) {
         setPaquetes(data || []);
     };
 
+    useEffect(() => {
+        const cargar = async () => {
+            if (!usuarioApp?.conjunto_id) return;
+
+            const { data, error } = await supabase
+                .from('paquetes')
+                .select('*')
+                .eq('conjunto_id', usuarioApp.conjunto_id)
+                .eq('estado', 'pendiente')
+                .order('fecha_recibido', { ascending: false });
+
+            if (error) {
+                console.log(error);
+                return;
+            }
+
+            setPaquetes(data || []);
+        };
+
+        cargar();
+    }, [usuarioApp]);
+
     // 🔥 ENTREGAR PAQUETE
     const entregarPaquete = async (paquete) => {
+        const result = await entregarPaqueteService(paquete.id);
 
-        // 1. actualizar estado
-        const { error } = await supabase
-            .from('paquetes')
-            .update({
-                estado: 'entregado',
-                fecha_entrega: new Date().toISOString()
-            })
-            .eq('id', paquete.id);
-
-        if (error) {
-            console.log(error);
-            alert('Error al entregar paquete');
+        if (!result.ok) {
+            toast.error(`No se pudo entregar: ${result.error}`);
             return;
         }
 
-        // 2. obtener usuario del residente
-        const { data: residente, error: errorResidente } = await supabase
-            .from('residentes')
-            .select('usuario_id')
-            .eq('id', paquete.residente_id)
-            .single();
-
-        if (errorResidente || !residente) {
-            console.log(errorResidente);
-            return;
-        }
-
-        // 3. crear notificación
-        const { error: errorNotif } = await supabase
-            .from('notificaciones')
-            .insert([{
-                usuario_id: residente.usuario_id,
-                tipo: 'paquete_entregado',
-                titulo: '📦 Paquete entregado',
-                mensaje: `Tu paquete (${paquete.descripcion}) fue entregado`
-            }]);
-
-        if (errorNotif) {
-            console.log(errorNotif);
-        }
-
-        // 4. refrescar lista
+        toast.success(`Paquete entregado: ${paquete.descripcion}`);
         obtenerPaquetes();
     };
 
