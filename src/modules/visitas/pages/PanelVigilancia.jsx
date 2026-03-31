@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, syncOfflineQueue } from '../services/porteriaService';
@@ -6,69 +7,68 @@ import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBit
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 
+const parseQRCode = (text) => {
+    try {
+        const parsed = JSON.parse(text);
+        if (parsed?.visita_id) return parsed;
+    } catch {
+        // fallback below
+    }
+
+    if (/^[0-9a-fA-F-]{8,}$/.test(text)) return { qr_code: text };
+    return null;
+};
+
 export default function PanelVigilancia({ usuarioApp }) {
 
     const [visitas, setVisitas] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [filtroEstado, setFiltroEstado] = useState('todos');
     const [busqueda, setBusqueda] = useState('');
+    const [vista, setVista] = useState('pendientes');
     const [seguridad, setSeguridad] = useState({ visitasHoy: 0, incidentesHoy: 0, paquetesPendientes: 0, porTurno: { mañana: 0, tarde: 0, noche: 0 } });
     const [offlinePendientes, setOfflinePendientes] = useState(0);
+
+    const [modalIngreso, setModalIngreso] = useState({ open: false, visita: null, manualQR: '' });
 
     useEffect(() => {
         let mounted = true;
 
-        const cargarVisitas = async () => {
+        const cargar = async () => {
             if (!usuarioApp?.conjunto_id) return;
-
             setLoading(true);
-
-            const hoy = new Date();
             const hace7dias = new Date();
-            hace7dias.setDate(hoy.getDate() - 7);
+
+            hace7dias.setDate(hace7dias.getDate() - 7);
             const fechaInicio = hace7dias.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 
-            const { data, error } = await supabase
-                .from('visitas')
-                .select('*')
-                .eq('conjunto_id', usuarioApp.conjunto_id)
-                .gte('fecha_visita', fechaInicio)
-                .order('fecha_visita', { ascending: false });
+            const [visitasResp, seguridadResp] = await Promise.all([
+                supabase
+                    .from('visitas')
+                    .select('*')
+                    .eq('conjunto_id', usuarioApp.conjunto_id)
+                    .gte('fecha_visita', fechaInicio)
+                    .order('fecha_visita', { ascending: false }),
+                obtenerSeguridadConsolidada(usuarioApp.conjunto_id)
+            ]);
 
             if (!mounted) return;
-
-            if (error) {
-                console.error(error);
-                toast.error('No se pudo cargar el control de visitas');
+            if (visitasResp.error) {
+                toast.error('No se pudo cargar el panel de vigilancia');
                 setLoading(false);
                 return;
             }
 
-            setVisitas(data || []);
+            setVisitas(visitasResp.data || []);
+            setSeguridad(seguridadResp);
             setOfflinePendientes(getOfflineQueue().length);
             setLoading(false);
         };
 
-        cargarVisitas();
-
-        const cargarSeguridad = async () => {
-            if (!usuarioApp?.conjunto_id) return;
-            const data = await obtenerSeguridadConsolidada(usuarioApp.conjunto_id);
-            setSeguridad(data);
-        };
-
-        cargarSeguridad();
+        cargar();
 
         const channel = supabase
             .channel(`visitas-vigilancia-${usuarioApp?.conjunto_id}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'visitas', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` },
-                () => {
-                    cargarVisitas();
-                    cargarSeguridad();
-                }
-            )
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'visitas', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` }, cargar)
             .subscribe();
 
         return () => {
@@ -77,100 +77,110 @@ export default function PanelVigilancia({ usuarioApp }) {
         };
     }, [usuarioApp?.conjunto_id]);
 
-    const darIngreso = async (id) => {
-        const timestamp = toBogotaTimestamp();
-        const { error } = await supabase
-            .from('visitas')
-            .update({
-                estado: 'ingresado',
-                hora_ingreso: timestamp
-            })
-            .eq('id', id);
-
-        if (error) {
-            console.error(error);
-            toast.error('Error al registrar ingreso');
+    const finalizarIngresoConQR = async (rawValue) => {
+        const parsed = parseQRCode(rawValue);
+        if (!parsed || !modalIngreso.visita) {
+            toast.error('QR inválido');
             return;
         }
 
-        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'ingresado', hora_ingreso: timestamp } : v)));
-        await registrarBitacora({ usuarioApp, visitaId: id, accion: 'dar_ingreso', detalle: 'Ingreso autorizado por vigilancia' });
-        toast.success('Ingreso registrado');
+        const { visita_id, qr_code } = parsed;
+        const visitaObjetivo = modalIngreso.visita;
+
+        if (visita_id && visita_id !== visitaObjetivo.id) {
+            toast.error('El QR no corresponde a esta visita');
+            return;
+        }
+
+        if (qr_code && visitaObjetivo.qr_code && qr_code !== visitaObjetivo.qr_code) {
+            toast.error('QR no coincide con la visita seleccionada');
+            return;
+        }
+
+        const timestamp = toBogotaTimestamp();
+        const { error } = await supabase
+            .from('visitas')
+            .update({ estado: 'ingresado', hora_ingreso: timestamp })
+            .eq('id', visitaObjetivo.id);
+
+        if (error) {
+            toast.error('No fue posible registrar el ingreso');
+            return;
+        }
+
+        setVisitas((prev) => prev.map((v) => (v.id === visitaObjetivo.id ? { ...v, estado: 'ingresado', hora_ingreso: timestamp } : v)));
+        await registrarBitacora({
+            usuarioApp,
+            visitaId: visitaObjetivo.id,
+            accion: 'dar_ingreso_qr_desde_panel',
+            detalle: 'Ingreso validado desde modal de QR en panel vigilancia'
+        });
+        setModalIngreso({ open: false, visita: null, manualQR: '' });
+        toast.success('Ingreso registrado por QR');
     };
 
     const registrarSalida = async (id) => {
         const timestamp = toBogotaTimestamp();
-        const { error } = await supabase
-            .from('visitas')
-            .update({
-                estado: 'salido',
-                hora_salida: timestamp
-            })
-            .eq('id', id);
+        const { error } = await supabase.from('visitas').update({ estado: 'salido', hora_salida: timestamp }).eq('id', id);
 
         if (error) {
-            console.error(error);
             toast.error('Error al registrar salida');
             return;
         }
 
         setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'salido', hora_salida: timestamp } : v)));
-        await registrarBitacora({ usuarioApp, visitaId: id, accion: 'registrar_salida', detalle: 'Salida registrada por vigilancia' });
+        await registrarBitacora({ usuarioApp, visitaId: id, accion: 'registrar_salida', detalle: 'Salida registrada desde panel vigilancia' });
         toast.success('Salida registrada');
     };
 
-    const visitasFiltradas = useMemo(() => {
-        const termino = busqueda.trim().toLowerCase();
+    const filtradas = useMemo(() => {
+        const term = busqueda.trim().toLowerCase();
+        const hoy = toDateOnly();
 
         return visitas.filter((v) => {
-            const matchEstado = filtroEstado === 'todos' ? true : v.estado === filtroEstado;
-            const matchBusqueda = !termino
-                || v.nombre_visitante?.toLowerCase().includes(termino)
-                || String(v.documento || '').toLowerCase().includes(termino)
-                || String(v.placa || '').toLowerCase().includes(termino);
+            const matchBusq = !term
+                || v.nombre_visitante?.toLowerCase().includes(term)
+                || String(v.documento || '').toLowerCase().includes(term)
+                || String(v.placa || '').toLowerCase().includes(term);
 
-            return matchEstado && matchBusqueda;
+            if (!matchBusq) return false;
+
+            if (vista === 'pendientes') return v.estado === 'pendiente';
+            if (vista === 'ingresadas') return v.estado === 'ingresado';
+            if (vista === 'hoy') return v.fecha_visita === hoy;
+            if (vista === 'finalizadas') return v.estado === 'salido';
+            return true;
         });
-    }, [visitas, filtroEstado, busqueda]);
+    }, [visitas, busqueda, vista]);
 
-    const hoyBogota = toDateOnly();
     const resumen = {
-        total: visitasFiltradas.length,
-        pendientes: visitasFiltradas.filter((v) => v.estado === 'pendiente').length,
-        enCurso: visitasFiltradas.filter((v) => v.estado === 'ingresado').length,
-        finalizadas: visitasFiltradas.filter((v) => v.estado === 'salido').length,
-        hoy: visitasFiltradas.filter((v) => v.fecha_visita === hoyBogota).length
+        pendientes: visitas.filter((v) => v.estado === 'pendiente').length,
+        ingresadas: visitas.filter((v) => v.estado === 'ingresado').length,
+        finalizadas: visitas.filter((v) => v.estado === 'salido').length
     };
-    const sla = calcularSLA(visitasFiltradas);
+    const sla = calcularSLA(visitas);
 
     return (
-        <div className="bg-white rounded-xl shadow p-4 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <h2 className="text-xl font-bold">Control visitas 👮‍♂️</h2>
-                <div className="text-xs text-gray-500">Actualizado automáticamente en tiempo real</div>
+        <div className="bg-white rounded-xl shadow p-4 space-y-4 relative">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xl font-bold">Control Visitas 👮‍♂️</h2>
+                <div className="flex gap-2 text-xs">
+                    <button className={`px-3 py-1 rounded-full ${vista === 'pendientes' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100'}`} onClick={() => setVista('pendientes')}>Pendientes ({resumen.pendientes})</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'ingresadas' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`} onClick={() => setVista('ingresadas')}>En curso ({resumen.ingresadas})</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'hoy' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'}`} onClick={() => setVista('hoy')}>Hoy</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'finalizadas' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`} onClick={() => setVista('finalizadas')}>Finalizadas</button>
+                </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
-                <div className="rounded-lg bg-gray-100 px-3 py-2"><b>Total:</b> {resumen.total}</div>
-                <div className="rounded-lg bg-amber-50 px-3 py-2"><b>Pendientes:</b> {resumen.pendientes}</div>
-                <div className="rounded-lg bg-blue-50 px-3 py-2"><b>Ingresadas:</b> {resumen.enCurso}</div>
-                <div className="rounded-lg bg-green-50 px-3 py-2"><b>Finalizadas:</b> {resumen.finalizadas}</div>
-                <div className="rounded-lg bg-purple-50 px-3 py-2"><b>Hoy:</b> {resumen.hoy}</div>
-            </div>
             <div className="grid md:grid-cols-4 gap-2 text-sm">
                 <div className="rounded-lg bg-indigo-50 px-3 py-2"><b>SLA promedio:</b> {sla.promedioMinutos} min</div>
                 <div className="rounded-lg bg-red-50 px-3 py-2"><b>Demoras &gt;15m:</b> {sla.demoras}</div>
                 <div className="rounded-lg bg-orange-50 px-3 py-2"><b>Offline pendiente:</b> {offlinePendientes}</div>
-                <button
-                    className="rounded-lg border px-3 py-2 hover:bg-gray-50"
-                    onClick={async () => {
-                        const result = await syncOfflineQueue(usuarioApp);
-                        setOfflinePendientes(getOfflineQueue().length);
-                        toast.success(`Sincronizados ${result.processed}, fallidos ${result.failed}`);
-                    }}
-                >
-                    Sincronizar contingencia
-                </button>
+                <button className="rounded-lg border px-3 py-2 hover:bg-gray-50" onClick={async () => {
+                    const result = await syncOfflineQueue(usuarioApp);
+                    setOfflinePendientes(getOfflineQueue().length);
+                    toast.success(`Sincronizados ${result.processed}, fallidos ${result.failed}`);
+                }}>Sincronizar contingencia</button>
             </div>
 
             <div className="grid md:grid-cols-5 gap-2 text-xs">
@@ -181,41 +191,18 @@ export default function PanelVigilancia({ usuarioApp }) {
                 <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Turno noche:</b> {seguridad.porTurno.noche}</div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-2">
-                <input
-                    className="border rounded-lg px-3 py-2 text-sm"
-                    placeholder="Buscar por nombre, documento o placa"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                />
-
-                <select
-                    className="border rounded-lg px-3 py-2 text-sm"
-                    value={filtroEstado}
-                    onChange={(e) => setFiltroEstado(e.target.value)}
-                >
-                    <option value="todos">Todos los estados</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="ingresado">Ingresado</option>
-                    <option value="salido">Finalizado</option>
-                </select>
-
-                <button
-                    className="border rounded-lg px-3 py-2 text-sm hover:bg-gray-50"
-                    onClick={() => {
-                        setBusqueda('');
-                        setFiltroEstado('todos');
-                    }}
-                >
-                    Limpiar filtros
-                </button>
-            </div>
+            <input
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Buscar por nombre, documento o placa"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+            />
 
             {loading && <p className="text-sm text-gray-500">Cargando visitas...</p>}
-            {!loading && visitasFiltradas.length === 0 && <p className="text-sm text-gray-500">No hay visitas para los filtros aplicados.</p>}
+            {!loading && filtradas.length === 0 && <p className="text-sm text-gray-500">No hay visitas para esta vista.</p>}
 
             <div className="space-y-3">
-                {visitasFiltradas.map((v) => (
+                {filtradas.map((v) => (
                     <div key={v.id} className="border rounded-xl p-3">
                         <div className="flex flex-col md:flex-row md:justify-between gap-2">
                             <div className="space-y-1 text-sm">
@@ -224,39 +211,20 @@ export default function PanelVigilancia({ usuarioApp }) {
                                 <p><b>Fecha visita:</b> {v.fecha_visita}</p>
                                 <p><b>Placa:</b> {v.placa || 'No registra'}</p>
                             </div>
-
-                            <div className="space-y-2 text-sm md:text-right">
-                                <p>
-                                    <b>Estado:</b>{' '}
-                                    <span className={
-                                        v.estado === 'pendiente' ? 'text-amber-600 font-semibold'
-                                            : v.estado === 'ingresado' ? 'text-blue-600 font-semibold'
-                                                : 'text-green-600 font-semibold'
-                                    }>
-                                        {v.estado}
-                                    </span>
-                                </p>
-
+                            <div className="space-y-1 text-sm md:text-right">
+                                <p><b>Estado:</b> <span className={v.estado === 'pendiente' ? 'text-amber-600 font-semibold' : v.estado === 'ingresado' ? 'text-blue-600 font-semibold' : 'text-green-600 font-semibold'}>{v.estado}</span></p>
                                 {v.hora_ingreso && <p className="text-blue-600">⏱ Ingreso: {v.hora_ingreso}</p>}
                                 {v.hora_salida && <p className="text-green-600">✅ Salida: {v.hora_salida}</p>}
                             </div>
                         </div>
-
                         <div className="mt-3 flex gap-2">
                             {v.estado === 'pendiente' && (
-                                <button
-                                    className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
-                                    onClick={() => darIngreso(v.id)}
-                                >
-                                    Dar ingreso
+                                <button className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700" onClick={() => setModalIngreso({ open: true, visita: v, manualQR: '' })}>
+                                    Validar QR e ingresar
                                 </button>
                             )}
-
                             {v.estado === 'ingresado' && (
-                                <button
-                                    className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700"
-                                    onClick={() => registrarSalida(v.id)}
-                                >
+                                <button className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700" onClick={() => registrarSalida(v.id)}>
                                     Registrar salida
                                 </button>
                             )}
@@ -264,6 +232,56 @@ export default function PanelVigilancia({ usuarioApp }) {
                     </div>
                 ))}
             </div>
+
+            {resumen.pendientes > 0 && vista !== 'pendientes' && (
+                <button
+                    className="fixed bottom-8 right-8 px-4 py-2 rounded-full bg-amber-500 text-white shadow-lg"
+                    onClick={() => setVista('pendientes')}
+                >
+                    🔔 Ver pendientes ({resumen.pendientes})
+                </button>
+            )}
+
+            {modalIngreso.open && modalIngreso.visita && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-4 space-y-3">
+                        <h3 className="font-semibold text-lg">Validar QR para ingreso</h3>
+                        <p className="text-sm text-gray-600">
+                            Visitante: <b>{modalIngreso.visita.nombre_visitante}</b> · Doc: <b>{modalIngreso.visita.documento}</b>
+                        </p>
+
+                        <div className="rounded-lg overflow-hidden border">
+                            <Scanner
+                                onScan={(result) => {
+                                    if (result?.[0]?.rawValue) {
+                                        finalizarIngresoConQR(result[0].rawValue);
+                                    }
+                                }}
+                            />
+                        </div>
+
+                        <div className="text-xs text-gray-500">Si la cámara falla, pega el QR manualmente:</div>
+                        <input
+                            className="w-full border rounded-lg px-3 py-2 text-sm"
+                            value={modalIngreso.manualQR}
+                            onChange={(e) => setModalIngreso((prev) => ({ ...prev, manualQR: e.target.value }))}
+                            placeholder='{"visita_id":"..."} o código QR'
+                        />
+
+                        <div className="flex justify-end gap-2">
+                            <button className="px-3 py-2 rounded-lg border" onClick={() => setModalIngreso({ open: false, visita: null, manualQR: '' })}>
+                                Cerrar
+                            </button>
+                            <button
+                                className="px-3 py-2 rounded-lg bg-blue-600 text-white"
+                                onClick={() => finalizarIngresoConQR(modalIngreso.manualQR)}
+                            >
+                                Validar manual
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
