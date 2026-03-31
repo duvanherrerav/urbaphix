@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechasIncidentesLocal } from '../services/seguridadService';
 
-const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
+const ESTADOS_GESTION = ['En gestion', 'Resuelto', 'Cerrado'];
 const formatBogota = (value, localEpoch) => {
   if (localEpoch) {
     return new Date(localEpoch).toLocaleString('es-CO', {
@@ -14,14 +14,15 @@ const formatBogota = (value, localEpoch) => {
   }
   if (!value) return '-';
   const raw = String(value).trim().replace(' ', 'T');
-  const baseDate = new Date(raw);
+  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
+  const baseDate = new Date(hasZone ? raw : `${raw}Z`);
   if (Number.isNaN(baseDate.getTime())) return '-';
 
   const bogotaMs = baseDate.getTime() - (5 * 60 * 60 * 1000);
   const bogotaDate = new Date(bogotaMs);
   const d = String(bogotaDate.getUTCDate()).padStart(2, '0');
   const m = String(bogotaDate.getUTCMonth() + 1).padStart(2, '0');
-  const y = String(bogotaDate.getUTCFullYear()).slice(-2);
+  const y = String(bogotaDate.getUTCFullYear()).slice(0);
   const h24 = bogotaDate.getUTCHours();
   const mm = String(bogotaDate.getUTCMinutes()).padStart(2, '0');
   const ampm = h24 >= 12 ? 'p. m.' : 'a. m.';
@@ -91,7 +92,7 @@ export default function ListaIncidentes({ usuarioApp }) {
   };
 
   const lista = incidentes.filter((i) => {
-    const estadoActual = estadosLocal[i.id]?.estado || 'nuevo';
+    const estadoActual = estadosLocal[i.id]?.estado || 'Nuevo';
     return filtroEstado === 'todos' ? true : estadoActual === filtroEstado;
   });
 
@@ -105,7 +106,7 @@ export default function ListaIncidentes({ usuarioApp }) {
           onChange={(e) => setFiltroEstado(e.target.value)}
         >
           <option value="todos">Todos</option>
-          {['nuevo', ...ESTADOS_GESTION].map((e) => (
+          {['Nuevo', ...ESTADOS_GESTION].map((e) => (
             <option key={e} value={e}>{e}</option>
           ))}
         </select>
@@ -115,8 +116,8 @@ export default function ListaIncidentes({ usuarioApp }) {
         <div key={i.id} className="border rounded-lg p-3 space-y-2">
           <p><b>Descripción:</b> {i.descripcion}</p>
           <p><b>Nivel:</b> {i.nivel}</p>
-          <p><b>Estado:</b> <span className="capitalize">{estadosLocal[i.id]?.estado || 'nuevo'}</span></p>
-          <p className="text-xs text-gray-500"><b>Fecha (Bogotá):</b> {formatBogota(i.created_at, fechasLocal[i.id])}</p>
+          <p><b>Estado:</b> <span className="capitalize">{estadosLocal[i.id]?.estado || 'Nuevo'}</span></p>
+          <p className="text-xs text-gray-500"><b>Fecha incidente:</b> {formatBogota(i.created_at, fechasLocal[i.id])}</p>
 
           {usuarioApp?.rol_id === 'admin' && (
             <div className="space-y-2">
