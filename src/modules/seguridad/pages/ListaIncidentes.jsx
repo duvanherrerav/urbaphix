@@ -4,9 +4,15 @@ import { supabase } from '../../../services/supabaseClient';
 import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal } from '../services/seguridadService';
 
 const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
+const toBogotaDate = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim().replace(' ', 'T');
+  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
+  return new Date(hasZone ? raw : `${raw}-05:00`);
+};
 const formatBogota = (value) =>
   value
-    ? new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short' })
+    ? toBogotaDate(value).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short' })
     : '-';
 
 export default function ListaIncidentes({ usuarioApp }) {
@@ -35,6 +41,19 @@ export default function ListaIncidentes({ usuarioApp }) {
     };
 
     cargar();
+
+    const channel = supabase
+      .channel(`incidentes-admin-${usuarioApp?.conjunto_id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'incidentes', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` },
+        () => cargar()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [usuarioApp?.conjunto_id]);
 
   const cambiarEstado = async (incidente, estado) => {
