@@ -14,7 +14,8 @@ const formatBogota = (value, localEpoch) => {
   }
   if (!value) return '-';
   const raw = String(value).trim().replace(' ', 'T');
-  const baseDate = new Date(raw);
+  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
+  const baseDate = new Date(hasZone ? raw : `${raw}Z`);
   if (Number.isNaN(baseDate.getTime())) return '-';
 
   const bogotaMs = baseDate.getTime() - (5 * 60 * 60 * 1000);
