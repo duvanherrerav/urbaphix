@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
+import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, syncOfflineQueue } from '../services/porteriaService';
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
@@ -11,6 +12,8 @@ export default function PanelVigilancia({ usuarioApp }) {
     const [loading, setLoading] = useState(false);
     const [filtroEstado, setFiltroEstado] = useState('todos');
     const [busqueda, setBusqueda] = useState('');
+    const [seguridad, setSeguridad] = useState({ visitasHoy: 0, incidentesHoy: 0, paquetesPendientes: 0, porTurno: { mañana: 0, tarde: 0, noche: 0 } });
+    const [offlinePendientes, setOfflinePendientes] = useState(0);
 
     useEffect(() => {
         let mounted = true;
@@ -42,17 +45,29 @@ export default function PanelVigilancia({ usuarioApp }) {
             }
 
             setVisitas(data || []);
+            setOfflinePendientes(getOfflineQueue().length);
             setLoading(false);
         };
 
         cargarVisitas();
+
+        const cargarSeguridad = async () => {
+            if (!usuarioApp?.conjunto_id) return;
+            const data = await obtenerSeguridadConsolidada(usuarioApp.conjunto_id);
+            setSeguridad(data);
+        };
+
+        cargarSeguridad();
 
         const channel = supabase
             .channel(`visitas-vigilancia-${usuarioApp?.conjunto_id}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'visitas', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` },
-                () => cargarVisitas()
+                () => {
+                    cargarVisitas();
+                    cargarSeguridad();
+                }
             )
             .subscribe();
 
@@ -63,11 +78,12 @@ export default function PanelVigilancia({ usuarioApp }) {
     }, [usuarioApp?.conjunto_id]);
 
     const darIngreso = async (id) => {
+        const timestamp = toBogotaTimestamp();
         const { error } = await supabase
             .from('visitas')
             .update({
                 estado: 'ingresado',
-                hora_ingreso: toBogotaTimestamp()
+                hora_ingreso: timestamp
             })
             .eq('id', id);
 
@@ -77,16 +93,18 @@ export default function PanelVigilancia({ usuarioApp }) {
             return;
         }
 
-        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'ingresado', hora_ingreso: toBogotaTimestamp() } : v)));
+        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'ingresado', hora_ingreso: timestamp } : v)));
+        await registrarBitacora({ usuarioApp, visitaId: id, accion: 'dar_ingreso', detalle: 'Ingreso autorizado por vigilancia' });
         toast.success('Ingreso registrado');
     };
 
     const registrarSalida = async (id) => {
+        const timestamp = toBogotaTimestamp();
         const { error } = await supabase
             .from('visitas')
             .update({
                 estado: 'salido',
-                hora_salida: toBogotaTimestamp()
+                hora_salida: timestamp
             })
             .eq('id', id);
 
@@ -96,7 +114,8 @@ export default function PanelVigilancia({ usuarioApp }) {
             return;
         }
 
-        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'salido', hora_salida: toBogotaTimestamp() } : v)));
+        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'salido', hora_salida: timestamp } : v)));
+        await registrarBitacora({ usuarioApp, visitaId: id, accion: 'registrar_salida', detalle: 'Salida registrada por vigilancia' });
         toast.success('Salida registrada');
     };
 
@@ -122,6 +141,7 @@ export default function PanelVigilancia({ usuarioApp }) {
         finalizadas: visitasFiltradas.filter((v) => v.estado === 'salido').length,
         hoy: visitasFiltradas.filter((v) => v.fecha_visita === hoyBogota).length
     };
+    const sla = calcularSLA(visitasFiltradas);
 
     return (
         <div className="bg-white rounded-xl shadow p-4 space-y-4">
@@ -136,6 +156,29 @@ export default function PanelVigilancia({ usuarioApp }) {
                 <div className="rounded-lg bg-blue-50 px-3 py-2"><b>Ingresadas:</b> {resumen.enCurso}</div>
                 <div className="rounded-lg bg-green-50 px-3 py-2"><b>Finalizadas:</b> {resumen.finalizadas}</div>
                 <div className="rounded-lg bg-purple-50 px-3 py-2"><b>Hoy:</b> {resumen.hoy}</div>
+            </div>
+            <div className="grid md:grid-cols-4 gap-2 text-sm">
+                <div className="rounded-lg bg-indigo-50 px-3 py-2"><b>SLA promedio:</b> {sla.promedioMinutos} min</div>
+                <div className="rounded-lg bg-red-50 px-3 py-2"><b>Demoras &gt;15m:</b> {sla.demoras}</div>
+                <div className="rounded-lg bg-orange-50 px-3 py-2"><b>Offline pendiente:</b> {offlinePendientes}</div>
+                <button
+                    className="rounded-lg border px-3 py-2 hover:bg-gray-50"
+                    onClick={async () => {
+                        const result = await syncOfflineQueue(usuarioApp);
+                        setOfflinePendientes(getOfflineQueue().length);
+                        toast.success(`Sincronizados ${result.processed}, fallidos ${result.failed}`);
+                    }}
+                >
+                    Sincronizar contingencia
+                </button>
+            </div>
+
+            <div className="grid md:grid-cols-5 gap-2 text-xs">
+                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Incidentes hoy:</b> {seguridad.incidentesHoy}</div>
+                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Paquetes pendientes:</b> {seguridad.paquetesPendientes}</div>
+                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Turno mañana:</b> {seguridad.porTurno.mañana}</div>
+                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Turno tarde:</b> {seguridad.porTurno.tarde}</div>
+                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Turno noche:</b> {seguridad.porTurno.noche}</div>
             </div>
 
             <div className="grid md:grid-cols-3 gap-2">
