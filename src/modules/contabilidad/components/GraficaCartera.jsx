@@ -25,9 +25,21 @@ export default function GraficaCartera({ pagos }) {
     labels: ['Pagado 💰', 'Pendiente ⏳'],
     datasets: [
       {
-        data: [totalPagado, totalPendiente]
+        data: [totalPagado, totalPendiente],
+        backgroundColor: ['#10B981', '#F59E0B'],
+        borderColor: ['#059669', '#D97706'],
+        borderWidth: 1
       }
     ]
+  };
+
+  const options = {
+    plugins: {
+      legend: {
+        position: 'bottom'
+      }
+    },
+    cutout: '68%'
   };
 
   return (
@@ -37,7 +49,7 @@ export default function GraficaCartera({ pagos }) {
         Estado financiero 📊
       </h3>
 
-      <Doughnut data={data} />
+      <Doughnut data={data} options={options} />
 
       <div className="mt-4 text-sm text-gray-600 space-y-1">
         <p>💰 Pagado: ${totalPagado.toLocaleString()}</p>

@@ -58,13 +58,38 @@ export default function GraficaFinanciera({ pagos }) {
     datasets: [
       {
         label: 'Pagado 💰',
-        data: dataPagado
+        data: dataPagado,
+        backgroundColor: 'rgba(16, 185, 129, 0.85)',
+        borderRadius: 8,
+        maxBarThickness: 34
       },
       {
         label: 'Pendiente ⏳',
-        data: dataPendiente
+        data: dataPendiente,
+        backgroundColor: 'rgba(245, 158, 11, 0.85)',
+        borderRadius: 8,
+        maxBarThickness: 34
       }
     ]
+  };
+
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'bottom'
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        }
+      },
+      y: {
+        beginAtZero: true
+      }
+    }
   };
 
   return (
@@ -74,7 +99,7 @@ export default function GraficaFinanciera({ pagos }) {
         Flujo financiero 📊
       </h3>
 
-      <Bar data={data} />
+      <Bar data={data} options={options} />
 
     </div>
   );
