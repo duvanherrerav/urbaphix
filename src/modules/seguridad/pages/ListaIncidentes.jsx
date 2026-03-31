@@ -4,16 +4,21 @@ import { supabase } from '../../../services/supabaseClient';
 import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal } from '../services/seguridadService';
 
 const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
-const toBogotaDate = (value) => {
-  if (!value) return null;
+const formatBogota = (value) => {
+  if (!value) return '-';
   const raw = String(value).trim().replace(' ', 'T');
-  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
-  return new Date(hasZone ? raw : `${raw}-05:00`);
+  const baseDate = new Date(raw);
+  if (Number.isNaN(baseDate.getTime())) return '-';
+
+  const bogotaMs = baseDate.getTime() - (5 * 60 * 60 * 1000);
+  const bogotaDate = new Date(bogotaMs);
+
+  return bogotaDate.toLocaleString('es-CO', {
+    timeZone: 'UTC',
+    dateStyle: 'short',
+    timeStyle: 'short'
+  });
 };
-const formatBogota = (value) =>
-  value
-    ? toBogotaDate(value).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short' })
-    : '-';
 
 export default function ListaIncidentes({ usuarioApp }) {
 
