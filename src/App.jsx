@@ -158,6 +158,15 @@ function App() {
   const moduloActual = modulo || moduloPorRol[usuarioApp?.rol_id] || '';
   const rolNoAutorizado = Boolean(usuarioApp) && !ROLES_VALIDOS.includes(usuarioApp?.rol_id);
 
+  useEffect(() => {
+    setOpenMenu(false);
+    setModulo('');
+  }, [user?.id]);
+
+  useEffect(() => {
+    setModulo('');
+  }, [usuarioApp?.rol_id]);
+
   if (isBootstrapping) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
