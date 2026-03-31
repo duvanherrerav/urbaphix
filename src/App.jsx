@@ -3,6 +3,7 @@ import { supabase } from './services/supabaseClient';
 
 import Login from './modules/auth/Login';
 import { pedirPermiso } from './utils/push';
+import { migrarStoragePorteria } from './modules/visitas/services/porteriaService';
 
 const MisPagos = lazy(() => import('./modules/contabilidad/pages/MisPagos'));
 const CrearCobro = lazy(() => import('./modules/contabilidad/pages/CrearCobro'));
@@ -82,6 +83,7 @@ function App() {
         setUser(data.user);
 
         if (data.user) {
+          migrarStoragePorteria();
           await obtenerUsuario(data.user.id);
         }
       } catch {
@@ -108,6 +110,7 @@ function App() {
         setUser(user);
 
         if (user) {
+          migrarStoragePorteria();
           obtenerUsuario(user.id);
         } else {
           setErrorPerfil('');
