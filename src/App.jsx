@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
 
-const EscanearQR = lazy(() => import('./modules/visitas/pages/EscanearQR'));
 import Login from './modules/auth/Login';
+import { pedirPermiso } from './utils/push';
+
 const MisPagos = lazy(() => import('./modules/contabilidad/pages/MisPagos'));
 const CrearCobro = lazy(() => import('./modules/contabilidad/pages/CrearCobro'));
 const CrearVisita = lazy(() => import('./modules/visitas/pages/CrearVisita'));
@@ -16,8 +17,6 @@ const NotificacionesPaquetes = lazy(() => import('./modules/paqueteria/component
 const PanelPagosAdmin = lazy(() => import('./modules/contabilidad/pages/PanelPagosAdmin'));
 const NotificacionesPagos = lazy(() => import('./modules/contabilidad/components/NotificacionesPagos'));
 const EstadoCuenta = lazy(() => import('./modules/contabilidad/components/EstadoCuenta'));
-
-import { pedirPermiso } from './utils/push';
 
 function App() {
 
@@ -339,7 +338,6 @@ function App() {
                 {moduloActual === 'visitas' && (
                   <>
                     <PanelVigilancia usuarioApp={usuarioApp} />
-                    <EscanearQR usuarioApp={usuarioApp} />
                   </>
                 )}
 
