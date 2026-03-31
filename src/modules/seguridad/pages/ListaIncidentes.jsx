@@ -13,11 +13,15 @@ const formatBogota = (value) => {
   const bogotaMs = baseDate.getTime() - (5 * 60 * 60 * 1000);
   const bogotaDate = new Date(bogotaMs);
 
-  return bogotaDate.toLocaleString('es-CO', {
-    timeZone: 'UTC',
-    dateStyle: 'short',
-    timeStyle: 'short'
-  });
+  const d = String(bogotaDate.getUTCDate()).padStart(2, '0');
+  const m = String(bogotaDate.getUTCMonth() + 1).padStart(2, '0');
+  const y = String(bogotaDate.getUTCFullYear()).slice(-2);
+  const h24 = bogotaDate.getUTCHours();
+  const mm = String(bogotaDate.getUTCMinutes()).padStart(2, '0');
+  const ampm = h24 >= 12 ? 'p. m.' : 'a. m.';
+  const h12 = h24 % 12 || 12;
+
+  return `${d}/${m}/${y}, ${h12}:${mm} ${ampm}`;
 };
 
 export default function ListaIncidentes({ usuarioApp }) {
