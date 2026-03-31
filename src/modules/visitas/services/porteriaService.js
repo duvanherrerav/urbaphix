@@ -19,7 +19,10 @@ export const enqueueOfflineAction = (action) => {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(payload));
 };
 
-export const getOfflineQueue = () => parseJson(localStorage.getItem(QUEUE_KEY), []);
+export const getOfflineQueue = () => {
+  const parsed = parseJson(localStorage.getItem(QUEUE_KEY), []);
+  return Array.isArray(parsed) ? parsed : [];
+};
 
 export const clearOfflineQueue = () => localStorage.removeItem(QUEUE_KEY);
 

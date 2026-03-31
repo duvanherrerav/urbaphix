@@ -60,7 +60,8 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             setVisitas(visitasResp.data || []);
             setSeguridad(seguridadResp);
-            setOfflinePendientes(getOfflineQueue().length);
+            const cola = getOfflineQueue();
+            setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
             setLoading(false);
         };
 
@@ -178,7 +179,8 @@ export default function PanelVigilancia({ usuarioApp }) {
                 <div className="rounded-lg bg-orange-50 px-3 py-2"><b>Offline pendiente:</b> {offlinePendientes}</div>
                 <button className="rounded-lg border px-3 py-2 hover:bg-gray-50" onClick={async () => {
                     const result = await syncOfflineQueue(usuarioApp);
-                    setOfflinePendientes(getOfflineQueue().length);
+                    const cola = getOfflineQueue();
+                    setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
                     toast.success(`Sincronizados ${result.processed}, fallidos ${result.failed}`);
                 }}>Sincronizar contingencia</button>
             </div>
