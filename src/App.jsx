@@ -18,6 +18,8 @@ const NotificacionesPaquetes = lazy(() => import('./modules/paqueteria/component
 const PanelPagosAdmin = lazy(() => import('./modules/contabilidad/pages/PanelPagosAdmin'));
 const NotificacionesPagos = lazy(() => import('./modules/contabilidad/components/NotificacionesPagos'));
 const EstadoCuenta = lazy(() => import('./modules/contabilidad/components/EstadoCuenta'));
+const ListaIncidentes = lazy(() => import('./modules/seguridad/pages/ListaIncidentes'));
+const ReportarIncidente = lazy(() => import('./modules/seguridad/pages/ReportarIncidente'));
 
 function App() {
 
@@ -221,6 +223,10 @@ function App() {
               <button onClick={() => setModulo('pagos')} className={menuBtn}>
                 💰 Pagos
               </button>
+
+              <button onClick={() => setModulo('incidentes')} className={menuBtn}>
+                🚨 Incidentes
+              </button>
             </>
           )}
 
@@ -233,6 +239,10 @@ function App() {
 
               <button onClick={() => setModulo('paquetes')} className={menuBtn}>
                 📦 Paquetería
+              </button>
+
+              <button onClick={() => setModulo('incidentes')} className={menuBtn}>
+                🚨 Reportar incidente
               </button>
             </>
           )}
@@ -341,6 +351,10 @@ function App() {
                     <EstadoCuenta usuarioApp={usuarioApp} />
                   </>
                 )}
+
+                {moduloActual === 'incidentes' && (
+                  <ListaIncidentes usuarioApp={usuarioApp} />
+                )}
               </>
             )}
 
@@ -358,6 +372,10 @@ function App() {
                     <CrearPaquete usuarioApp={usuarioApp} />
                     <PanelPaquetes usuarioApp={usuarioApp} />
                   </>
+                )}
+
+                {moduloActual === 'incidentes' && (
+                  <ReportarIncidente user={usuarioApp} />
                 )}
               </>
             )}
