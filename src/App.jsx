@@ -253,14 +253,14 @@ function App() {
       <div className="flex-1">
 
         {/* HEADER */}
-        <div className="bg-white shadow px-6 py-4 flex justify-between items-center">
+        <div className="bg-white shadow px-6 py-4 flex justify-between items-center relative z-50">
 
           <h2 className="font-semibold text-lg capitalize">
             {moduloActual}
           </h2>
 
           {/* 👤 MENU */}
-          <div className="relative" ref={menuRef}>
+          <div className="relative z-50" ref={menuRef}>
 
             <button
               onClick={() => setOpenMenu(!openMenu)}
@@ -270,7 +270,7 @@ function App() {
             </button>
 
             {openMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border z-[70]">
 
                 <div className="px-4 py-3 border-b">
                   <p className="text-sm font-semibold">
