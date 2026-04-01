@@ -1,41 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import jsPDF from 'jspdf';
-
-const MESES = [
-  { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' }, { value: 3, label: 'Marzo' },
-  { value: 4, label: 'Abril' }, { value: 5, label: 'Mayo' }, { value: 6, label: 'Junio' },
-  { value: 7, label: 'Julio' }, { value: 8, label: 'Agosto' }, { value: 9, label: 'Septiembre' },
-  { value: 10, label: 'Octubre' }, { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' }
-];
 
 export default function EstadoCuenta({ usuarioApp }) {
   const hoy = new Date();
   const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [mes, setMes] = useState(hoy.getMonth() + 1);
-  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [fechaDesde, setFechaDesde] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]);
+  const [fechaHasta, setFechaHasta] = useState(hoy.toISOString().split('T')[0]);
   const [estado, setEstado] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const aniosDisponibles = useMemo(() => {
-    const current = new Date().getFullYear();
-    return [current - 2, current - 1, current, current + 1];
-  }, []);
-
   const generarEstado = async () => {
     if (!usuarioApp?.conjunto_id) return;
+    if (!fechaDesde || !fechaHasta || fechaDesde > fechaHasta) {
+      alert('Rango de fechas inválido');
+      return;
+    }
     setLoading(true);
-
-    const inicio = `${anio}-${String(mes).padStart(2, '0')}-01`;
-    const finDate = new Date(anio, mes, 0);
-    const fin = `${anio}-${String(mes).padStart(2, '0')}-${String(finDate.getDate()).padStart(2, '0')}`;
 
     let query = supabase
       .from('pagos')
       .select('id, valor, estado, created_at, concepto, tipo_pago')
       .eq('conjunto_id', usuarioApp.conjunto_id)
-      .gte('created_at', `${inicio}T00:00:00`)
-      .lte('created_at', `${fin}T23:59:59`)
+      .gte('created_at', `${fechaDesde}T00:00:00`)
+      .lte('created_at', `${fechaHasta}T23:59:59`)
       .order('created_at', { ascending: false });
 
     if (filtroEstado !== 'todos') {
@@ -68,8 +56,8 @@ export default function EstadoCuenta({ usuarioApp }) {
     });
 
     setEstado({
-      mesLabel: MESES.find((m) => m.value === mes)?.label || `${mes}`,
-      anio,
+      fechaDesde,
+      fechaHasta,
       filtroEstado,
       totalPendiente,
       totalPagado,
@@ -87,7 +75,7 @@ export default function EstadoCuenta({ usuarioApp }) {
     doc.text('Reporte consolidado de pagos - Urbaphix', 10, y);
     y += 8;
     doc.setFontSize(11);
-    doc.text(`Periodo: ${estado.mesLabel} ${estado.anio}`, 10, y);
+    doc.text(`Periodo: ${estado.fechaDesde} a ${estado.fechaHasta}`, 10, y);
     y += 6;
     doc.text(`Estado filtrado: ${estado.filtroEstado}`, 10, y);
     y += 8;
@@ -120,13 +108,13 @@ export default function EstadoCuenta({ usuarioApp }) {
       }
     });
 
-    doc.save(`reporte_pagos_${estado.anio}_${String(mes).padStart(2, '0')}.pdf`);
+    doc.save(`reporte_pagos_${estado.fechaDesde}_${estado.fechaHasta}.pdf`);
   };
 
   return (
     <div className="bg-white p-6 rounded-xl shadow">
       <h2 className="text-xl font-bold mb-2">📄 Estado de cuenta consolidado</h2>
-      <p className="text-sm text-gray-500 mb-4">Genera reporte mensual por estado de pago (sin filtro por torre o apartamento).</p>
+      <p className="text-sm text-gray-500 mb-4">Genera reporte por rango de fechas y estado de pago (sin filtro por torre o apartamento).</p>
 
       <div className="grid md:grid-cols-4 gap-3 mb-4">
         <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="border rounded-lg px-3 py-2">
@@ -135,13 +123,8 @@ export default function EstadoCuenta({ usuarioApp }) {
           <option value="pagado">Pagado</option>
         </select>
 
-        <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className="border rounded-lg px-3 py-2">
-          {MESES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
-
-        <select value={anio} onChange={(e) => setAnio(Number(e.target.value))} className="border rounded-lg px-3 py-2">
-          {aniosDisponibles.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="border rounded-lg px-3 py-2" />
+        <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="border rounded-lg px-3 py-2" />
 
         <button onClick={generarEstado} className="bg-blue-600 text-white rounded-lg px-4 py-2">
           {loading ? 'Generando...' : 'Generar reporte'}
