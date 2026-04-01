@@ -31,12 +31,15 @@ export const crearPago = async (data, user) => {
     }
 
     // 🔥 crear pago
+    const tipoPago = String(data?.tipo_pago || 'administracion').trim().toLowerCase();
+
     const { data: pago, error } = await supabase
       .from('pagos')
       .insert([{
         conjunto_id: usuario.conjunto_id,
         residente_id: data.residente_id,
         concepto: String(data.concepto).trim(),
+        tipo_pago: tipoPago,
         valor: valorNumerico,
         estado: 'pendiente'
       }])
