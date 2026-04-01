@@ -4,13 +4,6 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
 
-const TIPOS_DOCUMENTO_FALLBACK = [
-  { codigo: 'CC', nombre: 'Cédula de ciudadanía' },
-  { codigo: 'CE', nombre: 'Cédula de extranjería' },
-  { codigo: 'TI', nombre: 'Tarjeta de identidad' },
-  { codigo: 'PAS', nombre: 'Pasaporte' }
-];
-
 export default function CrearVisita({ usuarioApp }) {
   const [form, setForm] = useState({
     nombre: '',
@@ -31,51 +24,44 @@ export default function CrearVisita({ usuarioApp }) {
 
   useEffect(() => {
     const cargarTipos = async () => {
-      const baseQuery = supabase
+      const { data, error } = await supabase
         .from('tipos_documento')
-        .select('codigo, nombre')
-        .order('nombre', { ascending: true });
+        .select('*')
+        .limit(200);
 
-      let data = [];
-      let error = null;
-
-      const activosResp = await baseQuery.eq('activo', true);
-      if (!activosResp.error && activosResp.data?.length) {
-        data = activosResp.data;
-      } else {
-        const todosResp = await supabase
-          .from('tipos_documento')
-          .select('codigo, nombre')
-          .order('nombre', { ascending: true });
-        data = todosResp.data || [];
-        error = todosResp.error;
-      }
-
-      if (!data.length) {
-        setTiposDocumento(TIPOS_DOCUMENTO_FALLBACK);
-        setForm((prev) => ({
-          ...prev,
-          tipo_documento: prev.tipo_documento || TIPOS_DOCUMENTO_FALLBACK[0].codigo
-        }));
+      if (error || !Array.isArray(data)) {
+        setTiposDocumento([]);
         if (!toastTiposShownRef.current) {
-          toast.error('No se pudo cargar catálogo desde Supabase; usando tipos por defecto');
+          toast.error('No se pudo cargar catálogo tipos_documento desde Supabase');
           toastTiposShownRef.current = true;
         }
         return;
       }
 
-      setTiposDocumento(data);
+      const codeKey = ['codigo', 'sigla', 'abreviatura', 'id'].find((k) => k in (data[0] || {}));
+      const nameKey = ['nombre', 'descripcion', 'tipo_documento', 'codigo'].find((k) => k in (data[0] || {}));
+      const activeKey = ['activo', 'habilitado', 'estado'].find((k) => k in (data[0] || {}));
+
+      const normalizados = data
+        .filter((row) => {
+          if (!activeKey) return true;
+          const value = row[activeKey];
+          if (typeof value === 'boolean') return value;
+          return String(value).toLowerCase() === 'activo';
+        })
+        .map((row) => ({
+          codigo: String(row[codeKey] || '').trim(),
+          nombre: String(row[nameKey] || row[codeKey] || '').trim()
+        }))
+        .filter((row) => row.codigo && row.nombre);
+
+      setTiposDocumento(normalizados);
       setForm((prev) => ({
         ...prev,
-        tipo_documento: prev.tipo_documento && data.some((t) => t.codigo === prev.tipo_documento)
+        tipo_documento: prev.tipo_documento && normalizados.some((t) => t.codigo === prev.tipo_documento)
           ? prev.tipo_documento
-          : data[0].codigo
+          : (normalizados[0]?.codigo || '')
       }));
-
-      if (error && !toastTiposShownRef.current) {
-        toast('Catálogo cargado sin filtro de estado (activo).');
-        toastTiposShownRef.current = true;
-      }
     };
     cargarTipos();
   }, []);
@@ -303,13 +289,13 @@ export default function CrearVisita({ usuarioApp }) {
           <option value="moto">Moto</option>
         </select>
 
-        <button
-          onClick={crearVisita}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full"
-        >
-          {loading ? 'Creando...' : 'Crear visita y generar QR'}
-        </button>
+      <button
+        onClick={crearVisita}
+        disabled={loading || !tiposDocumento.length}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full"
+      >
+        {loading ? 'Creando...' : !tiposDocumento.length ? 'Sin tipos_documento disponibles' : 'Crear visita y generar QR'}
+      </button>
       </div>
 
       {form.tipoVehiculo && (

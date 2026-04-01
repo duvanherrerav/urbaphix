@@ -8,6 +8,7 @@ const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: '
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 const normalizeEstado = (estado) => String(estado || '').trim().toLowerCase();
 const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
+const asFirst = (value) => (Array.isArray(value) ? value[0] : value);
 
 const parseQRCode = (text) => {
     try {
@@ -44,49 +45,57 @@ export default function PanelVigilancia({ usuarioApp }) {
             hace7dias.setDate(hace7dias.getDate() - 7);
             const fechaInicio = hace7dias.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 
-            const [registroResp, seguridadResp] = await Promise.all([
+            const [visitantesResp, seguridadResp] = await Promise.all([
                 supabase
-                    .from('registro_visitas')
-                    .select(`
-                        id, conjunto_id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
-                        visitantes(residente_id, nombre, documento, placa)
-                    `)
-                    .eq('conjunto_id', usuarioApp.conjunto_id)
-                    .gte('fecha_visita', fechaInicio)
-                    .order('fecha_visita', { ascending: false }),
+                    .from('visitantes')
+                    .select('id, residente_id, nombre, documento, placa')
+                    .eq('conjunto_id', usuarioApp.conjunto_id),
                 obtenerSeguridadConsolidada(usuarioApp.conjunto_id)
             ]);
 
             if (!mounted) return;
-            if (registroResp.error) {
-                toast.error('No se pudo cargar el panel de vigilancia');
+            if (visitantesResp.error) {
+                toast.error('No se pudieron cargar los visitantes del conjunto');
                 setLoading(false);
                 return;
             }
 
-            let registros = registroResp.data || [];
-
-            if (!registros.length) {
-                const [{ data: residentes }, { data: fallbackRegistros, error: fallbackError }] = await Promise.all([
-                    supabase.from('residentes').select('id').eq('conjunto_id', usuarioApp.conjunto_id),
-                    supabase
-                        .from('registro_visitas')
-                        .select(`
-                            id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
-                            visitantes(residente_id, nombre, documento, placa)
-                        `)
-                        .gte('fecha_visita', fechaInicio)
-                        .order('fecha_visita', { ascending: false })
-                        .limit(500)
-                ]);
-
-                if (!fallbackError && Array.isArray(fallbackRegistros)) {
-                    const residentesSet = new Set((residentes || []).map((r) => r.id));
-                    registros = fallbackRegistros.filter((row) => residentesSet.has(row.visitantes?.residente_id));
-                }
+            let visitantes = visitantesResp.data || [];
+            if (!visitantes.length) {
+                const { data: residentes } = await supabase.from('residentes').select('id').eq('conjunto_id', usuarioApp.conjunto_id);
+                const residentesSet = new Set((residentes || []).map((r) => r.id));
+                const { data: visitantesFallback } = await supabase
+                    .from('visitantes')
+                    .select('id, residente_id, nombre, documento, placa')
+                    .in('residente_id', Array.from(residentesSet));
+                visitantes = visitantesFallback || [];
             }
 
-            const mappedRegistro = registros.map((v) => ({
+            const visitantesMap = new Map((visitantes || []).map((vv) => [vv.id, vv]));
+            const idsVisitantes = Array.from(visitantesMap.keys());
+            if (!idsVisitantes.length) {
+                setVisitas([]);
+                setSeguridad(seguridadResp);
+                setLoading(false);
+                return;
+            }
+
+            const { data: registros, error: registrosError } = await supabase
+                .from('registro_visitas')
+                .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                .in('visitante_id', idsVisitantes)
+                .gte('fecha_visita', fechaInicio)
+                .order('fecha_visita', { ascending: false });
+
+            if (registrosError) {
+                toast.error('No se pudo cargar el registro de visitas');
+                setLoading(false);
+                return;
+            }
+
+            const mappedRegistro = (registros || []).map((v) => {
+                const visitante = asFirst(visitantesMap.get(v.visitante_id));
+                return {
                 id: v.id,
                 fecha_visita: normalizeFecha(v.fecha_visita),
                 estado: v.estado,
@@ -95,10 +104,11 @@ export default function PanelVigilancia({ usuarioApp }) {
                 hora_ingreso: v.hora_ingreso,
                 hora_salida: v.hora_salida,
                 created_at: v.created_at,
-                nombre_visitante: v.visitantes?.nombre,
-                documento: v.visitantes?.documento,
-                placa: v.visitantes?.placa
-            }));
+                nombre_visitante: visitante?.nombre,
+                documento: visitante?.documento,
+                placa: visitante?.placa
+            };
+            });
             setVisitas(mappedRegistro);
             setSeguridad(seguridadResp);
             const cola = getOfflineQueue();
@@ -110,7 +120,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
         const channel = supabase
             .channel(`registro-visitas-vigilancia-${usuarioApp?.conjunto_id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` }, cargar)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas' }, cargar)
             .subscribe();
 
         return () => {
