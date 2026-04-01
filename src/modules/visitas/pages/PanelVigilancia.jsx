@@ -276,14 +276,16 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             {modalIngreso.open && modalIngreso.visita && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-4 space-y-3">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-4 space-y-3 max-h-[92vh] overflow-y-auto">
                         <h3 className="font-semibold text-lg">Validar QR para ingreso</h3>
                         <p className="text-sm text-gray-600">
                             Visitante: <b>{modalIngreso.visita.nombre_visitante}</b> · Doc: <b>{modalIngreso.visita.documento}</b>
                         </p>
 
-                        <div className="rounded-lg overflow-hidden border">
+                        <div className="rounded-lg overflow-hidden border h-64">
                             <Scanner
+                                constraints={{ facingMode: 'environment' }}
+                                styles={{ container: { width: '100%', height: '100%' }, video: { width: '100%', height: '100%', objectFit: 'cover' } }}
                                 onScan={(result) => {
                                     if (result?.[0]?.rawValue) {
                                         finalizarIngresoConQR(result[0].rawValue);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
@@ -17,12 +17,15 @@ export default function CrearVisita({ usuarioApp }) {
     tipo_documento: 'CC',
     documento: '',
     fecha: '',
-    vieneVehiculo: false,
+    tipoVehiculo: '',
     placa: ''
   });
   const [tiposDocumento, setTiposDocumento] = useState(TIPOS_DOCUMENTO_FALLBACK);
   const [loading, setLoading] = useState(false);
   const [qrPayload, setQrPayload] = useState(null);
+  const [residenteId, setResidenteId] = useState(null);
+  const [historial, setHistorial] = useState([]);
+  const qrWrapRef = useRef(null);
 
   useEffect(() => {
     const cargarTipos = async () => {
@@ -37,6 +40,46 @@ export default function CrearVisita({ usuarioApp }) {
     cargarTipos();
   }, []);
 
+  const cargarHistorial = async (rid) => {
+    const { data } = await supabase
+      .from('visitas')
+      .select('id, nombre_visitante, tipo_documento, documento, placa, fecha_visita, estado, qr_code, created_at')
+      .eq('residente_id', rid)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setHistorial(data || []);
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const { data: residente } = await supabase
+        .from('residentes')
+        .select('id')
+        .eq('usuario_id', authData?.user?.id)
+        .single();
+      if (residente?.id) {
+        setResidenteId(residente.id);
+        cargarHistorial(residente.id);
+      }
+    };
+    init();
+  }, []);
+
+  const validacionPlaca = useMemo(() => {
+    if (!form.tipoVehiculo) return { ok: true, mensaje: '' };
+    const placa = String(form.placa || '').toUpperCase();
+    if (form.tipoVehiculo === 'carro') {
+      const ok = /^[A-Z]{3}[0-9]{3}$/.test(placa);
+      return { ok, mensaje: 'Para carro usa formato ABC123' };
+    }
+    if (form.tipoVehiculo === 'moto') {
+      const ok = /^[A-Z]{3}[0-9]{2}[A-Z]?$/.test(placa);
+      return { ok, mensaje: 'Para moto usa formato ABC12 o ABC12D' };
+    }
+    return { ok: true, mensaje: '' };
+  }, [form.tipoVehiculo, form.placa]);
+
   const crearVisita = async () => {
     if (!form.nombre || !form.documento || !form.fecha || !form.tipo_documento) {
       toast('Completa los campos obligatorios ⚠️');
@@ -44,6 +87,11 @@ export default function CrearVisita({ usuarioApp }) {
     }
 
     setLoading(true);
+    if (form.tipoVehiculo && !validacionPlaca.ok) {
+      toast.error(validacionPlaca.mensaje);
+      return;
+    }
+
     const { data: authData } = await supabase.auth.getUser();
     const { data: residente } = await supabase
       .from('residentes')
@@ -76,7 +124,8 @@ export default function CrearVisita({ usuarioApp }) {
     const payload = JSON.stringify({ visita_id: visita.id, qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
     toast.success('Visita creada. QR listo para compartir ✅');
-    setForm({ nombre: '', tipo_documento: 'CC', documento: '', fecha: '', vieneVehiculo: false, placa: '' });
+    setForm({ nombre: '', tipo_documento: 'CC', documento: '', fecha: '', tipoVehiculo: '', placa: '' });
+    if (residenteId) cargarHistorial(residenteId);
   };
 
   const copiarCodigo = async () => {
@@ -95,6 +144,42 @@ export default function CrearVisita({ usuarioApp }) {
     }
     await navigator.clipboard.writeText(texto);
     toast.success('Compartir no disponible. Código copiado.');
+  };
+
+  const compartirImagenQR = async () => {
+    const canvas = qrWrapRef.current?.querySelector('canvas');
+    if (!canvas) return;
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], 'qr-visita.png', { type: 'image/png' });
+
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: 'QR visita', files: [file] });
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'qr-visita.png';
+    a.click();
+    toast.success('Imagen QR descargada');
+  };
+
+  const setQRDesdeHistorial = (item) => {
+    const payload = JSON.stringify({ visita_id: item.id, qr_code: item.qr_code, conjunto_id: usuarioApp.conjunto_id });
+    setQrPayload(payload);
+  };
+
+  const reutilizarVisita = (item) => {
+    setForm({
+      nombre: item.nombre_visitante || '',
+      tipo_documento: item.tipo_documento || 'CC',
+      documento: item.documento || '',
+      fecha: new Date().toISOString().split('T')[0],
+      tipoVehiculo: item.placa ? (item.placa.length > 6 ? 'moto' : 'carro') : '',
+      placa: item.placa || ''
+    });
+    toast('Datos cargados. Solo ajusta fecha/placa y crea nueva visita.');
   };
 
   return (
@@ -137,22 +222,27 @@ export default function CrearVisita({ usuarioApp }) {
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={form.vieneVehiculo}
-          onChange={(e) => setForm({ ...form, vieneVehiculo: e.target.checked })}
-        />
-        Viene en vehículo
-      </label>
+      <select
+        className="border rounded-lg px-3 py-2 w-full md:w-1/2"
+        value={form.tipoVehiculo}
+        onChange={(e) => setForm({ ...form, tipoVehiculo: e.target.value, placa: '' })}
+      >
+        <option value="">Sin vehículo</option>
+        <option value="carro">Carro</option>
+        <option value="moto">Moto</option>
+      </select>
 
-      {form.vieneVehiculo && (
+      {form.tipoVehiculo && (
         <input
           className="border rounded-lg px-3 py-2 w-full md:w-1/2"
-          placeholder="Placa (ABC123)"
+          placeholder={form.tipoVehiculo === 'carro' ? 'Placa carro (ABC123)' : 'Placa moto (ABC12 o ABC12D)'}
           value={form.placa}
-          onChange={(e) => setForm({ ...form, placa: e.target.value.toUpperCase() })}
+          maxLength={form.tipoVehiculo === 'carro' ? 6 : 6}
+          onChange={(e) => setForm({ ...form, placa: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })}
         />
+      )}
+      {form.tipoVehiculo && form.placa && !validacionPlaca.ok && (
+        <p className="text-xs text-red-600">{validacionPlaca.mensaje}</p>
       )}
 
       <button
@@ -164,7 +254,7 @@ export default function CrearVisita({ usuarioApp }) {
       </button>
 
       {qrPayload && (
-        <div className="border rounded-xl p-4 bg-slate-50 space-y-3">
+        <div ref={qrWrapRef} className="border rounded-xl p-4 bg-slate-50 space-y-3">
           <h3 className="font-semibold">QR validable en portería 🔐</h3>
           <p className="text-xs text-gray-500">Portería puede validar este QR escaneando o pegando el código manual.</p>
           <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -172,10 +262,30 @@ export default function CrearVisita({ usuarioApp }) {
             <div className="space-y-2">
               <button className="w-full border rounded-lg px-3 py-2 text-sm" onClick={copiarCodigo}>Copiar código de validación</button>
               <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirQR}>Compartir QR</button>
+              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir imagen QR</button>
             </div>
           </div>
         </div>
       )}
+
+      <div className="border rounded-xl p-4">
+        <h3 className="font-semibold mb-2">Historial de visitas</h3>
+        <div className="space-y-2 max-h-72 overflow-auto">
+          {historial.map((item) => (
+            <div key={item.id} className="border rounded-lg p-3 text-sm">
+              <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
+              <p className="text-gray-500">Fecha visita: {item.fecha_visita} · Estado: {item.estado}</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {item.estado === 'pendiente' && (
+                  <button className="px-2 py-1 border rounded" onClick={() => setQRDesdeHistorial(item)}>Reenviar QR</button>
+                )}
+                <button className="px-2 py-1 border rounded" onClick={() => reutilizarVisita(item)}>Reutilizar datos</button>
+              </div>
+            </div>
+          ))}
+          {historial.length === 0 && <p className="text-sm text-gray-500">Aún no hay visitas registradas.</p>}
+        </div>
+      </div>
     </div>
   );
 }
