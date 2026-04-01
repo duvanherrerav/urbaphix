@@ -50,6 +50,8 @@ export default function GraficaVisitas({ visitas }) {
       {
         label: 'Visitas',
         data: valores,
+        backgroundColor: 'rgba(59, 130, 246, 0.85)',
+        hoverBackgroundColor: 'rgba(37, 99, 235, 0.95)',
         borderRadius: 8,
         maxBarThickness: 40
       }

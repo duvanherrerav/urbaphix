@@ -1,32 +1,38 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
 
-import EscanearQR from './modules/visitas/pages/EscanearQR';
 import Login from './modules/auth/Login';
-import MisPagos from './modules/contabilidad/pages/MisPagos';
-import CrearCobro from './modules/contabilidad/pages/CrearCobro';
-import CrearVisita from './modules/visitas/pages/CrearVisita';
-import PanelVigilancia from './modules/visitas/pages/PanelVigilancia';
-import NotificacionesVisitas from './modules/visitas/components/NotificacionesVisitas';
-import DashboardAdmin from './modules/admin/pages/DashboardAdmin';
-import CrearPaquete from './modules/paqueteria/pages/CrearPaquete';
-import MisPaquetes from './modules/paqueteria/pages/MisPaquetes';
-import PanelPaquetes from './modules/paqueteria/pages/PanelPaquetes';
-import NotificacionesPaquetes from './modules/paqueteria/components/NotificacionesPaquetes';
-import PanelPagosAdmin from './modules/contabilidad/pages/PanelPagosAdmin';
-import NotificacionesPagos from './modules/contabilidad/components/NotificacionesPagos';
-
 import { pedirPermiso } from './utils/push';
-import EstadoCuenta from './modules/contabilidad/components/EstadoCuenta';
+import { migrarStoragePorteria } from './modules/visitas/services/porteriaService';
+
+const MisPagos = lazy(() => import('./modules/contabilidad/pages/MisPagos'));
+const CrearCobro = lazy(() => import('./modules/contabilidad/pages/CrearCobro'));
+const CrearVisita = lazy(() => import('./modules/visitas/pages/CrearVisita'));
+const PanelVigilancia = lazy(() => import('./modules/visitas/pages/PanelVigilancia'));
+const NotificacionesVisitas = lazy(() => import('./modules/visitas/components/NotificacionesVisitas'));
+const DashboardAdmin = lazy(() => import('./modules/admin/pages/DashboardAdmin'));
+const CrearPaquete = lazy(() => import('./modules/paqueteria/pages/CrearPaquete'));
+const MisPaquetes = lazy(() => import('./modules/paqueteria/pages/MisPaquetes'));
+const PanelPaquetes = lazy(() => import('./modules/paqueteria/pages/PanelPaquetes'));
+const NotificacionesPaquetes = lazy(() => import('./modules/paqueteria/components/NotificacionesPaquetes'));
+const PanelPagosAdmin = lazy(() => import('./modules/contabilidad/pages/PanelPagosAdmin'));
+const NotificacionesPagos = lazy(() => import('./modules/contabilidad/components/NotificacionesPagos'));
+const EstadoCuenta = lazy(() => import('./modules/contabilidad/components/EstadoCuenta'));
+const ListaIncidentes = lazy(() => import('./modules/seguridad/pages/ListaIncidentes'));
+const ReportarIncidente = lazy(() => import('./modules/seguridad/pages/ReportarIncidente'));
 
 function App() {
 
   const [user, setUser] = useState(null);
   const [usuarioApp, setUsuarioApp] = useState(null);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [errorPerfil, setErrorPerfil] = useState('');
   const [openMenu, setOpenMenu] = useState(false);
   const [modulo, setModulo] = useState('');
+  const menuRef = useRef(null);
 
   const menuBtn = "w-full text-left p-2 rounded hover:bg-gray-700";
+  const ROLES_VALIDOS = ['admin', 'vigilancia', 'residente'];
 
   // 🔔 permisos
   useEffect(() => {
@@ -36,23 +42,64 @@ function App() {
   // 🔥 sesión
   useEffect(() => {
 
+    let isMounted = true;
+
+    const withTimeout = (promise, timeoutMs = 8000) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('timeout')), timeoutMs);
+        })
+      ]);
+    };
+
     const obtenerUsuario = async (userId) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('usuarios_app')
         .select('*')
         .eq('id', userId)
         .single();
 
-      setUsuarioApp(data);
+      if (error) {
+        if (isMounted) {
+          setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
+          setUsuarioApp(null);
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setErrorPerfil('');
+        setUsuarioApp(data);
+      }
     };
 
     const obtenerSesion = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
+      try {
+        const { data, error } = await withTimeout(supabase.auth.getUser());
+        if (error) {
+          throw error;
+        }
 
-      if (data.user) {
-        obtenerUsuario(data.user.id);
+        if (!isMounted) return;
+        setUser(data.user);
+
+        if (data.user) {
+          migrarStoragePorteria();
+          await obtenerUsuario(data.user.id);
+        }
+      } catch {
+        if (isMounted) {
+          setErrorPerfil('No pudimos verificar tu sesión. Revisa tu conexión e intenta nuevamente.');
+          setUser(null);
+          setUsuarioApp(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsBootstrapping(false);
+        }
       }
+
     };
 
     obtenerSesion();
@@ -60,39 +107,75 @@ function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         const user = session?.user || null;
+        if (!isMounted) return;
+
         setUser(user);
 
         if (user) {
+          migrarStoragePorteria();
           obtenerUsuario(user.id);
         } else {
+          setErrorPerfil('');
           setUsuarioApp(null);
         }
       }
     );
 
     return () => {
+      isMounted = false;
       listener.subscription.unsubscribe();
     };
 
   }, []);
 
-  // 🔥 DEFINIR MÓDULO INICIAL SEGÚN ROL
   useEffect(() => {
-    if (!usuarioApp || modulo) return;
+    const onPointerDown = (event) => {
+      if (!openMenu) return;
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenu(false);
+      }
+    };
 
-    if (usuarioApp.rol_id === 'admin') {
-      setModulo('dashboard');
-    }
+    const onEscape = (event) => {
+      if (event.key === 'Escape') {
+        setOpenMenu(false);
+      }
+    };
 
-    if (usuarioApp.rol_id === 'vigilancia') {
-      setModulo('visitas');
-    }
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onEscape);
 
-    if (usuarioApp.rol_id === 'residente') {
-      setModulo('visitas');
-    }
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [openMenu]);
 
-  }, [usuarioApp]);
+  const moduloPorRol = {
+    admin: 'dashboard',
+    vigilancia: 'visitas',
+    residente: 'visitas'
+  };
+
+  const moduloActual = modulo || moduloPorRol[usuarioApp?.rol_id] || '';
+  const rolNoAutorizado = Boolean(usuarioApp) && !ROLES_VALIDOS.includes(usuarioApp?.rol_id);
+
+  useEffect(() => {
+    setOpenMenu(false);
+    setModulo('');
+  }, [user?.id]);
+
+  useEffect(() => {
+    setModulo('');
+  }, [usuarioApp?.rol_id]);
+
+  if (isBootstrapping) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-gray-600 text-sm">Cargando Urbaphix...</div>
+      </div>
+    );
+  }
 
   // 🔐 LOGIN
   if (!user) {
@@ -140,6 +223,10 @@ function App() {
               <button onClick={() => setModulo('pagos')} className={menuBtn}>
                 💰 Pagos
               </button>
+
+              <button onClick={() => setModulo('incidentes')} className={menuBtn}>
+                🚨 Incidentes
+              </button>
             </>
           )}
 
@@ -152,6 +239,10 @@ function App() {
 
               <button onClick={() => setModulo('paquetes')} className={menuBtn}>
                 📦 Paquetería
+              </button>
+
+              <button onClick={() => setModulo('incidentes')} className={menuBtn}>
+                🚨 Reportar incidente
               </button>
             </>
           )}
@@ -181,14 +272,14 @@ function App() {
       <div className="flex-1">
 
         {/* HEADER */}
-        <div className="bg-white shadow px-6 py-4 flex justify-between items-center">
+        <div className="bg-white shadow px-6 py-4 flex justify-between items-center relative z-50">
 
           <h2 className="font-semibold text-lg capitalize">
-            {modulo}
+            {moduloActual}
           </h2>
 
           {/* 👤 MENU */}
-          <div className="relative">
+          <div className="relative z-50" ref={menuRef}>
 
             <button
               onClick={() => setOpenMenu(!openMenu)}
@@ -198,7 +289,7 @@ function App() {
             </button>
 
             {openMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border z-[70]">
 
                 <div className="px-4 py-3 border-b">
                   <p className="text-sm font-semibold">
@@ -233,59 +324,79 @@ function App() {
 
         {/* CONTENIDO DINÁMICO */}
         <div className="p-6 space-y-6">
-
-          {/* ADMIN */}
-          {usuarioApp?.rol_id === 'admin' && (
-            <>
-              {modulo === 'dashboard' && (
-                <DashboardAdmin usuarioApp={usuarioApp} />
-              )}
-
-              {modulo === 'pagos' && (
-                <>
-                  <CrearCobro usuarioApp={usuarioApp} />
-                  <PanelPagosAdmin usuarioApp={usuarioApp} />
-                  <EstadoCuenta usuarioApp={usuarioApp} />
-                </>
-              )}
-            </>
+          {errorPerfil && (
+            <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+              {errorPerfil}
+            </div>
           )}
 
-          {/* VIGILANCIA */}
-          {usuarioApp?.rol_id === 'vigilancia' && (
-            <>
-              {modulo === 'visitas' && (
-                <>
-                  <PanelVigilancia usuarioApp={usuarioApp} />
-                  <EscanearQR usuarioApp={usuarioApp} />
-                </>
-              )}
-
-              {modulo === 'paquetes' && (
-                <>
-                  <CrearPaquete usuarioApp={usuarioApp} />
-                  <PanelPaquetes usuarioApp={usuarioApp} />
-                </>
-              )}
-            </>
+          {rolNoAutorizado && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-700 px-4 py-3 text-sm">
+              Tu rol actual no está autorizado para este panel. Contacta al administrador del conjunto.
+            </div>
           )}
 
-          {/* RESIDENTE */}
-          {usuarioApp?.rol_id === 'residente' && (
-            <>
-              {modulo === 'visitas' && (
-                <CrearVisita usuarioApp={usuarioApp} />
-              )}
+          <Suspense fallback={<div className="text-sm text-gray-500">Cargando módulo...</div>}>
+            {/* ADMIN */}
+            {usuarioApp?.rol_id === 'admin' && (
+              <>
+                {moduloActual === 'dashboard' && (
+                  <DashboardAdmin usuarioApp={usuarioApp} />
+                )}
 
-              {modulo === 'paquetes' && (
-                <MisPaquetes usuarioApp={usuarioApp} />
-              )}
+                {moduloActual === 'pagos' && (
+                  <>
+                    <CrearCobro usuarioApp={usuarioApp} />
+                    <PanelPagosAdmin usuarioApp={usuarioApp} />
+                    <EstadoCuenta usuarioApp={usuarioApp} />
+                  </>
+                )}
 
-              {modulo === 'pagos' && (
-                <MisPagos usuarioApp={usuarioApp} />
-              )}
-            </>
-          )}
+                {moduloActual === 'incidentes' && (
+                  <ListaIncidentes usuarioApp={usuarioApp} />
+                )}
+              </>
+            )}
+
+            {/* VIGILANCIA */}
+            {usuarioApp?.rol_id === 'vigilancia' && (
+              <>
+                {moduloActual === 'visitas' && (
+                  <>
+                    <PanelVigilancia usuarioApp={usuarioApp} />
+                  </>
+                )}
+
+                {moduloActual === 'paquetes' && (
+                  <>
+                    <CrearPaquete usuarioApp={usuarioApp} />
+                    <PanelPaquetes usuarioApp={usuarioApp} />
+                  </>
+                )}
+
+                {moduloActual === 'incidentes' && (
+                  <ReportarIncidente user={usuarioApp} />
+                )}
+              </>
+            )}
+
+            {/* RESIDENTE */}
+            {usuarioApp?.rol_id === 'residente' && (
+              <>
+                {moduloActual === 'visitas' && (
+                  <CrearVisita usuarioApp={usuarioApp} />
+                )}
+
+                {moduloActual === 'paquetes' && (
+                  <MisPaquetes usuarioApp={usuarioApp} />
+                )}
+
+                {moduloActual === 'pagos' && (
+                  <MisPagos usuarioApp={usuarioApp} />
+                )}
+              </>
+            )}
+          </Suspense>
 
         </div>
 
@@ -293,11 +404,13 @@ function App() {
 
       {/* 🔔 NOTIFICACIONES */}
       {usuarioApp && (
-        <>
-          <NotificacionesVisitas usuarioApp={usuarioApp} />
-          <NotificacionesPaquetes usuarioApp={usuarioApp} />
-          <NotificacionesPagos usuarioApp={usuarioApp} />
-        </>
+        <Suspense fallback={null}>
+          <>
+            <NotificacionesVisitas usuarioApp={usuarioApp} />
+            <NotificacionesPaquetes usuarioApp={usuarioApp} />
+            <NotificacionesPagos usuarioApp={usuarioApp} />
+          </>
+        </Suspense>
       )}
 
     </div>

@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
+const formatFechaBogota = (value) => {
+    if (!value) return '-';
+    const raw = String(value).trim().replace(' ', 'T');
+    const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
+    const parsed = new Date(hasZone ? raw : `${raw}Z`);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+};
+
 export default function PanelPagosAdmin({ usuarioApp }) {
 
     const [pagos, setPagos] = useState([]);
@@ -9,14 +18,8 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     const [filtroEstado, setFiltroEstado] = useState('');
     const [busquedaApto, setBusquedaApto] = useState('');
 
-    useEffect(() => {
-        if (usuarioApp?.conjunto_id) {
-            cargarPagos();
-        }
-    }, [usuarioApp]);
-
     // 🔥 CARGAR PAGOS (SOLUCIÓN FINAL CON JOIN)
-    const cargarPagos = async () => {
+    async function cargarPagos() {
 
         setLoading(true);
 
@@ -24,6 +27,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
             .from('pagos')
             .select(`
                 *,
+                tipo_pago,
                 residentes (
                     id,
                     usuario_id,
@@ -57,7 +61,16 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
         setPagos(pagosFormateados);
         setLoading(false);
-    };
+    }
+
+    useEffect(() => {
+        if (usuarioApp?.conjunto_id) {
+            const timer = setTimeout(() => {
+                cargarPagos();
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+    }, [usuarioApp]);
 
     // 🔥 APROBAR PAGO
     const aprobarPago = async (pago) => {
@@ -104,7 +117,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         <div>
 
             <h2 className="text-2xl font-bold mb-4">
-                Pagos (Admin) 💰
+                Gestión de pagos 💰
             </h2>
 
             <div className="bg-white p-4 rounded-xl shadow flex flex-col md:flex-row gap-3 mb-4">
@@ -187,10 +200,13 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                             <p className="text-sm text-gray-400 mt-1">
                                 {p.concepto}
                             </p>
+                            <p className="text-xs text-gray-400">
+                                Tipo: {p.tipo_pago || '-'}
+                            </p>
 
                             {/* 📅 FECHA */}
                             <p className="text-xs text-gray-400">
-                                {new Date(p.created_at).toLocaleDateString()}
+                                {formatFechaBogota(p.created_at)}
                             </p>
 
                             {/* 📄 COMPROBANTE */}

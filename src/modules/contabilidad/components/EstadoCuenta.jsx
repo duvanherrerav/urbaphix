@@ -1,289 +1,191 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import jsPDF from 'jspdf';
 
+const formatFechaBogota = (value) => {
+  if (!value) return '-';
+  const raw = String(value).trim().replace(' ', 'T');
+  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
+  const parsed = new Date(hasZone ? raw : `${raw}Z`);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+};
+
 export default function EstadoCuenta({ usuarioApp }) {
-
-  const [torres, setTorres] = useState([]);
-  const [apartamentos, setApartamentos] = useState([]);
-  const [torreSeleccionada, setTorreSeleccionada] = useState('');
-  const [apartamentoSeleccionado, setApartamentoSeleccionado] = useState('');
+  const hoy = new Date();
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [fechaDesde, setFechaDesde] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]);
+  const [fechaHasta, setFechaHasta] = useState(hoy.toISOString().split('T')[0]);
   const [estado, setEstado] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // 🔥 CARGAR TORRES
-  useEffect(() => {
-    if (usuarioApp?.conjunto_id) {
-      obtenerTorres();
-    }
-  }, [usuarioApp]);
-
-  const obtenerTorres = async () => {
-    const { data } = await supabase
-      .from('torres')
-      .select('id, nombre')
-      .eq('conjunto_id', usuarioApp.conjunto_id);
-
-    setTorres(data || []);
-  };
-
-  const obtenerApartamentos = async (torreId) => {
-    const { data } = await supabase
-      .from('apartamentos')
-      .select('id, numero')
-      .eq('torre_id', torreId);
-
-    setApartamentos(data || []);
-  };
-
-  const handleTorre = (id) => {
-    setTorreSeleccionada(id);
-    setApartamentoSeleccionado('');
-    setEstado(null);
-    obtenerApartamentos(id);
-  };
-
-  // 🔥 GENERAR ESTADO
   const generarEstado = async () => {
-
-    if (!apartamentoSeleccionado) {
-      alert('Selecciona un apartamento');
+    if (!usuarioApp?.conjunto_id) return;
+    if (!fechaDesde || !fechaHasta || fechaDesde > fechaHasta) {
+      alert('Rango de fechas inválido');
       return;
     }
+    setLoading(true);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('pagos')
-      .select(`
-        valor,
-        estado,
-        created_at,
-        residentes (
-          id,
-          usuario_id,
-          apartamentos (
-            numero,
-            torres!fk_apartamento_torre (
-              nombre
-            )
-          ),
-          usuarios_app (
-            nombre
-          )
-        )
-      `)
+      .select('id, valor, estado, created_at, concepto, tipo_pago')
       .eq('conjunto_id', usuarioApp.conjunto_id)
-      .eq('residentes.apartamentos.id', apartamentoSeleccionado);
+      .gte('created_at', `${fechaDesde}T00:00:00`)
+      .lte('created_at', `${fechaHasta}T23:59:59`)
+      .order('created_at', { ascending: false });
+
+    if (filtroEstado !== 'todos') {
+      query = query.eq('estado', filtroEstado);
+    }
+
+    const { data, error } = await query;
+    setLoading(false);
 
     if (error) {
       console.log(error);
-      alert('Error generando estado');
+      alert('Error generando reporte');
       return;
     }
 
-    if (!data || data.length === 0) {
-      alert('No hay información para este apartamento');
-      return;
-    }
+    const pagos = data || [];
+    const totalPendiente = pagos
+      .filter((p) => p.estado === 'pendiente')
+      .reduce((acc, p) => acc + Number(p.valor || 0), 0);
+    const totalPagado = pagos
+      .filter((p) => p.estado === 'pagado')
+      .reduce((acc, p) => acc + Number(p.valor || 0), 0);
 
-    let totalPendiente = 0;
-    let totalPagado = 0;
-
-    data.forEach(p => {
-      if (p.estado === 'pendiente') {
-        totalPendiente += p.valor;
-      } else {
-        totalPagado += p.valor;
-      }
+    const porTipo = {};
+    pagos.forEach((p) => {
+      const tipo = p.tipo_pago || 'sin_tipo';
+      if (!porTipo[tipo]) porTipo[tipo] = { cantidad: 0, total: 0 };
+      porTipo[tipo].cantidad += 1;
+      porTipo[tipo].total += Number(p.valor || 0);
     });
 
-    const info = data[0]?.residentes;
-
     setEstado({
-      nombre: info?.usuarios_app?.nombre || 'Residente',
-      apartamento: info?.apartamentos?.numero || '-',
-      torre: info?.apartamentos?.torres?.nombre || '-',
+      fechaDesde,
+      fechaHasta,
+      filtroEstado,
       totalPendiente,
       totalPagado,
-      pagos: data
+      pagos,
+      porTipo
     });
   };
 
-  // 🔥 GENERAR PDF
   const generarPDF = () => {
-
     if (!estado) return;
 
     const doc = new jsPDF();
     let y = 10;
-
     doc.setFontSize(16);
-    doc.text('Estado de Cuenta - Urbaphix', 10, y);
-
-    y += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Torre: ${estado.torre}`, 10, y);
+    doc.text('Reporte consolidado de pagos - Urbaphix', 10, y);
+    y += 8;
+    doc.setFontSize(11);
+    doc.text(`Periodo: ${estado.fechaDesde} a ${estado.fechaHasta}`, 10, y);
+    y += 6;
+    doc.text(`Estado filtrado: ${estado.filtroEstado}`, 10, y);
+    y += 8;
+    doc.text(`Total pendiente: $${estado.totalPendiente.toLocaleString('es-CO')}`, 10, y);
+    y += 6;
+    doc.text(`Total pagado: $${estado.totalPagado.toLocaleString('es-CO')}`, 10, y);
+    y += 8;
+    doc.text('Resumen por tipo de pago:', 10, y);
     y += 6;
 
-    doc.text(`Apartamento: ${estado.apartamento}`, 10, y);
-    y += 6;
+    Object.entries(estado.porTipo).forEach(([tipo, info]) => {
+      doc.text(`${tipo}: ${info.cantidad} registros - $${info.total.toLocaleString('es-CO')}`, 10, y);
+      y += 6;
+    });
 
-    doc.text(`Residente: ${estado.nombre}`, 10, y);
-    y += 10;
-
-    doc.text(`Total Pendiente: $${estado.totalPendiente.toLocaleString()}`, 10, y);
-    y += 6;
-
-    doc.text(`Total Pagado: $${estado.totalPagado.toLocaleString()}`, 10, y);
-    y += 10;
-
+    y += 2;
     doc.text('Movimientos:', 10, y);
     y += 6;
 
     estado.pagos.forEach((p) => {
-
-      const fecha = new Date(p.created_at).toLocaleDateString();
-
       doc.text(
-        `${fecha} - $${p.valor.toLocaleString()} (${p.estado})`,
+        `${formatFechaBogota(p.created_at)} | ${p.estado} | ${p.tipo_pago || '-'} | $${Number(p.valor || 0).toLocaleString('es-CO')}`,
         10,
         y
       );
-
       y += 6;
-
       if (y > 270) {
         doc.addPage();
         y = 10;
       }
-
     });
 
-    doc.save(`estado_cuenta_apto_${estado.apartamento}.pdf`);
+    doc.save(`reporte_pagos_${estado.fechaDesde}_${estado.fechaHasta}.pdf`);
   };
 
   return (
     <div className="bg-white p-6 rounded-xl shadow">
+      <h2 className="text-xl font-bold mb-2">📄 Estado de cuenta consolidado</h2>
+      <p className="text-sm text-gray-500 mb-4">Genera reporte por rango de fechas y estado de pago (sin filtro por torre o apartamento).</p>
 
-      <h2 className="text-xl font-bold mb-4">
-        📄 Estado de cuenta
-      </h2>
-
-      {/* SELECTORES */}
-      <div className="grid md:grid-cols-3 gap-3 mb-4">
-
-        <select
-          value={torreSeleccionada}
-          onChange={e => handleTorre(e.target.value)}
-          className="border rounded-lg px-3 py-2"
-        >
-          <option value="">Selecciona torre</option>
-          {torres.map(t => (
-            <option key={t.id} value={t.id}>
-              {t.nombre}
-            </option>
-          ))}
+      <div className="grid md:grid-cols-4 gap-3 mb-4">
+        <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="border rounded-lg px-3 py-2">
+          <option value="todos">Todos</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="pagado">Pagado</option>
         </select>
 
-        <select
-          value={apartamentoSeleccionado}
-          onChange={e => setApartamentoSeleccionado(e.target.value)}
-          className="border rounded-lg px-3 py-2"
-        >
-          <option value="">Selecciona apartamento</option>
-          {apartamentos.map(a => (
-            <option key={a.id} value={a.id}>
-              Apto {a.numero}
-            </option>
-          ))}
-        </select>
+        <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="border rounded-lg px-3 py-2" />
+        <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="border rounded-lg px-3 py-2" />
 
-        <button
-          onClick={generarEstado}
-          className="bg-blue-600 text-white rounded-lg px-4 py-2"
-        >
-          Generar
+        <button onClick={generarEstado} className="bg-blue-600 text-white rounded-lg px-4 py-2">
+          {loading ? 'Generando...' : 'Generar reporte'}
         </button>
-
       </div>
 
-      {/* RESULTADO */}
       {estado && (
-
         <div className="space-y-4">
-
-          {/* HEADER */}
-          <div className="bg-gray-100 p-4 rounded-lg">
-            <p className="font-bold">
-              🏢 Torre {estado.torre} • Apto {estado.apartamento}
-            </p>
-            <p className="text-sm text-gray-500">
-              {estado.nombre}
-            </p>
-          </div>
-
-          {/* RESUMEN */}
           <div className="grid grid-cols-2 gap-4">
-
             <div className="bg-red-100 p-4 rounded-lg">
               <p className="text-sm text-gray-500">Pendiente</p>
-              <p className="text-xl font-bold text-red-600">
-                ${estado.totalPendiente.toLocaleString()}
-              </p>
+              <p className="text-xl font-bold text-red-600">${estado.totalPendiente.toLocaleString('es-CO')}</p>
             </div>
-
             <div className="bg-green-100 p-4 rounded-lg">
               <p className="text-sm text-gray-500">Pagado</p>
-              <p className="text-xl font-bold text-green-600">
-                ${estado.totalPagado.toLocaleString()}
-              </p>
+              <p className="text-xl font-bold text-green-600">${estado.totalPagado.toLocaleString('es-CO')}</p>
             </div>
-
           </div>
 
-          {/* BOTÓN PDF */}
-          <button
-            onClick={generarPDF}
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg"
-          >
+          <div className="bg-slate-50 rounded-lg p-4">
+            <h3 className="font-semibold mb-2">Tipo de pago</h3>
+            <div className="grid md:grid-cols-3 gap-2 text-sm">
+              {Object.entries(estado.porTipo).map(([tipo, info]) => (
+                <div key={tipo} className="border bg-white rounded px-3 py-2">
+                  <p className="font-medium">{tipo}</p>
+                  <p>{info.cantidad} registros</p>
+                  <p className="text-slate-600">${info.total.toLocaleString('es-CO')}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={generarPDF} className="bg-gray-900 text-white px-4 py-2 rounded-lg">
             Descargar PDF 📄
           </button>
 
-          {/* DETALLE */}
           <div>
-
-            <h3 className="font-semibold mb-2">
-              Movimientos
-            </h3>
-
-            <div className="space-y-2">
-
-              {estado.pagos.map((p, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between border p-2 rounded"
-                >
-                  <span className="text-sm">
-                    {new Date(p.created_at).toLocaleDateString()}
-                  </span>
-
-                  <span className={
-                    p.estado === 'pendiente'
-                      ? 'text-red-600'
-                      : 'text-green-600'
-                  }>
-                    ${p.valor.toLocaleString()}
+            <h3 className="font-semibold mb-2">Movimientos del periodo</h3>
+            <div className="space-y-2 max-h-72 overflow-auto">
+              {estado.pagos.map((p) => (
+                <div key={p.id} className="flex justify-between border p-2 rounded text-sm">
+                  <span>{formatFechaBogota(p.created_at)} · {p.tipo_pago || '-'}</span>
+                  <span className={p.estado === 'pendiente' ? 'text-red-600' : 'text-green-600'}>
+                    ${Number(p.valor || 0).toLocaleString('es-CO')} ({p.estado})
                   </span>
                 </div>
               ))}
-
+              {estado.pagos.length === 0 && <p className="text-gray-500">Sin pagos para ese filtro.</p>}
             </div>
-
           </div>
-
         </div>
-
       )}
-
     </div>
   );
 }

@@ -1,9 +1,23 @@
 import { supabase } from '../../../services/supabaseClient';
 
+const errorMessage = (error, fallback) => error?.message || fallback;
+
 // 🔥 CREAR COBRO
 export const crearPago = async (data, user) => {
 
   try {
+    if (!user?.id) {
+      throw new Error('Usuario no autenticado');
+    }
+
+    if (!data?.residente_id || !data?.concepto || !data?.valor) {
+      throw new Error('Datos del cobro incompletos');
+    }
+
+    const valorNumerico = Number(data.valor);
+    if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+      throw new Error('El valor del cobro debe ser mayor a 0');
+    }
 
     // 🔥 obtener conjunto del usuario
     const { data: usuario, error: errorUsuario } = await supabase
@@ -13,8 +27,10 @@ export const crearPago = async (data, user) => {
       .single();
 
     if (errorUsuario || !usuario) {
-      throw new Error('No se pudo obtener el usuario');
+      throw new Error(errorMessage(errorUsuario, 'No se pudo obtener el usuario'));
     }
+
+    const tipoPago = String(data?.tipo_pago || 'administracion').trim().toLowerCase();
 
     // 🔥 crear pago
     const { data: pago, error } = await supabase
@@ -22,15 +38,16 @@ export const crearPago = async (data, user) => {
       .insert([{
         conjunto_id: usuario.conjunto_id,
         residente_id: data.residente_id,
-        concepto: data.concepto,
-        valor: data.valor,
+        concepto: String(data.concepto).trim(),
+        tipo_pago: tipoPago,
+        valor: valorNumerico,
         estado: 'pendiente'
       }])
       .select()
       .single();
 
     if (error) {
-      throw error;
+      throw new Error(errorMessage(error, 'No se pudo crear el cobro'));
     }
 
     // 🔥 obtener usuario_app del residente
@@ -46,15 +63,15 @@ export const crearPago = async (data, user) => {
         usuario_id: residente.usuario_id,
         tipo: 'nuevo_cobro',
         titulo: '💰 Nuevo cobro',
-        mensaje: `Tienes un cobro de $${data.valor}`
+        mensaje: `Tienes un cobro de $${valorNumerico}`
       }]);
     }
 
     return { pago, error: null };
 
   } catch (err) {
-    console.log('Error crearPago:', err);
-    return { pago: null, error: err.message };
+    console.error('Error crearPago:', err);
+    return { pago: null, error: errorMessage(err, 'Error creando cobro') };
   }
 };
 
@@ -63,6 +80,9 @@ export const crearPago = async (data, user) => {
 export const registrarPago = async (pago_id) => {
 
   try {
+    if (!pago_id) {
+      throw new Error('Pago inválido');
+    }
 
     const { error } = await supabase
       .from('pagos')
@@ -73,13 +93,13 @@ export const registrarPago = async (pago_id) => {
       .eq('id', pago_id);
 
     if (error) {
-      throw error;
+      throw new Error(errorMessage(error, 'No se pudo registrar el pago'));
     }
 
     return { ok: true };
 
   } catch (err) {
-    console.log('Error registrarPago:', err);
-    return { ok: false, error: err.message };
+    console.error('Error registrarPago:', err);
+    return { ok: false, error: errorMessage(err, 'Error registrando pago') };
   }
 };
