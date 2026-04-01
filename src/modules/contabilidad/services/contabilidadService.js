@@ -30,6 +30,8 @@ export const crearPago = async (data, user) => {
       throw new Error(errorMessage(errorUsuario, 'No se pudo obtener el usuario'));
     }
 
+    const tipoPago = String(data?.tipo_pago || 'administracion').trim().toLowerCase();
+
     // 🔥 crear pago
     const { data: pago, error } = await supabase
       .from('pagos')
@@ -37,6 +39,7 @@ export const crearPago = async (data, user) => {
         conjunto_id: usuario.conjunto_id,
         residente_id: data.residente_id,
         concepto: String(data.concepto).trim(),
+        tipo_pago: tipoPago,
         valor: valorNumerico,
         estado: 'pendiente'
       }])
