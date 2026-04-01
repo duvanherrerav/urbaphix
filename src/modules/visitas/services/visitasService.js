@@ -8,7 +8,7 @@ export const crearVisita = async (data, user) => {
             throw new Error('Usuario no autenticado');
         }
 
-        if (!data?.residente_id || !data?.nombre || !data?.documento || !data?.fecha) {
+        if (!data?.residente_id || !data?.nombre || !data?.documento || !data?.fecha || !data?.tipo_documento) {
             throw new Error('Datos de visita incompletos');
         }
 
@@ -29,12 +29,15 @@ export const crearVisita = async (data, user) => {
             .insert([{
                 conjunto_id: usuario.conjunto_id,
                 residente_id: data.residente_id,
+                apartamento_id: data.apartamento_id || null,
                 nombre_visitante: data.nombre.trim(),
+                tipo_documento: String(data.tipo_documento).trim().toUpperCase(),
                 documento: String(data.documento).trim(),
                 placa: data.placa ? String(data.placa).trim().toUpperCase() : null,
                 fecha_visita: data.fecha,
                 hora_inicio: data.hora_inicio || null,
                 hora_fin: data.hora_fin || null,
+                estado: 'pendiente',
                 qr_code
             }])
             .select()
