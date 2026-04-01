@@ -25,6 +25,7 @@ export default function CrearVisita({ usuarioApp }) {
   const [qrPayload, setQrPayload] = useState(null);
   const [residenteId, setResidenteId] = useState(null);
   const [historial, setHistorial] = useState([]);
+  const [filtroHistorial, setFiltroHistorial] = useState('todos');
   const qrWrapRef = useRef(null);
 
   useEffect(() => {
@@ -199,14 +200,10 @@ export default function CrearVisita({ usuarioApp }) {
     toast('Datos cargados. Solo ajusta fecha/placa y crea nueva visita.');
   };
 
-  const visitantesFrecuentes = useMemo(() => {
-    const map = new Map();
-    historial.forEach((item) => {
-      const key = `${item.tipo_documento || ''}-${item.documento || ''}`;
-      if (!map.has(key)) map.set(key, item);
-    });
-    return Array.from(map.values());
-  }, [historial]);
+  const historialFiltrado = useMemo(() => {
+    if (filtroHistorial === 'todos') return historial;
+    return historial.filter((h) => h.estado === filtroHistorial);
+  }, [historial, filtroHistorial]);
 
   return (
     <div className="bg-white rounded-2xl shadow p-5 space-y-4 max-w-2xl">
@@ -296,22 +293,30 @@ export default function CrearVisita({ usuarioApp }) {
         </div>
       )}
 
-      <div className="border rounded-xl p-4">
-        <h3 className="font-semibold mb-2">Visitantes frecuentes</h3>
+      <div className="border rounded-xl p-4 space-y-3">
+        <h3 className="font-semibold">Historial de visitas</h3>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => setFiltroHistorial('todos')}>Todos</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => setFiltroHistorial('pendiente')}>Pendientes</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'ingresado' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'}`} onClick={() => setFiltroHistorial('ingresado')}>En curso</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}`} onClick={() => setFiltroHistorial('salido')}>Finalizadas</button>
+        </div>
         <div className="space-y-2 max-h-72 overflow-auto">
-          {visitantesFrecuentes.map((item) => (
+          {historialFiltrado.map((item) => (
             <div key={item.id} className="border rounded-lg p-3 text-sm">
               <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
-              <p className="text-gray-500">Fecha visita: {item.fecha_visita} · Estado: {item.estado}</p>
+              <p className="text-gray-500">Fecha visita: {item.fecha_visita} · Estado: {item.estado === 'salido' ? 'finalizada' : item.estado}</p>
               <div className="flex flex-wrap gap-2 mt-2">
                 {item.estado === 'pendiente' && (
                   <button className="px-2 py-1 border rounded" onClick={() => setQRDesdeHistorial(item)}>Reenviar QR</button>
                 )}
-                <button className="px-2 py-1 border rounded" onClick={() => reutilizarVisita(item)}>Reutilizar datos</button>
+                {item.estado === 'salido' && (
+                  <button className="px-2 py-1 border rounded" onClick={() => reutilizarVisita(item)}>Reprogramar visita</button>
+                )}
               </div>
             </div>
           ))}
-          {visitantesFrecuentes.length === 0 && <p className="text-sm text-gray-500">Aún no hay visitas registradas.</p>}
+          {historialFiltrado.length === 0 && <p className="text-sm text-gray-500">No hay visitas en este estado.</p>}
         </div>
       </div>
     </div>

@@ -42,7 +42,7 @@ export default function PanelVigilancia({ usuarioApp }) {
             hace7dias.setDate(hace7dias.getDate() - 7);
             const fechaInicio = hace7dias.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 
-            const [visitasResp, seguridadResp] = await Promise.all([
+            const [registroResp, legacyResp, seguridadResp] = await Promise.all([
                 supabase
                     .from('registro_visitas')
                     .select(`
@@ -52,17 +52,23 @@ export default function PanelVigilancia({ usuarioApp }) {
                     .eq('conjunto_id', usuarioApp.conjunto_id)
                     .gte('fecha_visita', fechaInicio)
                     .order('fecha_visita', { ascending: false }),
+                supabase
+                    .from('visitas')
+                    .select('id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, nombre_visitante, documento, placa')
+                    .eq('conjunto_id', usuarioApp.conjunto_id)
+                    .gte('fecha_visita', fechaInicio)
+                    .order('fecha_visita', { ascending: false }),
                 obtenerSeguridadConsolidada(usuarioApp.conjunto_id)
             ]);
 
             if (!mounted) return;
-            if (visitasResp.error) {
+            if (registroResp.error && legacyResp.error) {
                 toast.error('No se pudo cargar el panel de vigilancia');
                 setLoading(false);
                 return;
             }
 
-            const mapped = (visitasResp.data || []).map((v) => ({
+            const mappedRegistro = (registroResp.data || []).map((v) => ({
                 id: v.id,
                 fecha_visita: v.fecha_visita,
                 estado: v.estado,
@@ -74,7 +80,11 @@ export default function PanelVigilancia({ usuarioApp }) {
                 documento: v.visitantes?.documento,
                 placa: v.visitantes?.placa
             }));
-            setVisitas(mapped);
+            const mappedLegacy = (legacyResp.data || []).map((v) => ({ ...v }));
+
+            const unique = new Map();
+            [...mappedRegistro, ...mappedLegacy].forEach((v) => unique.set(v.id, v));
+            setVisitas(Array.from(unique.values()));
             setSeguridad(seguridadResp);
             const cola = getOfflineQueue();
             setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
