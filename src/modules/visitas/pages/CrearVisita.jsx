@@ -89,6 +89,7 @@ export default function CrearVisita({ usuarioApp }) {
     setLoading(true);
     if (form.tipoVehiculo && !validacionPlaca.ok) {
       toast.error(validacionPlaca.mensaje);
+      setLoading(false);
       return;
     }
 
@@ -111,7 +112,7 @@ export default function CrearVisita({ usuarioApp }) {
       nombre: form.nombre,
       tipo_documento: form.tipo_documento,
       documento: form.documento,
-      placa: form.vieneVehiculo ? form.placa : null,
+      placa: form.tipoVehiculo ? form.placa : null,
       fecha: form.fecha
     }, authData?.user);
 
@@ -182,6 +183,15 @@ export default function CrearVisita({ usuarioApp }) {
     toast('Datos cargados. Solo ajusta fecha/placa y crea nueva visita.');
   };
 
+  const visitantesFrecuentes = useMemo(() => {
+    const map = new Map();
+    historial.forEach((item) => {
+      const key = `${item.tipo_documento || ''}-${item.documento || ''}`;
+      if (!map.has(key)) map.set(key, item);
+    });
+    return Array.from(map.values());
+  }, [historial]);
+
   return (
     <div className="bg-white rounded-2xl shadow p-5 space-y-4 max-w-2xl">
       <div>
@@ -222,36 +232,38 @@ export default function CrearVisita({ usuarioApp }) {
         />
       </div>
 
-      <select
-        className="border rounded-lg px-3 py-2 w-full md:w-1/2"
-        value={form.tipoVehiculo}
-        onChange={(e) => setForm({ ...form, tipoVehiculo: e.target.value, placa: '' })}
-      >
-        <option value="">Sin vehículo</option>
-        <option value="carro">Carro</option>
-        <option value="moto">Moto</option>
-      </select>
+      <div className="grid md:grid-cols-2 gap-3 items-start">
+        <select
+          className="border rounded-lg px-3 py-2 w-full"
+          value={form.tipoVehiculo}
+          onChange={(e) => setForm({ ...form, tipoVehiculo: e.target.value, placa: '' })}
+        >
+          <option value="">Sin vehículo</option>
+          <option value="carro">Carro</option>
+          <option value="moto">Moto</option>
+        </select>
+
+        <button
+          onClick={crearVisita}
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full"
+        >
+          {loading ? 'Creando...' : 'Crear visita y generar QR'}
+        </button>
+      </div>
 
       {form.tipoVehiculo && (
         <input
           className="border rounded-lg px-3 py-2 w-full md:w-1/2"
           placeholder={form.tipoVehiculo === 'carro' ? 'Placa carro (ABC123)' : 'Placa moto (ABC12 o ABC12D)'}
           value={form.placa}
-          maxLength={form.tipoVehiculo === 'carro' ? 6 : 6}
+          maxLength={6}
           onChange={(e) => setForm({ ...form, placa: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })}
         />
       )}
       {form.tipoVehiculo && form.placa && !validacionPlaca.ok && (
         <p className="text-xs text-red-600">{validacionPlaca.mensaje}</p>
       )}
-
-      <button
-        onClick={crearVisita}
-        disabled={loading}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-      >
-        {loading ? 'Creando...' : 'Crear visita y generar QR'}
-      </button>
 
       {qrPayload && (
         <div ref={qrWrapRef} className="border rounded-xl p-4 bg-slate-50 space-y-3">
@@ -269,9 +281,9 @@ export default function CrearVisita({ usuarioApp }) {
       )}
 
       <div className="border rounded-xl p-4">
-        <h3 className="font-semibold mb-2">Historial de visitas</h3>
+        <h3 className="font-semibold mb-2">Visitantes frecuentes</h3>
         <div className="space-y-2 max-h-72 overflow-auto">
-          {historial.map((item) => (
+          {visitantesFrecuentes.map((item) => (
             <div key={item.id} className="border rounded-lg p-3 text-sm">
               <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
               <p className="text-gray-500">Fecha visita: {item.fecha_visita} · Estado: {item.estado}</p>
@@ -283,7 +295,7 @@ export default function CrearVisita({ usuarioApp }) {
               </div>
             </div>
           ))}
-          {historial.length === 0 && <p className="text-sm text-gray-500">Aún no hay visitas registradas.</p>}
+          {visitantesFrecuentes.length === 0 && <p className="text-sm text-gray-500">Aún no hay visitas registradas.</p>}
         </div>
       </div>
     </div>
