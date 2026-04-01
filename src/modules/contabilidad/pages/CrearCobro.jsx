@@ -21,8 +21,8 @@ export default function CrearCobro({ usuarioApp }) {
 
   const [form, setForm] = useState({
     concepto: 'administracion',
-    valor: '',
-    tipoPago: 'administracion'
+    subcategoriaMulta: '',
+    valor: ''
   });
 
   const [tarifasTipo, setTarifasTipo] = useState({
@@ -48,7 +48,7 @@ export default function CrearCobro({ usuarioApp }) {
   const limpiar = () => {
     setApartamentoInput('');
     setTorreSeleccionada('');
-    setForm({ concepto: 'administracion', valor: '', tipoPago: 'administracion' });
+    setForm({ concepto: 'administracion', subcategoriaMulta: '', valor: '' });
   };
 
   const obtenerResidentePorApartamento = async () => {
@@ -106,11 +106,20 @@ export default function CrearCobro({ usuarioApp }) {
     }
 
     const conceptoLabel = CATEGORIAS_PH.find((c) => c.value === form.concepto)?.label || form.concepto;
+    const esMulta = form.concepto === 'multa';
+    if (esMulta && !form.subcategoriaMulta) {
+      notificarError('COBRO-004', 'Selecciona subcategoría de multa');
+      setLoading(false);
+      return;
+    }
+
+    const tipoPago = esMulta ? 'multa' : form.concepto;
+    const conceptoFinal = esMulta ? `${conceptoLabel} - ${form.subcategoriaMulta}` : conceptoLabel;
 
     const { error } = await crearPago({
       residente_id: residenteId,
-      concepto: conceptoLabel,
-      tipo_pago: form.tipoPago,
+      concepto: conceptoFinal,
+      tipo_pago: tipoPago,
       valor: Number(form.valor)
     }, authData.user);
 
@@ -246,22 +255,24 @@ export default function CrearCobro({ usuarioApp }) {
 
           <select
             value={form.concepto}
-            onChange={(e) => setForm({ ...form, concepto: e.target.value })}
+            onChange={(e) => setForm({ ...form, concepto: e.target.value, subcategoriaMulta: '' })}
             className="w-full border rounded-lg px-3 py-2"
           >
             {CATEGORIAS_PH.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
 
-          <select
-            value={form.tipoPago}
-            onChange={(e) => setForm({ ...form, tipoPago: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2"
-          >
-            <option value="administracion">Tipo pago: Administración</option>
-            <option value="multa">Tipo pago: Multa</option>
-            <option value="sancion">Tipo pago: Sanción</option>
-            <option value="extraordinario">Tipo pago: Extraordinario</option>
-          </select>
+          {form.concepto === 'multa' && (
+            <select
+              value={form.subcategoriaMulta}
+              onChange={(e) => setForm({ ...form, subcategoriaMulta: e.target.value })}
+              className="w-full border rounded-lg px-3 py-2"
+            >
+              <option value="">Subcategoría de multa</option>
+              <option value="leve">Leve</option>
+              <option value="moderado">Moderado</option>
+              <option value="grave">Grave</option>
+            </select>
+          )}
 
           <input
             value={form.valor}
