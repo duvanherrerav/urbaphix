@@ -170,7 +170,7 @@ export const syncOfflineQueue = async (usuarioApp) => {
     try {
       if (item.type === 'visita_estado') {
         const { error } = await supabase
-          .from('visitas')
+          .from('registro_visitas')
           .update(item.payload)
           .eq('id', item.visita_id);
 
@@ -203,7 +203,7 @@ export const syncOfflineQueue = async (usuarioApp) => {
 export const obtenerSeguridadConsolidada = async (conjuntoId) => {
   const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
   const [visitas, incidentes, paquetes] = await Promise.all([
-    supabase.from('visitas').select('id, estado, created_at, hora_ingreso').eq('conjunto_id', conjuntoId).eq('fecha_visita', hoy),
+    supabase.from('registro_visitas').select('id, estado, created_at, hora_ingreso').eq('conjunto_id', conjuntoId).eq('fecha_visita', hoy),
     supabase.from('incidentes').select('id').eq('conjunto_id', conjuntoId).gte('created_at', `${hoy} 00:00:00`),
     supabase.from('paquetes').select('id, estado').eq('conjunto_id', conjuntoId).gte('fecha_recibido', `${hoy} 00:00:00`)
   ]);

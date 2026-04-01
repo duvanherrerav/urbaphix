@@ -42,7 +42,7 @@ export default function PanelVigilancia({ usuarioApp }) {
             hace7dias.setDate(hace7dias.getDate() - 7);
             const fechaInicio = hace7dias.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 
-            const [visitasResp, seguridadResp] = await Promise.all([
+            const [registroResp, seguridadResp] = await Promise.all([
                 supabase
                     .from('registro_visitas')
                     .select(`
@@ -56,13 +56,13 @@ export default function PanelVigilancia({ usuarioApp }) {
             ]);
 
             if (!mounted) return;
-            if (visitasResp.error) {
+            if (registroResp.error) {
                 toast.error('No se pudo cargar el panel de vigilancia');
                 setLoading(false);
                 return;
             }
 
-            const mapped = (visitasResp.data || []).map((v) => ({
+            const mappedRegistro = (registroResp.data || []).map((v) => ({
                 id: v.id,
                 fecha_visita: v.fecha_visita,
                 estado: v.estado,
@@ -74,7 +74,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                 documento: v.visitantes?.documento,
                 placa: v.visitantes?.placa
             }));
-            setVisitas(mapped);
+            setVisitas(mappedRegistro);
             setSeguridad(seguridadResp);
             const cola = getOfflineQueue();
             setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
