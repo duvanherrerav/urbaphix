@@ -6,6 +6,7 @@ import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBit
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+const normalizeEstado = (estado) => String(estado || '').trim().toLowerCase();
 
 const parseQRCode = (text) => {
     try {
@@ -47,7 +48,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                     .from('registro_visitas')
                     .select(`
                         id, conjunto_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
-                        visitantes!inner(nombre, documento, placa)
+                        visitantes(nombre, documento, placa)
                     `)
                     .eq('conjunto_id', usuarioApp.conjunto_id)
                     .gte('fecha_visita', fechaInicio)
@@ -66,6 +67,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                 id: v.id,
                 fecha_visita: v.fecha_visita,
                 estado: v.estado,
+                estado_normalizado: normalizeEstado(v.estado),
                 qr_code: v.qr_code,
                 hora_ingreso: v.hora_ingreso,
                 hora_salida: v.hora_salida,
@@ -162,10 +164,10 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             if (!matchBusq) return false;
 
-            if (vista === 'pendientes') return v.estado === 'pendiente';
-            if (vista === 'ingresadas') return v.estado === 'ingresado';
+            if (vista === 'pendientes') return v.estado_normalizado === 'pendiente';
+            if (vista === 'ingresadas') return v.estado_normalizado === 'ingresado';
             if (vista === 'hoy') return v.fecha_visita === hoy;
-            if (vista === 'finalizadas') return v.estado === 'salido';
+            if (vista === 'finalizadas') return v.estado_normalizado === 'salido';
             return true;
         });
     }, [visitas, busqueda, vista]);
@@ -175,9 +177,9 @@ export default function PanelVigilancia({ usuarioApp }) {
     const filtradasPaginadas = filtradas.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
     const resumen = {
-        pendientes: visitas.filter((v) => v.estado === 'pendiente').length,
-        ingresadas: visitas.filter((v) => v.estado === 'ingresado').length,
-        finalizadas: visitas.filter((v) => v.estado === 'salido').length
+        pendientes: visitas.filter((v) => v.estado_normalizado === 'pendiente').length,
+        ingresadas: visitas.filter((v) => v.estado_normalizado === 'ingresado').length,
+        finalizadas: visitas.filter((v) => v.estado_normalizado === 'salido').length
     };
     const sla = calcularSLA(visitas);
 
@@ -237,18 +239,18 @@ export default function PanelVigilancia({ usuarioApp }) {
                                 <p><b>Placa:</b> {v.placa || 'No registra'}</p>
                             </div>
                             <div className="space-y-1 text-sm md:text-right">
-                                <p><b>Estado:</b> <span className={v.estado === 'pendiente' ? 'text-amber-600 font-semibold' : v.estado === 'ingresado' ? 'text-blue-600 font-semibold' : 'text-green-600 font-semibold'}>{v.estado}</span></p>
+                                <p><b>Estado:</b> <span className={v.estado_normalizado === 'pendiente' ? 'text-amber-600 font-semibold' : v.estado_normalizado === 'ingresado' ? 'text-blue-600 font-semibold' : 'text-green-600 font-semibold'}>{v.estado}</span></p>
                                 {v.hora_ingreso && <p className="text-blue-600">⏱ Ingreso: {v.hora_ingreso}</p>}
                                 {v.hora_salida && <p className="text-green-600">✅ Salida: {v.hora_salida}</p>}
                             </div>
                         </div>
                         <div className="mt-3 flex gap-2">
-                            {v.estado === 'pendiente' && (
+                            {v.estado_normalizado === 'pendiente' && (
                                 <button className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700" onClick={() => setModalIngreso({ open: true, visita: v, manualQR: '' })}>
                                     Validar QR e ingresar
                                 </button>
                             )}
-                            {v.estado === 'ingresado' && (
+                            {v.estado_normalizado === 'ingresado' && (
                                 <button className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700" onClick={() => registrarSalida(v.id)}>
                                     Registrar salida
                                 </button>

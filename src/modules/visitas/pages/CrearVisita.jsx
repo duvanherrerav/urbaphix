@@ -4,23 +4,16 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
 
-const TIPOS_DOCUMENTO_FALLBACK = [
-  { codigo: 'CC', nombre: 'Cédula de ciudadanía' },
-  { codigo: 'CE', nombre: 'Cédula de extranjería' },
-  { codigo: 'TI', nombre: 'Tarjeta de identidad' },
-  { codigo: 'PAS', nombre: 'Pasaporte' }
-];
-
 export default function CrearVisita({ usuarioApp }) {
   const [form, setForm] = useState({
     nombre: '',
-    tipo_documento: 'CC',
+    tipo_documento: '',
     documento: '',
     fecha: '',
     tipoVehiculo: '',
     placa: ''
   });
-  const [tiposDocumento, setTiposDocumento] = useState(TIPOS_DOCUMENTO_FALLBACK);
+  const [tiposDocumento, setTiposDocumento] = useState([]);
   const [loading, setLoading] = useState(false);
   const [qrPayload, setQrPayload] = useState(null);
   const [residenteId, setResidenteId] = useState(null);
@@ -36,7 +29,18 @@ export default function CrearVisita({ usuarioApp }) {
         .eq('activo', true)
         .order('nombre', { ascending: true });
 
-      if (!error && data?.length) setTiposDocumento(data);
+      if (error || !data?.length) {
+        toast.error('No se pudo cargar tipos de documento desde configuración');
+        return;
+      }
+
+      setTiposDocumento(data);
+      setForm((prev) => ({
+        ...prev,
+        tipo_documento: prev.tipo_documento && data.some((t) => t.codigo === prev.tipo_documento)
+          ? prev.tipo_documento
+          : data[0].codigo
+      }));
     };
     cargarTipos();
   }, []);
@@ -102,6 +106,12 @@ export default function CrearVisita({ usuarioApp }) {
       return;
     }
 
+    const tipoValido = tiposDocumento.some((t) => t.codigo === form.tipo_documento);
+    if (!tipoValido) {
+      toast.error('Tipo de documento no válido. Actualiza e intenta de nuevo.');
+      return;
+    }
+
     setLoading(true);
     if (form.tipoVehiculo && !validacionPlaca.ok) {
       toast.error(validacionPlaca.mensaje);
@@ -142,7 +152,7 @@ export default function CrearVisita({ usuarioApp }) {
     const payload = JSON.stringify({ visita_id: visita.id, qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
     toast.success('Visita creada. QR listo para compartir ✅');
-    setForm({ nombre: '', tipo_documento: 'CC', documento: '', fecha: '', tipoVehiculo: '', placa: '' });
+    setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: '', tipoVehiculo: '', placa: '' }));
     if (residenteId) cargarHistorial(residenteId);
   };
 
@@ -223,8 +233,10 @@ export default function CrearVisita({ usuarioApp }) {
         <select
           className="border rounded-lg px-3 py-2"
           value={form.tipo_documento}
+          disabled={!tiposDocumento.length}
           onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}
         >
+          {!tiposDocumento.length && <option value="">Cargando tipos...</option>}
           {tiposDocumento.map((item) => (
             <option key={item.codigo} value={item.codigo}>{item.nombre}</option>
           ))}
