@@ -22,32 +22,29 @@ export const crearVisita = async (data, user) => {
             throw new Error(errorMessage(errorUsuario, 'No se pudo obtener el conjunto del usuario'));
         }
 
-        const qr_code = crypto.randomUUID();
+        const { data: rpcData, error } = await supabase.rpc('fn_crear_o_reutilizar_visitante_y_registro', {
+            p_conjunto_id: usuario.conjunto_id,
+            p_residente_id: data.residente_id,
+            p_apartamento_id: data.apartamento_id || null,
+            p_nombre: data.nombre.trim(),
+            p_tipo_documento: String(data.tipo_documento).trim().toUpperCase(),
+            p_documento: String(data.documento).trim(),
+            p_tipo_vehiculo: data.tipo_vehiculo || null,
+            p_placa: data.placa ? String(data.placa).trim().toUpperCase() : null,
+            p_fecha_visita: data.fecha
+        });
 
-        const { data: visita, error } = await supabase
-            .from('visitas')
-            .insert([{
-                conjunto_id: usuario.conjunto_id,
-                residente_id: data.residente_id,
-                apartamento_id: data.apartamento_id || null,
-                nombre_visitante: data.nombre.trim(),
-                tipo_documento: String(data.tipo_documento).trim().toUpperCase(),
-                documento: String(data.documento).trim(),
-                placa: data.placa ? String(data.placa).trim().toUpperCase() : null,
-                fecha_visita: data.fecha,
-                hora_inicio: data.hora_inicio || null,
-                hora_fin: data.hora_fin || null,
-                estado: 'pendiente',
-                qr_code
-            }])
-            .select()
-            .single();
-
-        if (error || !visita) {
+        const first = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+        if (error || !first?.registro_id) {
             throw new Error(errorMessage(error, 'No se pudo crear la visita'));
         }
 
-        return { ok: true, visita, qr_code, error: null };
+        return {
+            ok: true,
+            visita: { id: first.registro_id, visitante_id: first.visitante_id, fecha_visita: data.fecha, estado: 'pendiente' },
+            qr_code: first.qr_code,
+            error: null
+        };
     } catch (error) {
         console.error('crearVisita error:', error);
         return { ok: false, visita: null, qr_code: null, error: errorMessage(error, 'Error creando visita') };
@@ -61,27 +58,29 @@ export const validarQR = async (qr_code) => {
         }
 
         const { data: visita, error: errorVisita } = await supabase
-            .from('visitas')
-            .select('*')
+            .from('registro_visitas')
+            .select(`
+                *,
+                visitantes (
+                    id,
+                    nombre,
+                    documento,
+                    residente_id
+                )
+            `)
             .eq('qr_code', qr_code)
             .single();
 
-            if (errorVisita || !visita) {
+        if (errorVisita || !visita) {
             throw new Error('QR inválido o visita no encontrada');
         }
 
-        const { error: errorAcceso } = await supabase.from('accesos').insert([{
-            visita_id: visita.id,
-            fecha_ingreso: new Date().toISOString()
-        }]);
-
-        if (errorAcceso) {
-            throw new Error(errorMessage(errorAcceso, 'No se pudo registrar el acceso'));
-        }
-
         const { error: errorUpdate } = await supabase
-            .from('visitas')
-            .update({ estado: 'ingresado' })
+            .from('registro_visitas')
+            .update({
+                estado: 'ingresado',
+                hora_ingreso: new Date().toISOString()
+            })
             .eq('id', visita.id);
 
         if (errorUpdate) {
@@ -89,10 +88,10 @@ export const validarQR = async (qr_code) => {
         }
 
         const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
-            usuario_id: visita.residente_id,
+            usuario_id: visita.visitantes?.residente_id,
             tipo: 'visita_ingreso',
             titulo: 'Tu visita ingresó',
-            mensaje: `${visita.nombre_visitante} ya está en portería`
+            mensaje: `${visita.visitantes?.nombre || 'Tu visitante'} ya está en portería`
         }]);
 
         if (errorNotificacion) {

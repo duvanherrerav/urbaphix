@@ -44,8 +44,11 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             const [visitasResp, seguridadResp] = await Promise.all([
                 supabase
-                    .from('visitas')
-                    .select('*')
+                    .from('registro_visitas')
+                    .select(`
+                        id, conjunto_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
+                        visitantes!inner(nombre, documento, placa)
+                    `)
                     .eq('conjunto_id', usuarioApp.conjunto_id)
                     .gte('fecha_visita', fechaInicio)
                     .order('fecha_visita', { ascending: false }),
@@ -59,7 +62,19 @@ export default function PanelVigilancia({ usuarioApp }) {
                 return;
             }
 
-            setVisitas(visitasResp.data || []);
+            const mapped = (visitasResp.data || []).map((v) => ({
+                id: v.id,
+                fecha_visita: v.fecha_visita,
+                estado: v.estado,
+                qr_code: v.qr_code,
+                hora_ingreso: v.hora_ingreso,
+                hora_salida: v.hora_salida,
+                created_at: v.created_at,
+                nombre_visitante: v.visitantes?.nombre,
+                documento: v.visitantes?.documento,
+                placa: v.visitantes?.placa
+            }));
+            setVisitas(mapped);
             setSeguridad(seguridadResp);
             const cola = getOfflineQueue();
             setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
@@ -69,8 +84,8 @@ export default function PanelVigilancia({ usuarioApp }) {
         cargar();
 
         const channel = supabase
-            .channel(`visitas-vigilancia-${usuarioApp?.conjunto_id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'visitas', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` }, cargar)
+            .channel(`registro-visitas-vigilancia-${usuarioApp?.conjunto_id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` }, cargar)
             .subscribe();
 
         return () => {
@@ -101,7 +116,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
         const timestamp = toBogotaTimestamp();
         const { error } = await supabase
-            .from('visitas')
+            .from('registro_visitas')
             .update({ estado: 'ingresado', hora_ingreso: timestamp })
             .eq('id', visitaObjetivo.id);
 
@@ -123,7 +138,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const registrarSalida = async (id) => {
         const timestamp = toBogotaTimestamp();
-        const { error } = await supabase.from('visitas').update({ estado: 'salido', hora_salida: timestamp }).eq('id', id);
+        const { error } = await supabase.from('registro_visitas').update({ estado: 'salido', hora_salida: timestamp }).eq('id', id);
 
         if (error) {
             toast.error('Error al registrar salida');

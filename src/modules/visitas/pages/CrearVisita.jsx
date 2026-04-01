@@ -42,12 +42,27 @@ export default function CrearVisita({ usuarioApp }) {
 
   const cargarHistorial = async (rid) => {
     const { data } = await supabase
-      .from('visitas')
-      .select('id, nombre_visitante, tipo_documento, documento, placa, fecha_visita, estado, qr_code, created_at')
-      .eq('residente_id', rid)
+      .from('registro_visitas')
+      .select(`
+        id, fecha_visita, estado, qr_code, created_at,
+        visitantes!inner(id, residente_id, nombre, tipo_documento, documento, placa, tipo_vehiculo)
+      `)
+      .eq('visitantes.residente_id', rid)
       .order('created_at', { ascending: false })
       .limit(20);
-    setHistorial(data || []);
+    const mapped = (data || []).map((row) => ({
+      id: row.id,
+      fecha_visita: row.fecha_visita,
+      estado: row.estado,
+      qr_code: row.qr_code,
+      created_at: row.created_at,
+      nombre_visitante: row.visitantes?.nombre,
+      tipo_documento: row.visitantes?.tipo_documento,
+      documento: row.visitantes?.documento,
+      placa: row.visitantes?.placa,
+      tipo_vehiculo: row.visitantes?.tipo_vehiculo
+    }));
+    setHistorial(mapped);
   };
 
   useEffect(() => {
@@ -112,6 +127,7 @@ export default function CrearVisita({ usuarioApp }) {
       nombre: form.nombre,
       tipo_documento: form.tipo_documento,
       documento: form.documento,
+      tipo_vehiculo: form.tipoVehiculo || null,
       placa: form.tipoVehiculo ? form.placa : null,
       fecha: form.fecha
     }, authData?.user);
@@ -127,12 +143,6 @@ export default function CrearVisita({ usuarioApp }) {
     toast.success('Visita creada. QR listo para compartir ✅');
     setForm({ nombre: '', tipo_documento: 'CC', documento: '', fecha: '', tipoVehiculo: '', placa: '' });
     if (residenteId) cargarHistorial(residenteId);
-  };
-
-  const copiarCodigo = async () => {
-    if (!qrPayload) return;
-    await navigator.clipboard.writeText(qrPayload);
-    toast.success('Código QR copiado');
   };
 
   const compartirQR = async () => {
@@ -177,7 +187,7 @@ export default function CrearVisita({ usuarioApp }) {
       tipo_documento: item.tipo_documento || 'CC',
       documento: item.documento || '',
       fecha: new Date().toISOString().split('T')[0],
-      tipoVehiculo: item.placa ? (item.placa.length > 6 ? 'moto' : 'carro') : '',
+      tipoVehiculo: item.tipo_vehiculo || '',
       placa: item.placa || ''
     });
     toast('Datos cargados. Solo ajusta fecha/placa y crea nueva visita.');
@@ -272,9 +282,8 @@ export default function CrearVisita({ usuarioApp }) {
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <QRCodeCanvas value={qrPayload} size={180} />
             <div className="space-y-2">
-              <button className="w-full border rounded-lg px-3 py-2 text-sm" onClick={copiarCodigo}>Copiar código de validación</button>
-              <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirQR}>Compartir QR</button>
-              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir imagen QR</button>
+              <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir QR</button>
+              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirQR}>Copiar código de validación</button>
             </div>
           </div>
         </div>
