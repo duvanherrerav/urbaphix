@@ -4,6 +4,13 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
 
+const TIPOS_DOCUMENTO_FALLBACK = [
+  { codigo: 'CC', nombre: 'Cédula de ciudadanía' },
+  { codigo: 'CE', nombre: 'Cédula de extranjería' },
+  { codigo: 'TI', nombre: 'Tarjeta de identidad' },
+  { codigo: 'PAS', nombre: 'Pasaporte' }
+];
+
 export default function CrearVisita({ usuarioApp }) {
   const [form, setForm] = useState({
     nombre: '',
@@ -20,17 +27,40 @@ export default function CrearVisita({ usuarioApp }) {
   const [historial, setHistorial] = useState([]);
   const [filtroHistorial, setFiltroHistorial] = useState('todos');
   const qrWrapRef = useRef(null);
+  const toastTiposShownRef = useRef(false);
 
   useEffect(() => {
     const cargarTipos = async () => {
-      const { data, error } = await supabase
+      const baseQuery = supabase
         .from('tipos_documento')
         .select('codigo, nombre')
-        .eq('activo', true)
         .order('nombre', { ascending: true });
 
-      if (error || !data?.length) {
-        toast.error('No se pudo cargar tipos de documento desde configuración');
+      let data = [];
+      let error = null;
+
+      const activosResp = await baseQuery.eq('activo', true);
+      if (!activosResp.error && activosResp.data?.length) {
+        data = activosResp.data;
+      } else {
+        const todosResp = await supabase
+          .from('tipos_documento')
+          .select('codigo, nombre')
+          .order('nombre', { ascending: true });
+        data = todosResp.data || [];
+        error = todosResp.error;
+      }
+
+      if (!data.length) {
+        setTiposDocumento(TIPOS_DOCUMENTO_FALLBACK);
+        setForm((prev) => ({
+          ...prev,
+          tipo_documento: prev.tipo_documento || TIPOS_DOCUMENTO_FALLBACK[0].codigo
+        }));
+        if (!toastTiposShownRef.current) {
+          toast.error('No se pudo cargar catálogo desde Supabase; usando tipos por defecto');
+          toastTiposShownRef.current = true;
+        }
         return;
       }
 
@@ -41,6 +71,11 @@ export default function CrearVisita({ usuarioApp }) {
           ? prev.tipo_documento
           : data[0].codigo
       }));
+
+      if (error && !toastTiposShownRef.current) {
+        toast('Catálogo cargado sin filtro de estado (activo).');
+        toastTiposShownRef.current = true;
+      }
     };
     cargarTipos();
   }, []);

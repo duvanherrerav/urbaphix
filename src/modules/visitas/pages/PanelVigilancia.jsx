@@ -7,6 +7,7 @@ import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBit
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 const normalizeEstado = (estado) => String(estado || '').trim().toLowerCase();
+const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
 
 const parseQRCode = (text) => {
     try {
@@ -47,8 +48,8 @@ export default function PanelVigilancia({ usuarioApp }) {
                 supabase
                     .from('registro_visitas')
                     .select(`
-                        id, conjunto_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
-                        visitantes(nombre, documento, placa)
+                        id, conjunto_id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
+                        visitantes(residente_id, nombre, documento, placa)
                     `)
                     .eq('conjunto_id', usuarioApp.conjunto_id)
                     .gte('fecha_visita', fechaInicio)
@@ -63,9 +64,31 @@ export default function PanelVigilancia({ usuarioApp }) {
                 return;
             }
 
-            const mappedRegistro = (registroResp.data || []).map((v) => ({
+            let registros = registroResp.data || [];
+
+            if (!registros.length) {
+                const [{ data: residentes }, { data: fallbackRegistros, error: fallbackError }] = await Promise.all([
+                    supabase.from('residentes').select('id').eq('conjunto_id', usuarioApp.conjunto_id),
+                    supabase
+                        .from('registro_visitas')
+                        .select(`
+                            id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
+                            visitantes(residente_id, nombre, documento, placa)
+                        `)
+                        .gte('fecha_visita', fechaInicio)
+                        .order('fecha_visita', { ascending: false })
+                        .limit(500)
+                ]);
+
+                if (!fallbackError && Array.isArray(fallbackRegistros)) {
+                    const residentesSet = new Set((residentes || []).map((r) => r.id));
+                    registros = fallbackRegistros.filter((row) => residentesSet.has(row.visitantes?.residente_id));
+                }
+            }
+
+            const mappedRegistro = registros.map((v) => ({
                 id: v.id,
-                fecha_visita: v.fecha_visita,
+                fecha_visita: normalizeFecha(v.fecha_visita),
                 estado: v.estado,
                 estado_normalizado: normalizeEstado(v.estado),
                 qr_code: v.qr_code,
@@ -127,7 +150,7 @@ export default function PanelVigilancia({ usuarioApp }) {
             return;
         }
 
-        setVisitas((prev) => prev.map((v) => (v.id === visitaObjetivo.id ? { ...v, estado: 'ingresado', hora_ingreso: timestamp } : v)));
+        setVisitas((prev) => prev.map((v) => (v.id === visitaObjetivo.id ? { ...v, estado: 'ingresado', estado_normalizado: 'ingresado', hora_ingreso: timestamp } : v)));
         await registrarBitacora({
             usuarioApp,
             visitaId: visitaObjetivo.id,
@@ -147,7 +170,7 @@ export default function PanelVigilancia({ usuarioApp }) {
             return;
         }
 
-        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'salido', hora_salida: timestamp } : v)));
+        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'salido', estado_normalizado: 'salido', hora_salida: timestamp } : v)));
         await registrarBitacora({ usuarioApp, visitaId: id, accion: 'registrar_salida', detalle: 'Salida registrada desde panel vigilancia' });
         toast.success('Salida registrada');
     };
