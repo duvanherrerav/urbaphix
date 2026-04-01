@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
+const formatFechaBogota = (value) => {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+};
+
 export default function PanelPagosAdmin({ usuarioApp }) {
 
     const [pagos, setPagos] = useState([]);
@@ -197,7 +202,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
                             {/* 📅 FECHA */}
                             <p className="text-xs text-gray-400">
-                                {new Date(p.created_at).toLocaleDateString()}
+                                {formatFechaBogota(p.created_at)}
                             </p>
 
                             {/* 📄 COMPROBANTE */}

@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import jsPDF from 'jspdf';
 
+const formatFechaBogota = (value) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+};
+
 export default function EstadoCuenta({ usuarioApp }) {
   const hoy = new Date();
   const [filtroEstado, setFiltroEstado] = useState('todos');
@@ -97,7 +102,7 @@ export default function EstadoCuenta({ usuarioApp }) {
 
     estado.pagos.forEach((p) => {
       doc.text(
-        `${new Date(p.created_at).toLocaleDateString()} | ${p.estado} | ${p.tipo_pago || '-'} | $${Number(p.valor || 0).toLocaleString('es-CO')}`,
+        `${formatFechaBogota(p.created_at)} | ${p.estado} | ${p.tipo_pago || '-'} | $${Number(p.valor || 0).toLocaleString('es-CO')}`,
         10,
         y
       );
@@ -166,7 +171,7 @@ export default function EstadoCuenta({ usuarioApp }) {
             <div className="space-y-2 max-h-72 overflow-auto">
               {estado.pagos.map((p) => (
                 <div key={p.id} className="flex justify-between border p-2 rounded text-sm">
-                  <span>{new Date(p.created_at).toLocaleDateString()} · {p.tipo_pago || '-'}</span>
+                  <span>{formatFechaBogota(p.created_at)} · {p.tipo_pago || '-'}</span>
                   <span className={p.estado === 'pendiente' ? 'text-red-600' : 'text-green-600'}>
                     ${Number(p.valor || 0).toLocaleString('es-CO')} ({p.estado})
                   </span>

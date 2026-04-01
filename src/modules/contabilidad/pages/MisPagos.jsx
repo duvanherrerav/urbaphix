@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
+const formatFechaBogota = (value) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+};
+
 export default function MisPagos({ usuarioApp }) {
 
   const [pagos, setPagos] = useState([]);
@@ -8,17 +13,8 @@ export default function MisPagos({ usuarioApp }) {
   const [configPago, setConfigPago] = useState(null);
   const [archivo, setArchivo] = useState(null);
 
-  useEffect(() => {
-
-    if (!usuarioApp) return;
-
-    obtenerConfigPago();
-    cargar();
-
-  }, [usuarioApp]);
-
   // 🔥 CONFIG PAGOS
-  const obtenerConfigPago = async () => {
+  async function obtenerConfigPago() {
 
     const { data, error } = await supabase
       .from('config_pagos')
@@ -33,10 +29,34 @@ export default function MisPagos({ usuarioApp }) {
     }
 
     setConfigPago(data);
-  };
+  }
+
+  // 🔥 REALTIME
+  function suscribirse(residenteId) {
+
+    const channel = supabase
+      .channel('mis-pagos')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pagos',
+          filter: `residente_id=eq.${residenteId}`
+        },
+        () => {
+          cargar();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }
 
   // 🔥 CARGAR PAGOS
-  const cargar = async () => {
+  async function cargar() {
 
     try {
 
@@ -83,34 +103,19 @@ export default function MisPagos({ usuarioApp }) {
       console.log(err);
       setLoading(false);
     }
-  };
+  }
 
-  // 🔥 REALTIME
-  const suscribirse = (residenteId) => {
-
-    const channel = supabase
-      .channel('mis-pagos')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pagos',
-          filter: `residente_id=eq.${residenteId}`
-        },
-        () => {
-          cargar();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
+  useEffect(() => {
+    if (!usuarioApp) return;
+    const timer = setTimeout(() => {
+      obtenerConfigPago();
+      cargar();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [usuarioApp]);
 
   // 🔥 PAGAR
-  const pagar = (pago) => {
+  const pagar = () => {
 
     if (!configPago) {
       alert('No hay configuración de pagos');
@@ -142,7 +147,7 @@ export default function MisPagos({ usuarioApp }) {
       return;
     }
 
-    const nombreArchivo = `${pagoId}_${Date.now()}`;
+    const nombreArchivo = `${pagoId}_${String(archivo.name || 'comprobante').replace(/\s+/g, '_')}`;
 
     const { error } = await supabase.storage
       .from('comprobantes')
@@ -216,7 +221,7 @@ export default function MisPagos({ usuarioApp }) {
                 </p>
 
                 <p className="text-sm text-gray-500">
-                  {new Date(p.created_at).toLocaleDateString()}
+                  {formatFechaBogota(p.created_at)}
                 </p>
 
                 {/* 🔥 VER COMPROBANTE */}
@@ -246,7 +251,7 @@ export default function MisPagos({ usuarioApp }) {
                 {/* 🔥 BOTÓN PAGAR */}
                 {p.estado === 'pendiente' && (
                   <button
-                    onClick={() => pagar(p)}
+                    onClick={pagar}
                     className="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg"
                   >
                     Pagar
