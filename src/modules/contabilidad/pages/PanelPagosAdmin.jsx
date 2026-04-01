@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
+const formatFechaBogota = (value) => {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+};
+
 export default function PanelPagosAdmin({ usuarioApp }) {
 
     const [pagos, setPagos] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [filtroTorre, setFiltroTorre] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
     const [busquedaApto, setBusquedaApto] = useState('');

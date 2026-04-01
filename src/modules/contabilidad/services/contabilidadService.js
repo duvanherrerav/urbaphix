@@ -1,10 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 
 const errorMessage = (error, fallback) => error?.message || fallback;
-const bogotaNowISO = () => {
-  const local = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' });
-  return `${local.replace(' ', 'T')}-05:00`;
-};
 
 // 🔥 CREAR COBRO
 export const crearPago = async (data, user) => {
@@ -45,7 +41,6 @@ export const crearPago = async (data, user) => {
         concepto: String(data.concepto).trim(),
         tipo_pago: tipoPago,
         valor: valorNumerico,
-        created_at: bogotaNowISO(),
         estado: 'pendiente'
       }])
       .select()
