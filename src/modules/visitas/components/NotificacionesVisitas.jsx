@@ -17,7 +17,7 @@ export default function NotificacionesVisitas({ usuarioApp }) {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'visitas'
+          table: 'registro_visitas'
         },
         async (payload) => {
 
@@ -35,8 +35,16 @@ export default function NotificacionesVisitas({ usuarioApp }) {
 
           if (!residente) return;
 
+          const { data: visitante } = await supabase
+            .from('visitantes')
+            .select('residente_id, nombre')
+            .eq('id', visita.visitante_id)
+            .single();
+
+          if (!visitante) return;
+
           // 🔥 3. VALIDAR QUE LA VISITA SEA DE ESTE RESIDENTE
-          if (visita.residente_id !== residente.id) return;
+          if (visitante.residente_id !== residente.id) return;
 
           // 🔥 4. EVITAR DUPLICADOS
           const clave = visita.id + visita.estado;
@@ -51,7 +59,7 @@ export default function NotificacionesVisitas({ usuarioApp }) {
 
             if (Notification.permission === 'granted') {
               new Notification('🚗 Visita ingresó', {
-                body: `${visita.nombre_visitante} ha ingresado`,
+                body: `${visitante.nombre} ha ingresado`,
                 icon: '/icon.png'
               });
             }
@@ -63,7 +71,7 @@ export default function NotificacionesVisitas({ usuarioApp }) {
 
             if (Notification.permission === 'granted') {
               new Notification('✅ Visita salió', {
-                body: `${visita.nombre_visitante} ha salido`,
+                body: `${visitante.nombre} ha salido`,
                 icon: '/icon.png'
               });
             }

@@ -48,8 +48,11 @@ export default function EscanearQR({ usuarioApp }) {
 
       // 🔥 buscar visita
       const { data: visita, error } = await supabase
-        .from('visitas')
-        .select('*')
+        .from('registro_visitas')
+        .select(`
+          id, qr_code, conjunto_id, estado, fecha_visita, hora_inicio, hora_fin, visitante_id,
+          visitantes (nombre, documento, residente_id)
+        `)
         .or(visita_id ? `id.eq.${visita_id}` : `qr_code.eq.${qr_code}`)
         .single();
 
@@ -65,12 +68,19 @@ export default function EscanearQR({ usuarioApp }) {
         return;
       }
 
-      const regla = validarReglasAcceso(visita);
+      const visitaNormalizada = {
+        ...visita,
+        nombre_visitante: visita.visitantes?.nombre,
+        documento: visita.visitantes?.documento,
+        residente_id: visita.visitantes?.residente_id
+      };
+
+      const regla = validarReglasAcceso(visitaNormalizada);
       if (!regla.ok) {
         toast.error(regla.error);
         await registrarBitacora({
           usuarioApp,
-          visitaId: visita.id,
+          visitaId: visitaNormalizada.id,
           accion: 'acceso_denegado_regla',
           detalle: regla.error,
           metadata: { modoEscaneo }
@@ -80,18 +90,18 @@ export default function EscanearQR({ usuarioApp }) {
 
       // 🔥 registrar ingreso
       const { error: updateError } = await supabase
-        .from('visitas')
+        .from('registro_visitas')
         .update({
           estado: 'ingresado',
           hora_ingreso: new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ')
         })
-        .eq('id', visita.id);
+        .eq('id', visitaNormalizada.id);
 
       // 🔥 buscar token del usuario
       const { data: usuario } = await supabase
         .from('usuarios_app')
         .select('fcm_token')
-        .eq('id', visita.residente_id)
+        .eq('id', visitaNormalizada.residente_id)
         .single();
 
       // 🔥 enviar push
@@ -103,14 +113,14 @@ export default function EscanearQR({ usuarioApp }) {
         body: JSON.stringify({
           token: usuario.fcm_token,
           titulo: '🚗 Visita ingresó',
-          mensaje: `${visita.nombre_visitante} ha ingresado`
+          mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
         })
       });
 
       if (updateError) {
         enqueueOfflineAction({
           type: 'visita_estado',
-          visita_id: visita.id,
+          visita_id: visitaNormalizada.id,
           payload: {
             estado: 'ingresado',
             hora_ingreso: new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ')
@@ -120,17 +130,17 @@ export default function EscanearQR({ usuarioApp }) {
       } else {
         // 🔥 guardar notificación
         await supabase.from('notificaciones').insert([{
-          usuario_id: visita.residente_id,
+          usuario_id: visitaNormalizada.residente_id,
           tipo: 'visita_ingreso',
           titulo: "Visita ingresó",
-          mensaje: `${visita.nombre_visitante} ha ingresado`
+          mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
         }]);
 
-        setResultado(visita);
+        setResultado(visitaNormalizada);
         toast.success('Ingreso autorizado');
         await registrarBitacora({
           usuarioApp,
-          visitaId: visita.id,
+          visitaId: visitaNormalizada.id,
           accion: 'ingreso_por_qr',
           detalle: 'Ingreso autorizado por lectura QR',
           metadata: { modoEscaneo }
