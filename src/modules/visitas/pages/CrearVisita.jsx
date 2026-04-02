@@ -26,14 +26,13 @@ export default function CrearVisita({ usuarioApp }) {
     const cargarTipos = async () => {
       let { data, error } = await supabase
         .from('tipos_documento')
-        .select('codigo, nombre')
-        .eq('activo', true)
+        .select('id, codigo, nombre, activo')
         .order('id', { ascending: true });
 
       if ((!data || !data.length) && !error) {
         const allResp = await supabase
           .from('tipos_documento')
-          .select('codigo, nombre')
+          .select('id, codigo, nombre, activo')
           .order('id', { ascending: true });
         data = allResp.data;
         error = allResp.error;
@@ -49,6 +48,11 @@ export default function CrearVisita({ usuarioApp }) {
       }
 
       const normalizados = data
+        .filter((row) => {
+          if (row.activo === undefined || row.activo === null) return true;
+          if (typeof row.activo === 'boolean') return row.activo;
+          return ['true', '1', 'activo'].includes(String(row.activo).toLowerCase());
+        })
         .map((row) => ({
           codigo: String(row.codigo || '').trim(),
           nombre: String(row.nombre || '').trim()

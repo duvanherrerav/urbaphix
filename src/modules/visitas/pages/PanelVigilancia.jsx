@@ -73,31 +73,32 @@ export default function PanelVigilancia({ usuarioApp }) {
             }
 
             const registros = registroResp.data || [];
-            let registrosUsables = registros;
-
-            if (!registrosUsables.length) {
-                const { data: residentes } = await supabase
-                    .from('residentes')
+            const { data: residentes } = await supabase
+                .from('residentes')
+                .select('id')
+                .eq('conjunto_id', conjuntoId);
+            const idsResidentes = (residentes || []).map((r) => r.id);
+            const { data: visitantesConjunto } = idsResidentes.length
+                ? await supabase
+                    .from('visitantes')
                     .select('id')
-                    .eq('conjunto_id', conjuntoId);
-                const idsResidentes = (residentes || []).map((r) => r.id);
-                const { data: visitantesConjunto } = idsResidentes.length
-                    ? await supabase
-                        .from('visitantes')
-                        .select('id')
-                        .in('residente_id', idsResidentes)
-                    : { data: [] };
+                    .in('residente_id', idsResidentes)
+                : { data: [] };
 
-                const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
-                if (idsVisitantesConjunto.length) {
-                    const { data: registrosFallback } = await supabase
-                        .from('registro_visitas')
-                        .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
-                        .in('visitante_id', idsVisitantesConjunto)
-                        .order('fecha_visita', { ascending: false });
-                    registrosUsables = registrosFallback || [];
-                }
-            }
+            const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
+            const { data: registrosFallback } = idsVisitantesConjunto.length
+                ? await supabase
+                    .from('registro_visitas')
+                    .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                    .in('visitante_id', idsVisitantesConjunto)
+                    .order('fecha_visita', { ascending: false })
+                : { data: [] };
+
+            const dedupe = new Map();
+            [...registros, ...(registrosFallback || [])].forEach((row) => {
+                if (row?.id) dedupe.set(row.id, row);
+            });
+            const registrosUsables = Array.from(dedupe.values());
             const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
             const { data: visitantesData } = visitanteIds.length
                 ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
