@@ -41,6 +41,9 @@ export default function CrearVisita({ usuarioApp }) {
       const codeKey = ['codigo', 'sigla', 'abreviatura', 'id'].find((k) => k in (data[0] || {}));
       const nameKey = ['nombre', 'descripcion', 'tipo_documento', 'codigo'].find((k) => k in (data[0] || {}));
       const activeKey = ['activo', 'habilitado', 'estado'].find((k) => k in (data[0] || {}));
+      const fallbackKeys = Object.keys(data[0] || {});
+      const fallbackCodeKey = fallbackKeys[0];
+      const fallbackNameKey = fallbackKeys[1] || fallbackKeys[0];
 
       const normalizados = data
         .filter((row) => {
@@ -50,8 +53,8 @@ export default function CrearVisita({ usuarioApp }) {
           return String(value).toLowerCase() === 'activo';
         })
         .map((row) => ({
-          codigo: String(row[codeKey] || '').trim(),
-          nombre: String(row[nameKey] || row[codeKey] || '').trim()
+          codigo: String(row[codeKey || fallbackCodeKey] || '').trim(),
+          nombre: String(row[nameKey || fallbackNameKey] || row[codeKey || fallbackCodeKey] || '').trim()
         }))
         .filter((row) => row.codigo && row.nombre);
 
@@ -124,6 +127,11 @@ export default function CrearVisita({ usuarioApp }) {
   const crearVisita = async () => {
     if (!form.nombre || !form.documento || !form.fecha || !form.tipo_documento) {
       toast('Completa los campos obligatorios ⚠️');
+      return;
+    }
+
+    if (!tiposDocumento.length) {
+      toast.error('No hay tipos de documento configurados en Supabase');
       return;
     }
 
@@ -254,10 +262,9 @@ export default function CrearVisita({ usuarioApp }) {
         <select
           className="border rounded-lg px-3 py-2"
           value={form.tipo_documento}
-          disabled={!tiposDocumento.length}
           onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}
         >
-          {!tiposDocumento.length && <option value="">Cargando tipos...</option>}
+          {!tiposDocumento.length && <option value="">Seleccione tipo documento</option>}
           {tiposDocumento.map((item) => (
             <option key={item.codigo} value={item.codigo}>{item.nombre}</option>
           ))}
@@ -291,10 +298,10 @@ export default function CrearVisita({ usuarioApp }) {
 
       <button
         onClick={crearVisita}
-        disabled={loading || !tiposDocumento.length}
+        disabled={loading}
         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full"
       >
-        {loading ? 'Creando...' : !tiposDocumento.length ? 'Sin tipos_documento disponibles' : 'Crear visita y generar QR'}
+        {loading ? 'Creando...' : 'Crear visita y generar QR'}
       </button>
       </div>
 

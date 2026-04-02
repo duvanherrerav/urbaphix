@@ -6,9 +6,14 @@ import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBit
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
-const normalizeEstado = (estado) => String(estado || '').trim().toLowerCase();
+const normalizeEstado = (estado) => {
+    const value = String(estado || '').trim().toLowerCase();
+    if (value.includes('pend')) return 'pendiente';
+    if (value.includes('ingres') || value.includes('curso')) return 'ingresado';
+    if (value.includes('sal') || value.includes('final')) return 'salido';
+    return value;
+};
 const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
-const asFirst = (value) => (Array.isArray(value) ? value[0] : value);
 
 const parseQRCode = (text) => {
     try {
@@ -45,56 +50,32 @@ export default function PanelVigilancia({ usuarioApp }) {
             hace7dias.setDate(hace7dias.getDate() - 7);
             const fechaInicio = hace7dias.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 
-            const [visitantesResp, seguridadResp] = await Promise.all([
+            const [registroResp, seguridadResp] = await Promise.all([
                 supabase
-                    .from('visitantes')
-                    .select('id, residente_id, nombre, documento, placa')
-                    .eq('conjunto_id', usuarioApp.conjunto_id),
+                    .from('registro_visitas')
+                    .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                    .eq('conjunto_id', usuarioApp.conjunto_id)
+                    .gte('fecha_visita', fechaInicio)
+                    .order('fecha_visita', { ascending: false }),
                 obtenerSeguridadConsolidada(usuarioApp.conjunto_id)
             ]);
 
             if (!mounted) return;
-            if (visitantesResp.error) {
-                toast.error('No se pudieron cargar los visitantes del conjunto');
-                setLoading(false);
-                return;
-            }
-
-            let visitantes = visitantesResp.data || [];
-            if (!visitantes.length) {
-                const { data: residentes } = await supabase.from('residentes').select('id').eq('conjunto_id', usuarioApp.conjunto_id);
-                const residentesSet = new Set((residentes || []).map((r) => r.id));
-                const { data: visitantesFallback } = await supabase
-                    .from('visitantes')
-                    .select('id, residente_id, nombre, documento, placa')
-                    .in('residente_id', Array.from(residentesSet));
-                visitantes = visitantesFallback || [];
-            }
-
-            const visitantesMap = new Map((visitantes || []).map((vv) => [vv.id, vv]));
-            const idsVisitantes = Array.from(visitantesMap.keys());
-            if (!idsVisitantes.length) {
-                setVisitas([]);
-                setSeguridad(seguridadResp);
-                setLoading(false);
-                return;
-            }
-
-            const { data: registros, error: registrosError } = await supabase
-                .from('registro_visitas')
-                .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
-                .in('visitante_id', idsVisitantes)
-                .gte('fecha_visita', fechaInicio)
-                .order('fecha_visita', { ascending: false });
-
-            if (registrosError) {
+            if (registroResp.error) {
                 toast.error('No se pudo cargar el registro de visitas');
                 setLoading(false);
                 return;
             }
 
-            const mappedRegistro = (registros || []).map((v) => {
-                const visitante = asFirst(visitantesMap.get(v.visitante_id));
+            const registros = registroResp.data || [];
+            const visitanteIds = [...new Set(registros.map((r) => r.visitante_id).filter(Boolean))];
+            const { data: visitantesData } = visitanteIds.length
+                ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
+                : { data: [] };
+            const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
+
+            const mappedRegistro = registros.map((v) => {
+                const visitante = visitantesMap.get(v.visitante_id);
                 return {
                 id: v.id,
                 fecha_visita: normalizeFecha(v.fecha_visita),
