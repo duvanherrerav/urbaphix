@@ -71,10 +71,17 @@ export default function PanelVigilancia({ usuarioApp }) {
             let registrosUsables = registros;
 
             if (!registrosUsables.length) {
-                const { data: visitantesConjunto } = await supabase
-                    .from('visitantes')
+                const { data: residentes } = await supabase
+                    .from('residentes')
                     .select('id')
                     .eq('conjunto_id', usuarioApp.conjunto_id);
+                const idsResidentes = (residentes || []).map((r) => r.id);
+                const { data: visitantesConjunto } = idsResidentes.length
+                    ? await supabase
+                        .from('visitantes')
+                        .select('id')
+                        .in('residente_id', idsResidentes)
+                    : { data: [] };
 
                 const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
                 if (idsVisitantesConjunto.length) {
