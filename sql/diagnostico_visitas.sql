@@ -1,5 +1,6 @@
 -- Diagnóstico Urbaphix: tipos_documento + panel vigilancia
 -- Ejecutar en Supabase SQL Editor con rol postgres.
+-- Conjunto reportado: 3c9188a0-18e3-4b33-a411-8d9ec8fbb4c7
 
 -- 1) Verificar catálogo de tipos de documento
 select id, codigo, nombre, activo
@@ -13,13 +14,14 @@ where schemaname = 'public'
   and tablename = 'tipos_documento'
 order by policyname;
 
--- 3) Primero identifica un conjunto válido (si no lo conoces)
-select distinct conjunto_id from public.residentes where conjunto_id is not null limit 20;
+-- 3) Validar que el conjunto exista en residentes
+select distinct conjunto_id
+from public.residentes
+where conjunto_id = '3c9188a0-18e3-4b33-a411-8d9ec8fbb4c7';
 
 -- 4) Conteo rápido por conjunto en tablas de visitas
--- IMPORTANTE: reemplaza el valor de ejemplo por un conjunto_id real.
 with params as (
-  select 'REEMPLAZAR_CONJUNTO_ID'::text as conjunto_id
+  select '3c9188a0-18e3-4b33-a411-8d9ec8fbb4c7'::text as conjunto_id
 )
 select
   (select count(*) from public.residentes r, params p where r.conjunto_id::text = p.conjunto_id) as residentes,
@@ -42,9 +44,8 @@ where r.id is null
 limit 50;
 
 -- 7) Ver exactamente qué debería ver vigilancia (vía residente->visitante->registro)
--- Reemplaza REEMPLAZAR_CONJUNTO_ID por el valor real.
 with params as (
-  select 'REEMPLAZAR_CONJUNTO_ID'::text as conjunto_id
+  select '3c9188a0-18e3-4b33-a411-8d9ec8fbb4c7'::text as conjunto_id
 ), visitantes_conjunto as (
   select v.id, v.nombre, v.documento, v.placa
   from public.visitantes v
@@ -67,9 +68,8 @@ order by rv.fecha_visita desc, rv.created_at desc
 limit 200;
 
 -- 8) Distribución de estados para depurar filtros del panel
--- Reemplaza REEMPLAZAR_CONJUNTO_ID por el valor real.
 with params as (
-  select 'REEMPLAZAR_CONJUNTO_ID'::text as conjunto_id
+  select '3c9188a0-18e3-4b33-a411-8d9ec8fbb4c7'::text as conjunto_id
 )
 select lower(trim(rv.estado)) as estado_normalizado, count(*) as total
 from public.registro_visitas rv
@@ -78,3 +78,23 @@ join public.residentes r on r.id = v.residente_id
 join params p on r.conjunto_id::text = p.conjunto_id
 group by lower(trim(rv.estado))
 order by total desc;
+
+-- 9) Diagnóstico específico de tipos_documento
+select id, codigo, nombre, activo
+from public.tipos_documento
+where activo = true
+order by id;
+
+-- 10) Ver políticas RLS de tipos_documento
+select schemaname, tablename, policyname, roles, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public'
+  and tablename = 'tipos_documento';
+
+-- 11) Si no hay política de lectura para usuarios autenticados, crearla:
+-- alter table public.tipos_documento enable row level security;
+-- create policy "tipos_documento_select_authenticated"
+-- on public.tipos_documento
+-- for select
+-- to authenticated
+-- using (true);

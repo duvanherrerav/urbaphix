@@ -56,16 +56,11 @@ export default function PanelVigilancia({ usuarioApp }) {
             if (!conjuntoId) return;
             setLoading(true);
 
-            const hace7dias = new Date();
-            hace7dias.setDate(hace7dias.getDate() - 7);
-            const fechaInicio = hace7dias.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
-
             const [registroResp, seguridadResp] = await Promise.all([
                 supabase
                     .from('registro_visitas')
                     .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
                     .eq('conjunto_id', conjuntoId)
-                    .gte('fecha_visita', fechaInicio)
                     .order('fecha_visita', { ascending: false }),
                 obtenerSeguridadConsolidada(conjuntoId)
             ]);
@@ -99,7 +94,6 @@ export default function PanelVigilancia({ usuarioApp }) {
                         .from('registro_visitas')
                         .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
                         .in('visitante_id', idsVisitantesConjunto)
-                        .gte('fecha_visita', fechaInicio)
                         .order('fecha_visita', { ascending: false });
                     registrosUsables = registrosFallback || [];
                 }
