@@ -5,6 +5,7 @@ import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
 
 export default function CrearVisita({ usuarioApp }) {
+  const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
   const [form, setForm] = useState({
     nombre: '',
     tipo_documento: '',
@@ -242,7 +243,7 @@ export default function CrearVisita({ usuarioApp }) {
 
   const historialFiltrado = useMemo(() => {
     if (filtroHistorial === 'todos') return historial;
-    return historial.filter((h) => h.estado === filtroHistorial);
+    return historial.filter((h) => normalizarEstado(h.estado) === filtroHistorial);
   }, [historial, filtroHistorial]);
 
   return (
@@ -334,25 +335,40 @@ export default function CrearVisita({ usuarioApp }) {
         </div>
       )}
 
-      <div className="border rounded-xl p-4 space-y-3">
-        <h3 className="font-semibold">Historial de visitas</h3>
+      <div className="border rounded-xl p-4 space-y-3 bg-slate-50/60">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Visitantes frecuentes</h3>
+          <span className="text-xs text-gray-500">{historialFiltrado.length} registros</span>
+        </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => setFiltroHistorial('todos')}>Todos</button>
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => setFiltroHistorial('pendiente')}>Pendientes</button>
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'ingresado' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'}`} onClick={() => setFiltroHistorial('ingresado')}>En curso</button>
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}`} onClick={() => setFiltroHistorial('salido')}>Finalizadas</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}`} onClick={() => setFiltroHistorial('salido')}>Completadas</button>
         </div>
         <div className="space-y-2 max-h-72 overflow-auto">
           {historialFiltrado.map((item) => (
-            <div key={item.id} className="border rounded-lg p-3 text-sm">
-              <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
-              <p className="text-gray-500">Fecha visita: {item.fecha_visita} · Estado: {item.estado === 'salido' ? 'finalizada' : item.estado}</p>
+            <div key={item.id} className="border rounded-xl p-3 text-sm bg-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                  normalizarEstado(item.estado) === 'salido'
+                    ? 'bg-green-100 text-green-700'
+                    : normalizarEstado(item.estado) === 'ingresado'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {normalizarEstado(item.estado) === 'salido' ? 'Completada' : normalizarEstado(item.estado) === 'ingresado' ? 'En curso' : 'Pendiente'}
+                </span>
+              </div>
+              <p className="text-gray-500">Fecha visita: {item.fecha_visita}</p>
+              {item.placa && <p className="text-gray-500">Placa: {item.placa}</p>}
               <div className="flex flex-wrap gap-2 mt-2">
-                {item.estado === 'pendiente' && (
+                {normalizarEstado(item.estado) === 'pendiente' && (
                   <button className="px-2 py-1 border rounded" onClick={() => setQRDesdeHistorial(item)}>Reenviar QR</button>
                 )}
-                {item.estado === 'salido' && (
-                  <button className="px-2 py-1 border rounded" onClick={() => reutilizarVisita(item)}>Reprogramar visita</button>
+                {normalizarEstado(item.estado) === 'salido' && (
+                  <button className="px-2 py-1 border rounded" onClick={() => reutilizarVisita(item)}>Crear nueva visita con estos datos</button>
                 )}
               </div>
             </div>
