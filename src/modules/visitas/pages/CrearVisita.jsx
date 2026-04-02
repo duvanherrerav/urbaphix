@@ -6,6 +6,7 @@ import { crearVisita as crearVisitaService } from '../services/visitasService';
 
 export default function CrearVisita({ usuarioApp }) {
   const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
+  const hoyBogota = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
   const [form, setForm] = useState({
     nombre: '',
     tipo_documento: '',
@@ -20,6 +21,8 @@ export default function CrearVisita({ usuarioApp }) {
   const [residenteId, setResidenteId] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [filtroHistorial, setFiltroHistorial] = useState('todos');
+  const [busquedaFrecuentes, setBusquedaFrecuentes] = useState('');
+  const [paginaFrecuentes, setPaginaFrecuentes] = useState(1);
   const qrWrapRef = useRef(null);
   const toastTiposShownRef = useRef(false);
 
@@ -245,6 +248,15 @@ export default function CrearVisita({ usuarioApp }) {
     if (filtroHistorial === 'todos') return historial;
     return historial.filter((h) => normalizarEstado(h.estado) === filtroHistorial);
   }, [historial, filtroHistorial]);
+  const historialBuscado = useMemo(() => {
+    const term = busquedaFrecuentes.trim().toLowerCase();
+    if (!term) return historialFiltrado;
+    return historialFiltrado.filter((h) => (h.nombre_visitante || '').toLowerCase().includes(term));
+  }, [historialFiltrado, busquedaFrecuentes]);
+  const PAGE_SIZE = 6;
+  const totalPaginasFrecuentes = Math.max(1, Math.ceil(historialBuscado.length / PAGE_SIZE));
+  const paginaFrecuenteActual = Math.min(paginaFrecuentes, totalPaginasFrecuentes);
+  const historialPaginado = historialBuscado.slice((paginaFrecuenteActual - 1) * PAGE_SIZE, paginaFrecuenteActual * PAGE_SIZE);
 
   return (
     <div className="bg-white rounded-2xl shadow p-5 space-y-4 max-w-2xl">
@@ -283,6 +295,7 @@ export default function CrearVisita({ usuarioApp }) {
           type="date"
           className="border rounded-lg px-3 py-2"
           value={form.fecha}
+          min={hoyBogota()}
           onChange={(e) => setForm({ ...form, fecha: e.target.value })}
         />
       </div>
@@ -341,23 +354,31 @@ export default function CrearVisita({ usuarioApp }) {
           <span className="text-xs text-gray-500">{historialFiltrado.length} registros</span>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => setFiltroHistorial('todos')}>Todos</button>
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => setFiltroHistorial('pendiente')}>Pendientes</button>
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'ingresado' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'}`} onClick={() => setFiltroHistorial('ingresado')}>En curso</button>
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}`} onClick={() => setFiltroHistorial('salido')}>Completadas</button>
-          </div>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => { setFiltroHistorial('todos'); setPaginaFrecuentes(1); }}>Todos</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => { setFiltroHistorial('pendiente'); setPaginaFrecuentes(1); }}>Pendientes</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'ingresado' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'}`} onClick={() => { setFiltroHistorial('ingresado'); setPaginaFrecuentes(1); }}>En curso</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}`} onClick={() => { setFiltroHistorial('salido'); setPaginaFrecuentes(1); }}>Completadas</button>
+        </div>
+        <input
+          className="w-full border rounded-lg px-3 py-2 text-sm"
+          placeholder="Filtrar por nombre del visitante"
+          value={busquedaFrecuentes}
+          onChange={(e) => {
+            setBusquedaFrecuentes(e.target.value);
+            setPaginaFrecuentes(1);
+          }}
+        />
         <div className="space-y-2 max-h-72 overflow-auto">
-          {historialFiltrado.map((item) => (
+          {historialPaginado.map((item) => (
             <div key={item.id} className="border rounded-xl p-3 text-sm bg-white shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  normalizarEstado(item.estado) === 'salido'
+                <span className={`px-2 py-0.5 rounded-full text-xs ${normalizarEstado(item.estado) === 'salido'
                     ? 'bg-green-100 text-green-700'
                     : normalizarEstado(item.estado) === 'ingresado'
                       ? 'bg-blue-100 text-blue-700'
                       : 'bg-amber-100 text-amber-700'
-                }`}>
+                  }`}>
                   {normalizarEstado(item.estado) === 'salido' ? 'Completada' : normalizarEstado(item.estado) === 'ingresado' ? 'En curso' : 'Pendiente'}
                 </span>
               </div>
@@ -373,8 +394,29 @@ export default function CrearVisita({ usuarioApp }) {
               </div>
             </div>
           ))}
-          {historialFiltrado.length === 0 && <p className="text-sm text-gray-500">No hay visitas en este estado.</p>}
+          {historialBuscado.length === 0 && <p className="text-sm text-gray-500">No hay visitas para este filtro.</p>}
         </div>
+        {historialBuscado.length > 0 && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500">Página {paginaFrecuenteActual} de {totalPaginasFrecuentes}</span>
+            <div className="flex gap-2">
+              <button
+                className="px-2 py-1 border rounded disabled:opacity-40"
+                disabled={paginaFrecuenteActual === 1}
+                onClick={() => setPaginaFrecuentes((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </button>
+              <button
+                className="px-2 py-1 border rounded disabled:opacity-40"
+                disabled={paginaFrecuenteActual === totalPaginasFrecuentes}
+                onClick={() => setPaginaFrecuentes((p) => Math.min(totalPaginasFrecuentes, p + 1))}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
