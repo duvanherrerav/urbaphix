@@ -43,7 +43,17 @@ export default function PanelVigilancia({ usuarioApp }) {
         let mounted = true;
 
         const cargar = async () => {
-            if (!usuarioApp?.conjunto_id) return;
+            let conjuntoId = usuarioApp?.conjunto_id;
+            if (!conjuntoId) {
+                const { data: authData } = await supabase.auth.getUser();
+                const { data: usuarioDb } = await supabase
+                    .from('usuarios_app')
+                    .select('conjunto_id')
+                    .eq('id', authData?.user?.id)
+                    .single();
+                conjuntoId = usuarioDb?.conjunto_id || null;
+            }
+            if (!conjuntoId) return;
             setLoading(true);
 
             const hace7dias = new Date();
@@ -54,10 +64,10 @@ export default function PanelVigilancia({ usuarioApp }) {
                 supabase
                     .from('registro_visitas')
                     .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
-                    .eq('conjunto_id', usuarioApp.conjunto_id)
+                    .eq('conjunto_id', conjuntoId)
                     .gte('fecha_visita', fechaInicio)
                     .order('fecha_visita', { ascending: false }),
-                obtenerSeguridadConsolidada(usuarioApp.conjunto_id)
+                obtenerSeguridadConsolidada(conjuntoId)
             ]);
 
             if (!mounted) return;
@@ -74,7 +84,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                 const { data: residentes } = await supabase
                     .from('residentes')
                     .select('id')
-                    .eq('conjunto_id', usuarioApp.conjunto_id);
+                    .eq('conjunto_id', conjuntoId);
                 const idsResidentes = (residentes || []).map((r) => r.id);
                 const { data: visitantesConjunto } = idsResidentes.length
                     ? await supabase

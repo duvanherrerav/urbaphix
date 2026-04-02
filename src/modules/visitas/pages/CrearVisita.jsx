@@ -24,16 +24,25 @@ export default function CrearVisita({ usuarioApp }) {
 
   useEffect(() => {
     const cargarTipos = async () => {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('tipos_documento')
         .select('codigo, nombre')
         .eq('activo', true)
         .order('id', { ascending: true });
 
+      if ((!data || !data.length) && !error) {
+        const allResp = await supabase
+          .from('tipos_documento')
+          .select('codigo, nombre')
+          .order('id', { ascending: true });
+        data = allResp.data;
+        error = allResp.error;
+      }
+
       if (error || !Array.isArray(data)) {
         setTiposDocumento([]);
         if (!toastTiposShownRef.current) {
-          toast.error('No se pudo cargar catálogo tipos_documento desde Supabase');
+          toast.error(`No se pudo cargar catálogo tipos_documento (${error?.message || 'sin acceso'})`);
           toastTiposShownRef.current = true;
         }
         return;
