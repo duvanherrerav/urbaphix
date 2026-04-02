@@ -20,26 +20,51 @@ export default function CrearVisita({ usuarioApp }) {
   const [historial, setHistorial] = useState([]);
   const [filtroHistorial, setFiltroHistorial] = useState('todos');
   const qrWrapRef = useRef(null);
+  const toastTiposShownRef = useRef(false);
 
   useEffect(() => {
     const cargarTipos = async () => {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('tipos_documento')
-        .select('codigo, nombre')
-        .eq('activo', true)
-        .order('nombre', { ascending: true });
+        .select('id, codigo, nombre, activo')
+        .order('id', { ascending: true });
 
-      if (error || !data?.length) {
-        toast.error('No se pudo cargar tipos de documento desde configuración');
+      if ((!data || !data.length) && !error) {
+        const allResp = await supabase
+          .from('tipos_documento')
+          .select('id, codigo, nombre, activo')
+          .order('id', { ascending: true });
+        data = allResp.data;
+        error = allResp.error;
+      }
+
+      if (error || !Array.isArray(data)) {
+        setTiposDocumento([]);
+        if (!toastTiposShownRef.current) {
+          toast.error(`No se pudo cargar catálogo tipos_documento (${error?.message || 'sin acceso'})`);
+          toastTiposShownRef.current = true;
+        }
         return;
       }
 
-      setTiposDocumento(data);
+      const normalizados = data
+      .filter((row) => {
+          if (row.activo === undefined || row.activo === null) return true;
+          if (typeof row.activo === 'boolean') return row.activo;
+          return ['true', '1', 'activo'].includes(String(row.activo).toLowerCase());
+        })
+        .map((row) => ({
+          codigo: String(row.codigo || '').trim(),
+          nombre: String(row.nombre || '').trim()
+        }))
+        .filter((row) => row.codigo && row.nombre);
+
+      setTiposDocumento(normalizados);
       setForm((prev) => ({
         ...prev,
-        tipo_documento: prev.tipo_documento && data.some((t) => t.codigo === prev.tipo_documento)
+        tipo_documento: prev.tipo_documento && normalizados.some((t) => t.codigo === prev.tipo_documento)
           ? prev.tipo_documento
-          : data[0].codigo
+          : (normalizados[0]?.codigo || '')
       }));
     };
     cargarTipos();
@@ -103,6 +128,11 @@ export default function CrearVisita({ usuarioApp }) {
   const crearVisita = async () => {
     if (!form.nombre || !form.documento || !form.fecha || !form.tipo_documento) {
       toast('Completa los campos obligatorios ⚠️');
+      return;
+    }
+
+    if (!tiposDocumento.length) {
+      toast.error('No hay tipos de documento configurados en Supabase');
       return;
     }
 
@@ -231,10 +261,9 @@ export default function CrearVisita({ usuarioApp }) {
         <select
           className="border rounded-lg px-3 py-2"
           value={form.tipo_documento}
-          disabled={!tiposDocumento.length}
           onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}
         >
-          {!tiposDocumento.length && <option value="">Cargando tipos...</option>}
+          {!tiposDocumento.length && <option value="">Seleccione tipo documento</option>}
           {tiposDocumento.map((item) => (
             <option key={item.codigo} value={item.codigo}>{item.nombre}</option>
           ))}

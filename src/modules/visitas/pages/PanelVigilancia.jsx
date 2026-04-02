@@ -6,7 +6,14 @@ import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBit
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
-const normalizeEstado = (estado) => String(estado || '').trim().toLowerCase();
+const normalizeEstado = (estado) => {
+    const value = String(estado || '').trim().toLowerCase();
+    if (value.includes('pend')) return 'pendiente';
+    if (value.includes('ingres') || value.includes('curso')) return 'ingresado';
+    if (value.includes('sal') || value.includes('final')) return 'salido';
+    return value;
+};
+const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
 
 const parseQRCode = (text) => {
     try {
@@ -36,46 +43,84 @@ export default function PanelVigilancia({ usuarioApp }) {
         let mounted = true;
 
         const cargar = async () => {
-            if (!usuarioApp?.conjunto_id) return;
+            let conjuntoId = usuarioApp?.conjunto_id;
+            if (!conjuntoId) {
+                const { data: authData } = await supabase.auth.getUser();
+                const { data: usuarioDb } = await supabase
+                    .from('usuarios_app')
+                    .select('conjunto_id')
+                    .eq('id', authData?.user?.id)
+                    .single();
+                conjuntoId = usuarioDb?.conjunto_id || null;
+            }
+            if (!conjuntoId) return;
             setLoading(true);
-            const hace7dias = new Date();
-
-            hace7dias.setDate(hace7dias.getDate() - 7);
-            const fechaInicio = hace7dias.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 
             const [registroResp, seguridadResp] = await Promise.all([
                 supabase
                     .from('registro_visitas')
-                    .select(`
-                        id, conjunto_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at,
-                        visitantes(nombre, documento, placa)
-                    `)
-                    .eq('conjunto_id', usuarioApp.conjunto_id)
-                    .gte('fecha_visita', fechaInicio)
+                    .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                    .eq('conjunto_id', conjuntoId)
                     .order('fecha_visita', { ascending: false }),
-                obtenerSeguridadConsolidada(usuarioApp.conjunto_id)
+                obtenerSeguridadConsolidada(conjuntoId)
             ]);
 
             if (!mounted) return;
             if (registroResp.error) {
-                toast.error('No se pudo cargar el panel de vigilancia');
+                toast.error('No se pudo cargar el registro de visitas');
                 setLoading(false);
                 return;
             }
 
-            const mappedRegistro = (registroResp.data || []).map((v) => ({
-                id: v.id,
-                fecha_visita: v.fecha_visita,
-                estado: v.estado,
-                estado_normalizado: normalizeEstado(v.estado),
-                qr_code: v.qr_code,
-                hora_ingreso: v.hora_ingreso,
-                hora_salida: v.hora_salida,
-                created_at: v.created_at,
-                nombre_visitante: v.visitantes?.nombre,
-                documento: v.visitantes?.documento,
-                placa: v.visitantes?.placa
-            }));
+            const registros = registroResp.data || [];
+            const { data: residentes } = await supabase
+                .from('residentes')
+                .select('id')
+                .eq('conjunto_id', conjuntoId);
+            const idsResidentes = (residentes || []).map((r) => r.id);
+            const { data: visitantesConjunto } = idsResidentes.length
+                ? await supabase
+                    .from('visitantes')
+                    .select('id')
+                    .in('residente_id', idsResidentes)
+                : { data: [] };
+
+            const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
+            const { data: registrosFallback } = idsVisitantesConjunto.length
+                ? await supabase
+                    .from('registro_visitas')
+                    .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                    .in('visitante_id', idsVisitantesConjunto)
+                    .order('fecha_visita', { ascending: false })
+                : { data: [] };
+
+            const dedupe = new Map();
+            [...registros, ...(registrosFallback || [])].forEach((row) => {
+                if (row?.id) dedupe.set(row.id, row);
+            });
+            const registrosUsables = Array.from(dedupe.values());
+            const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
+            const { data: visitantesData } = visitanteIds.length
+                ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
+                : { data: [] };
+            const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
+
+            const mappedRegistro = registrosUsables.map((v) => {
+                const visitante = visitantesMap.get(v.visitante_id);
+                return {
+                    id: v.id,
+                    fecha_visita: normalizeFecha(v.fecha_visita),
+                    estado: v.estado,
+                    estado_normalizado: normalizeEstado(v.estado),
+                    qr_code: v.qr_code,
+                    hora_ingreso: v.hora_ingreso,
+                    hora_salida: v.hora_salida,
+                    created_at: v.created_at,
+                    nombre_visitante: visitante?.nombre,
+                    documento: visitante?.documento,
+                    placa: visitante?.placa
+                };
+            });
             setVisitas(mappedRegistro);
             setSeguridad(seguridadResp);
             const cola = getOfflineQueue();
@@ -87,7 +132,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
         const channel = supabase
             .channel(`registro-visitas-vigilancia-${usuarioApp?.conjunto_id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` }, cargar)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas' }, cargar)
             .subscribe();
 
         return () => {
@@ -127,7 +172,7 @@ export default function PanelVigilancia({ usuarioApp }) {
             return;
         }
 
-        setVisitas((prev) => prev.map((v) => (v.id === visitaObjetivo.id ? { ...v, estado: 'ingresado', hora_ingreso: timestamp } : v)));
+        setVisitas((prev) => prev.map((v) => (v.id === visitaObjetivo.id ? { ...v, estado: 'ingresado', estado_normalizado: 'ingresado', hora_ingreso: timestamp } : v)));
         await registrarBitacora({
             usuarioApp,
             visitaId: visitaObjetivo.id,
@@ -147,7 +192,7 @@ export default function PanelVigilancia({ usuarioApp }) {
             return;
         }
 
-        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'salido', hora_salida: timestamp } : v)));
+        setVisitas((prev) => prev.map((v) => (v.id === id ? { ...v, estado: 'salido', estado_normalizado: 'salido', hora_salida: timestamp } : v)));
         await registrarBitacora({ usuarioApp, visitaId: id, accion: 'registrar_salida', detalle: 'Salida registrada desde panel vigilancia' });
         toast.success('Salida registrada');
     };
