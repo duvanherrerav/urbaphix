@@ -24,10 +24,24 @@ export default function CrearVisita({ usuarioApp }) {
 
   useEffect(() => {
     const cargarTipos = async () => {
-      const { data, error } = await supabase
-        .from('tipos_documento')
-        .select('*')
-        .limit(200);
+      const tables = ['tipos_documento', 'tipo_documento', 'documentos_tipo'];
+      let data = null;
+      let error = null;
+
+      for (const table of tables) {
+        const resp = await supabase.from(table).select('*').limit(200);
+        if (!resp.error && Array.isArray(resp.data) && resp.data.length) {
+          data = resp.data;
+          error = null;
+          break;
+        }
+        if (!resp.error && Array.isArray(resp.data) && resp.data.length === 0) {
+          data = [];
+          error = null;
+          break;
+        }
+        error = resp.error;
+      }
 
       if (error || !Array.isArray(data)) {
         setTiposDocumento([]);
@@ -57,6 +71,19 @@ export default function CrearVisita({ usuarioApp }) {
           nombre: String(row[nameKey || fallbackNameKey] || row[codeKey || fallbackCodeKey] || '').trim()
         }))
         .filter((row) => row.codigo && row.nombre);
+
+      if (!normalizados.length) {
+        const { data: visitantesTipos } = await supabase
+          .from('visitantes')
+          .select('tipo_documento')
+          .not('tipo_documento', 'is', null)
+          .limit(500);
+        const unicos = [...new Set((visitantesTipos || []).map((v) => String(v.tipo_documento || '').trim()).filter(Boolean))];
+        const desdeVisitantes = unicos.map((codigo) => ({ codigo, nombre: codigo }));
+        setTiposDocumento(desdeVisitantes);
+        setForm((prev) => ({ ...prev, tipo_documento: prev.tipo_documento || (desdeVisitantes[0]?.codigo || '') }));
+        return;
+      }
 
       setTiposDocumento(normalizados);
       setForm((prev) => ({

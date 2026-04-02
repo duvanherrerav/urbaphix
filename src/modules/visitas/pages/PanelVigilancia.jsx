@@ -68,13 +68,32 @@ export default function PanelVigilancia({ usuarioApp }) {
             }
 
             const registros = registroResp.data || [];
-            const visitanteIds = [...new Set(registros.map((r) => r.visitante_id).filter(Boolean))];
+            let registrosUsables = registros;
+
+            if (!registrosUsables.length) {
+                const { data: visitantesConjunto } = await supabase
+                    .from('visitantes')
+                    .select('id')
+                    .eq('conjunto_id', usuarioApp.conjunto_id);
+
+                const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
+                if (idsVisitantesConjunto.length) {
+                    const { data: registrosFallback } = await supabase
+                        .from('registro_visitas')
+                        .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                        .in('visitante_id', idsVisitantesConjunto)
+                        .gte('fecha_visita', fechaInicio)
+                        .order('fecha_visita', { ascending: false });
+                    registrosUsables = registrosFallback || [];
+                }
+            }
+            const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
             const { data: visitantesData } = visitanteIds.length
                 ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
                 : { data: [] };
             const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
 
-            const mappedRegistro = registros.map((v) => {
+            const mappedRegistro = registrosUsables.map((v) => {
                 const visitante = visitantesMap.get(v.visitante_id);
                 return {
                 id: v.id,
