@@ -27,6 +27,34 @@ export const parsearCategoriaDesdeDescripcion = (descripcionRaw) => {
   return { categoria: 'paquete', descripcion: text };
 };
 
+const resolverApartamentoId = async ({ apartamento_id, apartamento_numero, torre_id, conjunto_id }) => {
+  if (apartamento_id) return apartamento_id;
+  if (!apartamento_numero) return null;
+
+  let aptoQuery = supabase
+    .from('apartamentos')
+    .select('id, torre_id')
+    .eq('numero', String(apartamento_numero).trim());
+
+  if (torre_id) {
+    aptoQuery = aptoQuery.eq('torre_id', torre_id);
+  } else if (conjunto_id) {
+    const { data: torres } = await supabase
+      .from('torres')
+      .select('id')
+      .eq('conjunto_id', conjunto_id);
+    const ids = (torres || []).map((t) => t.id);
+    if (ids.length) aptoQuery = aptoQuery.in('torre_id', ids);
+  }
+
+  const { data: aptos, error } = await aptoQuery.limit(2);
+  if (error || !aptos?.length) return null;
+  if (aptos.length > 1) {
+    throw new Error('Apartamento ambiguo. Indica torre para continuar.');
+  }
+  return aptos[0].id;
+};
+
 const resolverUsuarioResidente = async ({ residente_id, apartamento_id }) => {
   if (residente_id) {
     const { data: residente, error } = await supabase
@@ -54,7 +82,7 @@ export const registrarPaquete = async (data, user) => {
       throw new Error('Usuario no autenticado');
     }
 
-    if ((!data?.residente_id && !data?.apartamento_id) || !data?.descripcion) {
+    if ((!data?.residente_id && !data?.apartamento_id && !data?.apartamento_numero) || !data?.descripcion) {
       throw new Error('Datos de paquete incompletos');
     }
 
@@ -68,9 +96,16 @@ export const registrarPaquete = async (data, user) => {
       throw new Error(errorMessage(errorUsuario, 'No se pudo obtener el conjunto del usuario'));
     }
 
+    const apartamentoId = await resolverApartamentoId({
+      apartamento_id: data?.apartamento_id,
+      apartamento_numero: data?.apartamento_numero,
+      torre_id: data?.torre_id,
+      conjunto_id: usuario?.conjunto_id
+    });
+
     const residenteTarget = await resolverUsuarioResidente({
       residente_id: data?.residente_id,
-      apartamento_id: data?.apartamento_id
+      apartamento_id: apartamentoId
     });
     if (!residenteTarget?.id) {
       throw new Error('No se encontró un residente válido para el apartamento seleccionado');
@@ -83,7 +118,7 @@ export const registrarPaquete = async (data, user) => {
       .from('paquetes')
       .insert([{
         conjunto_id: usuario.conjunto_id,
-        apartamento_id: data?.apartamento_id || null,
+        apartamento_id: apartamentoId || null,
         residente_id: residenteTarget.id,
         descripcion: descripcionPersistida,
         recibido_por: user.id,

@@ -5,11 +5,10 @@ import { registrarPaquete } from '../services/paquetesService';
 
 export default function CrearPaquete({ usuarioApp }) {
   const [torres, setTorres] = useState([]);
-  const [apartamentos, setApartamentos] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [torreSeleccionada, setTorreSeleccionada] = useState('');
-  const [apartamentoSeleccionado, setApartamentoSeleccionado] = useState('');
+  const [apartamentoManual, setApartamentoManual] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [categoria, setCategoria] = useState('paquete');
 
@@ -32,38 +31,23 @@ export default function CrearPaquete({ usuarioApp }) {
     obtenerTorres();
   }, [usuarioApp?.conjunto_id]);
 
-  const obtenerApartamentos = async (torreId) => {
-    const { data, error } = await supabase
-      .from('apartamentos')
-      .select('id, numero')
-      .eq('torre_id', torreId)
-      .order('numero', { ascending: true });
-
-    if (error) {
-      toast.error('No se pudieron cargar los apartamentos');
-      return;
-    }
-
-    setApartamentos(data || []);
-  };
-
   const limpiarFormulario = () => {
     setDescripcion('');
-    setApartamentoSeleccionado('');
+    setApartamentoManual('');
     setTorreSeleccionada('');
-    setApartamentos([]);
     setCategoria('paquete');
   };
 
   const crearPaquete = async () => {
     if (!torreSeleccionada) return toast.error('Selecciona torre');
-    if (!apartamentoSeleccionado) return toast.error('Selecciona apartamento');
+    if (!apartamentoManual.trim()) return toast.error('Escribe el apartamento');
     if (!descripcion.trim()) return toast.error('Ingresa una descripción');
     if (!usuarioApp?.id) return toast.error('Usuario no autenticado');
 
     setLoading(true);
     const result = await registrarPaquete({
-      apartamento_id: apartamentoSeleccionado,
+      apartamento_numero: apartamentoManual.trim().toUpperCase(),
+      torre_id: torreSeleccionada,
       descripcion: descripcion.trim(),
       categoria
     }, usuarioApp);
@@ -104,11 +88,7 @@ export default function CrearPaquete({ usuarioApp }) {
         <select
           className="border rounded-lg px-3 py-2"
           value={torreSeleccionada}
-          onChange={(e) => {
-            setTorreSeleccionada(e.target.value);
-            setApartamentoSeleccionado('');
-            obtenerApartamentos(e.target.value);
-          }}
+          onChange={(e) => setTorreSeleccionada(e.target.value)}
         >
           <option value="">Selecciona torre</option>
           {torres.map((t) => (
@@ -118,18 +98,12 @@ export default function CrearPaquete({ usuarioApp }) {
           ))}
         </select>
 
-        <select
+        <input
           className="border rounded-lg px-3 py-2"
-          value={apartamentoSeleccionado}
-          onChange={(e) => setApartamentoSeleccionado(e.target.value)}
-        >
-          <option value="">Selecciona apartamento</option>
-          {apartamentos.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.numero}
-            </option>
-          ))}
-        </select>
+          placeholder="Apartamento (escrito manual, ej: 1203A)"
+          value={apartamentoManual}
+          onChange={(e) => setApartamentoManual(e.target.value)}
+        />
 
         <input
           className="border rounded-lg px-3 py-2"
