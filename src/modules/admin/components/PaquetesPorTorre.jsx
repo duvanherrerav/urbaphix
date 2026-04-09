@@ -5,13 +5,8 @@ export default function PaquetesPorTorre({ usuarioApp }) {
 
   const [data, setData] = useState([]);
 
-  useEffect(() => {
-    if (usuarioApp?.conjunto_id) {
-      obtenerData();
-    }
-  }, [usuarioApp]);
-
-  const obtenerData = async () => {
+  const obtenerData = async (conjuntoId) => {
+    if (!conjuntoId) return;
 
     const { data: torres, error } = await supabase
       .from('torres')
@@ -26,7 +21,7 @@ export default function PaquetesPorTorre({ usuarioApp }) {
           )
         )
       `)
-      .eq('conjunto_id', usuarioApp.conjunto_id);
+      .eq('conjunto_id', conjuntoId);
 
     if (error) {
       console.log(error);
@@ -51,6 +46,12 @@ export default function PaquetesPorTorre({ usuarioApp }) {
 
     setData(resultado);
   };
+
+  useEffect(() => {
+    if (!usuarioApp?.conjunto_id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    obtenerData(usuarioApp.conjunto_id);
+  }, [usuarioApp?.conjunto_id]);
 
   // 🔥 calcular máximo para barras
   const max = Math.max(...data.map(d => d.total), 1);

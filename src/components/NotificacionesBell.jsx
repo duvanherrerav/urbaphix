@@ -6,7 +6,20 @@ export default function NotificacionesBell({ usuarioApp }) {
     const [notificaciones, setNotificaciones] = useState([]);
     const [abierto, setAbierto] = useState(false);
 
+    const obtenerNotificaciones = async () => {
+        if (!usuarioApp?.id) return;
+        const { data } = await supabase
+            .from('notificaciones')
+            .select('*')
+            .eq('usuario_id', usuarioApp.id)
+            .order('created_at', { ascending: false });
+
+        setNotificaciones(data || []);
+    };
+
     useEffect(() => {
+        if (!usuarioApp?.id) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         obtenerNotificaciones();
 
         const channel = supabase
@@ -28,17 +41,7 @@ export default function NotificacionesBell({ usuarioApp }) {
 
         return () => supabase.removeChannel(channel);
 
-    }, []);
-
-    const obtenerNotificaciones = async () => {
-        const { data } = await supabase
-            .from('notificaciones')
-            .select('*')
-            .eq('usuario_id', usuarioApp.id)
-            .order('created_at', { ascending: false });
-
-        setNotificaciones(data || []);
-    };
+    }, [usuarioApp?.id]);
 
     const marcarComoLeidas = async () => {
 
@@ -97,9 +100,7 @@ export default function NotificacionesBell({ usuarioApp }) {
                     <h4>Notificaciones</h4>
 
                     {notificaciones.length === 0 && (
-                        <p><small style={{ color: '#888' }}>
-                            {new Date(n.created_at).toLocaleString()}
-                        </small>No hay notificaciones</p>
+                        <p style={{ color: '#888' }}>No hay notificaciones</p>
                     )}
 
                     {notificaciones.map(n => (
