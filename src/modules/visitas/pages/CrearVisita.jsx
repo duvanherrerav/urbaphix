@@ -190,22 +190,17 @@ export default function CrearVisita({ usuarioApp }) {
     if (residenteId) cargarHistorial(residenteId);
   };
 
-  const copiarCodigo = async () => {
-    if (!qrPayload) return;
-    await navigator.clipboard.writeText(qrPayload);
-    toast.success('Código QR copiado');
-  };
-
-  const compartirQR = async () => {
+  const compartirCodigoQR = async () => {
     if (!qrPayload) return;
     const texto = `Te comparto tu acceso de visita Urbaphix:\n${qrPayload}`;
 
     if (navigator.share) {
       await navigator.share({ title: 'QR de visita', text: texto });
+      toast.success('Código QR compartido');
       return;
     }
     await navigator.clipboard.writeText(texto);
-    toast.success('Compartir no disponible. Código copiado.');
+    toast.success('Código QR copiado para compartir.');
   };
 
   const compartirImagenQR = async () => {
@@ -340,9 +335,8 @@ export default function CrearVisita({ usuarioApp }) {
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <QRCodeCanvas value={qrPayload} size={180} />
             <div className="space-y-2">
-              <button className="w-full border rounded-lg px-3 py-2 text-sm" onClick={copiarCodigo}>Copiar código de validación</button>
-              <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirQR}>Compartir QR</button>
-              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir imagen QR</button>
+              <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirCodigoQR}>Compartir código QR</button>
+              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir QR</button>
             </div>
           </div>
         </div>
