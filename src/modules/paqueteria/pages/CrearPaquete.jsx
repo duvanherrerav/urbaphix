@@ -10,19 +10,13 @@ export default function CrearPaquete({ usuarioApp }) {
   const [apartamentoSeleccionado, setApartamentoSeleccionado] = useState('');
   const [descripcion, setDescripcion] = useState('');
 
-  // 🔥 CARGAR TORRES
-  useEffect(() => {
-    if (usuarioApp?.conjunto_id) {
-      obtenerTorres();
-    }
-  }, [usuarioApp]);
-
-  const obtenerTorres = async () => {
+  const obtenerTorres = async (conjuntoId) => {
+    if (!conjuntoId) return;
 
     const { data, error } = await supabase
       .from('torres')
       .select('*')
-      .eq('conjunto_id', usuarioApp.conjunto_id);
+      .eq('conjunto_id', conjuntoId);
 
     if (error) {
       console.log('Error cargando torres:', error);
@@ -31,6 +25,13 @@ export default function CrearPaquete({ usuarioApp }) {
 
     setTorres(data || []);
   };
+
+  // 🔥 CARGAR TORRES
+  useEffect(() => {
+    if (!usuarioApp?.conjunto_id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    obtenerTorres(usuarioApp.conjunto_id);
+  }, [usuarioApp?.conjunto_id]);
 
   // 🔥 CARGAR APARTAMENTOS SEGÚN TORRE
   const obtenerApartamentos = async (torreId) => {

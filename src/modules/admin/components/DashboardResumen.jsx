@@ -1,20 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 export default function DashboardResumen({ stats, kpis }) {
-
-  const [mensaje, setMensaje] = useState('');
-  const [alertas, setAlertas] = useState([]);
-
-  useEffect(() => {
-
+  const mensaje = useMemo(() => {
     let texto = `Hoy tienes ${kpis.visitasHoy || 0} visitas y ${kpis.paquetesPendientes || 0} paquetes pendientes.`;
 
     if (kpis.torreTop && kpis.torreTop !== '-') {
       texto += ` ${kpis.torreTop} es la torre con más movimiento.`;
     }
+    return texto;
+  }, [kpis.paquetesPendientes, kpis.torreTop, kpis.visitasHoy]);
 
-    setMensaje(texto);
-
+  const alertas = useMemo(() => {
     let nuevasAlertas = [];
 
     if (kpis.paquetesPendientes > 5) {
@@ -37,10 +33,8 @@ export default function DashboardResumen({ stats, kpis }) {
         tipo: 'info'
       });
     }
-
-    setAlertas(nuevasAlertas);
-
-  }, [stats, kpis]);
+    return nuevasAlertas;
+  }, [kpis.paquetesPendientes, kpis.visitasHoy, stats.pendientes]);
 
   return (
     <div className="space-y-4">

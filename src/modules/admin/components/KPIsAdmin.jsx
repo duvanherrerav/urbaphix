@@ -2,17 +2,9 @@ import { useEffect } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
 export default function KPIsAdmin({ usuarioApp, setKpis }) {
-
-  useEffect(() => {
-    if (usuarioApp?.conjunto_id) {
-      cargarKPIs();
-    }
-  }, [usuarioApp]);
-
-  const cargarKPIs = async () => {
-
+  const cargarKPIs = async (conjuntoId) => {
+    if (!conjuntoId) return;
     try {
-
       const hoy = new Date().toISOString().split('T')[0];
 
       const hace7dias = new Date();
@@ -25,12 +17,12 @@ export default function KPIsAdmin({ usuarioApp, setKpis }) {
         supabase
           .from('visitas')
           .select('fecha_visita')
-          .eq('conjunto_id', usuarioApp.conjunto_id),
+          .eq('conjunto_id', conjuntoId),
 
         supabase
           .from('paquetes')
           .select('estado, apartamento_id')
-          .eq('conjunto_id', usuarioApp.conjunto_id),
+          .eq('conjunto_id', conjuntoId),
 
         supabase
           .from('apartamentos')
@@ -106,6 +98,11 @@ export default function KPIsAdmin({ usuarioApp, setKpis }) {
       console.log('Error KPIs:', err);
     }
   };
+
+  useEffect(() => {
+    if (!usuarioApp?.conjunto_id) return;
+    cargarKPIs(usuarioApp.conjunto_id);
+  }, [usuarioApp?.conjunto_id]);
 
   return null;
 }
