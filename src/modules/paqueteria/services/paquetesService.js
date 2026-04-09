@@ -72,7 +72,7 @@ const resolverUsuarioResidente = async ({ residente_id, apartamento_id }) => {
   if (residente_id) {
     const { data: residente, error } = await supabase
       .from('residentes')
-      .select('id, usuario_id')
+      .select('id, usuario_id, apartamento_id')
       .eq('id', residente_id)
       .single();
     if (!error && residente?.id) return residente;
@@ -81,7 +81,7 @@ const resolverUsuarioResidente = async ({ residente_id, apartamento_id }) => {
   if (apartamento_id) {
     const { data: residente, error } = await supabase
       .from('residentes')
-      .select('id, usuario_id')
+      .select('id, usuario_id, apartamento_id')
       .eq('apartamento_id', apartamento_id)
       .single();
     if (!error && residente?.id) return residente;
@@ -124,6 +124,11 @@ export const registrarPaquete = async (data, user) => {
       throw new Error('No se encontró un residente válido para el apartamento seleccionado');
     }
 
+    const apartamentoFinal = apartamentoId || residenteTarget?.apartamento_id || null;
+    if (!apartamentoFinal) {
+      throw new Error('No se pudo resolver el apartamento. Verifica torre y número.');
+    }
+
     const categoria = normalizarCategoriaPaquete(data?.categoria);
     const descripcionPersistida = construirDescripcionPersistida(data?.descripcion, categoria);
 
@@ -131,7 +136,7 @@ export const registrarPaquete = async (data, user) => {
       .from('paquetes')
       .insert([{
         conjunto_id: usuario.conjunto_id,
-        apartamento_id: apartamentoId || null,
+        apartamento_id: apartamentoFinal,
         residente_id: residenteTarget.id,
         descripcion: descripcionPersistida,
         recibido_por: user.id,
