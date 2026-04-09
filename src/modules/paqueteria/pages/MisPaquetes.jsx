@@ -3,10 +3,12 @@ import { supabase } from '../../../services/supabaseClient';
 import { parsearCategoriaDesdeDescripcion } from '../services/paquetesService';
 
 export default function MisPaquetes({ usuarioApp }) {
+  const PAGE_SIZE = 8;
   const [paquetes, setPaquetes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [pagina, setPagina] = useState(1);
 
   const obtenerPaquetes = async (usuarioId) => {
     if (!usuarioId) return;
@@ -40,20 +42,40 @@ export default function MisPaquetes({ usuarioApp }) {
     obtenerPaquetes(usuarioApp.id);
   }, [usuarioApp?.id]);
 
+  const paquetesNormalizados = useMemo(
+    () => paquetes.map((raw) => {
+      const parsed = parsearCategoriaDesdeDescripcion(raw.descripcion);
+      return { ...raw, descripcion_visible: parsed.descripcion, categoria: parsed.categoria };
+    }),
+    [paquetes]
+  );
+
+  const resumen = useMemo(() => ({
+    total: paquetesNormalizados.length,
+    pendientes: paquetesNormalizados.filter((p) => String(p.estado || '').toLowerCase() === 'pendiente').length,
+    entregados: paquetesNormalizados.filter((p) => String(p.estado || '').toLowerCase() === 'entregado').length,
+    servicios: paquetesNormalizados.filter((p) => p.categoria === 'servicio_publico').length
+  }), [paquetesNormalizados]);
+
   const paquetesFiltrados = useMemo(() => {
     const estado = String(filtroEstado || '').toLowerCase();
     const term = String(busqueda || '').trim().toLowerCase();
 
-    return paquetes.filter((raw) => {
-      const parsed = parsearCategoriaDesdeDescripcion(raw.descripcion);
-      const p = { ...raw, descripcion_visible: parsed.descripcion, categoria: parsed.categoria };
+    return paquetesNormalizados.filter((p) => {
       const coincideEstado = estado === 'todos' ? true : String(p.estado || '').toLowerCase() === estado;
       const coincideBusqueda = term
         ? String(p.descripcion_visible || '').toLowerCase().includes(term)
         : true;
       return coincideEstado && coincideBusqueda;
     });
-  }, [paquetes, filtroEstado, busqueda]);
+  }, [paquetesNormalizados, filtroEstado, busqueda]);
+
+  const totalPaginas = Math.max(1, Math.ceil(paquetesFiltrados.length / PAGE_SIZE));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const paquetesPaginados = useMemo(
+    () => paquetesFiltrados.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE),
+    [paquetesFiltrados, paginaActual]
+  );
 
   return (
     <div className="space-y-4">
@@ -63,16 +85,20 @@ export default function MisPaquetes({ usuarioApp }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => setFiltroEstado('todos')}>Todos</button>
-        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => setFiltroEstado('pendiente')}>Pendientes</button>
-        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'entregado' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'}`} onClick={() => setFiltroEstado('entregado')}>Entregados</button>
+        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => { setFiltroEstado('todos'); setPagina(1); }}>Todos ({resumen.total})</button>
+        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => { setFiltroEstado('pendiente'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
+        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'entregado' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'}`} onClick={() => { setFiltroEstado('entregado'); setPagina(1); }}>Entregados ({resumen.entregados})</button>
+        <span className="px-3 py-1 rounded-full text-sm bg-indigo-100 text-indigo-700">Servicios públicos ({resumen.servicios})</span>
       </div>
 
       <input
         className="w-full border rounded-lg px-3 py-2"
         placeholder="Buscar por descripción"
         value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
+        onChange={(e) => {
+          setBusqueda(e.target.value);
+          setPagina(1);
+        }}
       />
 
       {loading && <p className="text-sm text-gray-500">Cargando paquetes...</p>}
@@ -82,7 +108,7 @@ export default function MisPaquetes({ usuarioApp }) {
       )}
 
       <div className="space-y-3">
-        {paquetesFiltrados.map((p) => (
+        {paquetesPaginados.map((p) => (
           <div key={p.id} className="border rounded-xl p-3 bg-white shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <p className="font-medium">Descripción: {p.descripcion_visible}</p>
@@ -114,6 +140,27 @@ export default function MisPaquetes({ usuarioApp }) {
           </div>
         ))}
       </div>
+      {!loading && paquetesFiltrados.length > 0 && (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500">Página {paginaActual} de {totalPaginas} · {paquetesFiltrados.length} resultados</span>
+          <div className="flex gap-2">
+            <button
+              className="px-2 py-1 border rounded disabled:opacity-40"
+              disabled={paginaActual === 1}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+            >
+              Anterior
+            </button>
+            <button
+              className="px-2 py-1 border rounded disabled:opacity-40"
+              disabled={paginaActual === totalPaginas}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
