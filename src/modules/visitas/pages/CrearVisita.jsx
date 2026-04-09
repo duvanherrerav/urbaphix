@@ -335,8 +335,8 @@ export default function CrearVisita({ usuarioApp }) {
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <QRCodeCanvas value={qrPayload} size={180} />
             <div className="space-y-2">
-              <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirCodigoQR}>Compartir código QR (Comparte el código)</button>
-              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir QR (Comparte la imagen)</button>
+              <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirCodigoQR}>Compartir código QR</button>
+              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir QR</button>
             </div>
           </div>
         </div>
