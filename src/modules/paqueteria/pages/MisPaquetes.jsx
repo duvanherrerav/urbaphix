@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { parsearCategoriaDesdeDescripcion } from '../services/paquetesService';
 
 export default function MisPaquetes({ usuarioApp }) {
   const [paquetes, setPaquetes] = useState([]);
@@ -43,10 +44,12 @@ export default function MisPaquetes({ usuarioApp }) {
     const estado = String(filtroEstado || '').toLowerCase();
     const term = String(busqueda || '').trim().toLowerCase();
 
-    return paquetes.filter((p) => {
+    return paquetes.filter((raw) => {
+      const parsed = parsearCategoriaDesdeDescripcion(raw.descripcion);
+      const p = { ...raw, descripcion_visible: parsed.descripcion, categoria: parsed.categoria };
       const coincideEstado = estado === 'todos' ? true : String(p.estado || '').toLowerCase() === estado;
       const coincideBusqueda = term
-        ? String(p.descripcion || '').toLowerCase().includes(term)
+        ? String(p.descripcion_visible || '').toLowerCase().includes(term)
         : true;
       return coincideEstado && coincideBusqueda;
     });
@@ -81,7 +84,16 @@ export default function MisPaquetes({ usuarioApp }) {
       <div className="space-y-3">
         {paquetesFiltrados.map((p) => (
           <div key={p.id} className="border rounded-xl p-3 bg-white shadow-sm">
-            <p className="font-medium">Descripción: {p.descripcion}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium">Descripción: {p.descripcion_visible}</p>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                p.categoria === 'servicio_publico'
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}>
+                {p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}
+              </span>
+            </div>
 
             <p>
               <span className="font-semibold">Estado:</span>
