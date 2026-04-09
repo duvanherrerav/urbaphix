@@ -1,175 +1,124 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
+import { registrarPaquete } from '../services/paquetesService';
 
 export default function CrearPaquete({ usuarioApp }) {
-
   const [torres, setTorres] = useState([]);
-  const [apartamentos, setApartamentos] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [torreSeleccionada, setTorreSeleccionada] = useState('');
-  const [apartamentoSeleccionado, setApartamentoSeleccionado] = useState('');
+  const [apartamentoManual, setApartamentoManual] = useState('');
   const [descripcion, setDescripcion] = useState('');
+  const [categoria, setCategoria] = useState('paquete');
 
-  const obtenerTorres = async (conjuntoId) => {
-    if (!conjuntoId) return;
-
-    const { data, error } = await supabase
-      .from('torres')
-      .select('*')
-      .eq('conjunto_id', conjuntoId);
-
-    if (error) {
-      console.log('Error cargando torres:', error);
-      return;
-    }
-
-    setTorres(data || []);
-  };
-
-  // 🔥 CARGAR TORRES
   useEffect(() => {
     if (!usuarioApp?.conjunto_id) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    obtenerTorres(usuarioApp.conjunto_id);
+    const obtenerTorres = async () => {
+      const { data, error } = await supabase
+        .from('torres')
+        .select('id, nombre')
+        .eq('conjunto_id', usuarioApp.conjunto_id)
+        .order('nombre', { ascending: true });
+
+      if (error) {
+        toast.error('No se pudieron cargar las torres');
+        return;
+      }
+
+      setTorres(data || []);
+    };
+    obtenerTorres();
   }, [usuarioApp?.conjunto_id]);
 
-  // 🔥 CARGAR APARTAMENTOS SEGÚN TORRE
-  const obtenerApartamentos = async (torreId) => {
-
-    const { data, error } = await supabase
-      .from('apartamentos')
-      .select('*')
-      .eq('torre_id', torreId);
-
-    if (error) {
-      console.log('Error cargando apartamentos:', error);
-      return;
-    }
-
-    setApartamentos(data || []);
+  const limpiarFormulario = () => {
+    setDescripcion('');
+    setApartamentoManual('');
+    setTorreSeleccionada('');
+    setCategoria('paquete');
   };
 
-  // 🔥 CREAR PAQUETE
   const crearPaquete = async () => {
+    if (!torreSeleccionada) return toast.error('Selecciona torre');
+    if (!apartamentoManual.trim()) return toast.error('Escribe el apartamento');
+    if (!descripcion.trim()) return toast.error('Ingresa una descripción');
+    if (!usuarioApp?.id) return toast.error('Usuario no autenticado');
 
-    if (!torreSeleccionada) {
-      alert('Selecciona torre');
+    setLoading(true);
+    const result = await registrarPaquete({
+      apartamento_numero: apartamentoManual.trim().toUpperCase(),
+      torre_id: torreSeleccionada,
+      descripcion: descripcion.trim(),
+      categoria
+    }, usuarioApp);
+    setLoading(false);
+
+    if (!result.ok) {
+      toast.error(`No se pudo registrar: ${result.error}`);
       return;
     }
 
-    if (!apartamentoSeleccionado) {
-      alert('Selecciona apartamento');
-      return;
-    }
-
-    if (!descripcion) {
-      alert('Ingresa una descripción');
-      return;
-    }
-
-    // 🔥 1. BUSCAR RESIDENTE AUTOMÁTICO
-    const { data: residente, error: errorResidente } = await supabase
-      .from('residentes')
-      .select('id, usuario_id')
-      .eq('apartamento_id', apartamentoSeleccionado)
-      .single();
-
-    if (errorResidente || !residente) {
-      console.log(errorResidente);
-      alert('No hay residente en ese apartamento');
-      return;
-    }
-
-    // 🔥 2. CREAR PAQUETE
-    const { error } = await supabase
-      .from('paquetes')
-      .insert([{
-        conjunto_id: usuarioApp.conjunto_id,
-        apartamento_id: apartamentoSeleccionado,
-        residente_id: residente.id,
-        descripcion: descripcion,
-        recibido_por: usuarioApp.id,
-        estado: 'pendiente'
-      }]);
-
-    if (error) {
-      console.log(error);
-      alert('Error creando paquete');
-      return;
-    }
-
-    // 🔥 3. CREAR NOTIFICACIÓN
-    const { error: errorNotif } = await supabase
-      .from('notificaciones')
-      .insert([{
-        usuario_id: residente.usuario_id,
-        tipo: 'paquete',
-        titulo: '📦 Nuevo paquete',
-        mensaje: `Tienes un paquete (${descripcion}) en portería`
-      }]);
-
-    if (errorNotif) {
-      console.log(errorNotif);
-    }
-
-    alert('📦 Paquete registrado');
-
-    // 🔥 LIMPIAR FORMULARIO
-    setDescripcion('');
-    setApartamentoSeleccionado('');
-    setTorreSeleccionada('');
-    setApartamentos([]);
+    toast.success(
+      categoria === 'servicio_publico'
+        ? 'Servicio público recibido y notificado al residente'
+        : 'Paquete registrado y notificado al residente'
+    );
+    limpiarFormulario();
   };
 
   return (
-    <div>
-      <h2>Registrar paquete 📦</h2>
+    <div className="bg-white rounded-2xl shadow p-5 space-y-4">
+      <div>
+        <h2 className="text-2xl font-bold">Registrar recepción 📦</h2>
+        <p className="text-sm text-gray-500">
+          Registra paquetes o servicios públicos para que el residente tenga alerta al llegar.
+        </p>
+      </div>
 
-      {/* 🔥 TORRE */}
-      <select
-        value={torreSeleccionada}
-        onChange={(e) => {
-          setTorreSeleccionada(e.target.value);
-          setApartamentoSeleccionado('');
-          obtenerApartamentos(e.target.value);
-        }}
+      <div className="grid md:grid-cols-2 gap-3">
+        <select
+          className="border rounded-lg px-3 py-2"
+          value={categoria}
+          onChange={(e) => setCategoria(e.target.value)}
+        >
+          <option value="paquete">Paquete</option>
+          <option value="servicio_publico">Servicio público</option>
+        </select>
+
+        <select
+          className="border rounded-lg px-3 py-2"
+          value={torreSeleccionada}
+          onChange={(e) => setTorreSeleccionada(e.target.value)}
+        >
+          <option value="">Selecciona torre</option>
+          {torres.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.nombre}
+            </option>
+          ))}
+        </select>
+
+        <input
+          className="border rounded-lg px-3 py-2"
+          placeholder="Apartamento (escrito manual)"
+          value={apartamentoManual}
+          onChange={(e) => setApartamentoManual(e.target.value)}
+        />
+
+        <input
+          className="border rounded-lg px-3 py-2"
+          placeholder={categoria === 'servicio_publico' ? 'Ej: Factura de energía abril' : 'Ej: Amazon, MercadoLibre'}
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+        />
+      </div>
+
+      <button
+        onClick={crearPaquete}
+        disabled={loading}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
       >
-        <option value="">Selecciona torre</option>
-        {torres.map(t => (
-          <option key={t.id} value={t.id}>
-            {t.nombre}
-          </option>
-        ))}
-      </select>
-
-      <br /><br />
-
-      {/* 🔥 APARTAMENTO */}
-      <select
-        value={apartamentoSeleccionado}
-        onChange={(e) => setApartamentoSeleccionado(e.target.value)}
-      >
-        <option value="">Selecciona apartamento</option>
-        {apartamentos.map(a => (
-          <option key={a.id} value={a.id}>
-            {a.numero}
-          </option>
-        ))}
-      </select>
-
-      <br /><br />
-
-      {/* 🔥 DESCRIPCIÓN */}
-      <input
-        placeholder="Descripción (ej: Amazon, MercadoLibre...)"
-        value={descripcion}
-        onChange={e => setDescripcion(e.target.value)}
-      />
-
-      <br /><br />
-
-      <button onClick={crearPaquete}>
-        Guardar paquete
+        {loading ? 'Guardando...' : (categoria === 'servicio_publico' ? 'Registrar servicio público' : 'Guardar paquete')}
       </button>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import toast from 'react-hot-toast';
+import { parsearCategoriaDesdeDescripcion } from '../services/paquetesService';
 
 export default function NotificacionesPaquetes({ usuarioApp }) {
 
@@ -47,15 +48,23 @@ export default function NotificacionesPaquetes({ usuarioApp }) {
 
             // 🟢 NUEVO PAQUETE
             if (payload.eventType === 'INSERT') {
+              const parsed = parsearCategoriaDesdeDescripcion(paquete.descripcion);
+              const isServicio = parsed.categoria === 'servicio_publico';
 
               if (Notification.permission === 'granted') {
-                new Notification('📦 Nuevo paquete', {
-                  body: `Tienes un paquete (${paquete.descripcion})`,
+                new Notification(isServicio ? '🧾 Servicio público recibido' : '📦 Nuevo paquete', {
+                  body: isServicio
+                    ? `Tienes un servicio público por reclamar (${parsed.descripcion})`
+                    : `Tienes un paquete (${parsed.descripcion})`,
                   icon: '/icon.png'
                 });
               }
 
-              toast.success('📦 Tienes un nuevo paquete');
+              toast.success(
+                isServicio
+                  ? '🧾 Tienes un servicio público por reclamar'
+                  : '📦 Tienes un nuevo paquete'
+              );
             }
 
             // 🔵 PAQUETE ENTREGADO
