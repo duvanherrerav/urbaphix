@@ -8,6 +8,8 @@ export default function CrearVisita({ usuarioApp }) {
   const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
   const hoyBogota = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
   const fechaHoy = hoyBogota();
+  const normalizarDocumento = (value) => String(value || '').replace(/\s+/g, '').toUpperCase();
+  const normalizarNombre = (value) => String(value || '').replace(/\s+/g, ' ').trim();
   const [form, setForm] = useState({
     nombre: '',
     tipo_documento: '',
@@ -77,7 +79,7 @@ export default function CrearVisita({ usuarioApp }) {
   }, []);
 
   const cargarHistorial = async (rid) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('registro_visitas')
       .select(`
         id, fecha_visita, estado, qr_code, created_at,
@@ -86,6 +88,11 @@ export default function CrearVisita({ usuarioApp }) {
       .eq('visitantes.residente_id', rid)
       .order('created_at', { ascending: false })
       .limit(20);
+    if (error) {
+      toast.error('No se pudo cargar el historial de visitas');
+      setHistorial([]);
+      return;
+    }
     const mapped = (data || []).map((row) => ({
       id: row.id,
       fecha_visita: row.fecha_visita,
@@ -163,9 +170,17 @@ export default function CrearVisita({ usuarioApp }) {
   };
 
   const crearVisita = async () => {
-    if (!form.nombre || !form.documento || !form.fecha || !form.tipo_documento) {
+    const nombreLimpio = normalizarNombre(form.nombre);
+    const documentoLimpio = normalizarDocumento(form.documento);
+
+    if (!nombreLimpio || !documentoLimpio || !form.fecha || !form.tipo_documento) {
       setTouched({ nombre: true, documento: true, fecha: true });
       toast('Completa los campos obligatorios ⚠️');
+      return;
+    }
+    if (form.fecha < hoyBogota()) {
+      setTouched((prev) => ({ ...prev, fecha: true }));
+      toast.error('No puedes crear una visita para una fecha pasada.');
       return;
     }
 
@@ -203,9 +218,9 @@ export default function CrearVisita({ usuarioApp }) {
     const { ok, visita, qr_code, error } = await crearVisitaService({
       residente_id: residente.id,
       apartamento_id: residente.apartamento_id,
-      nombre: form.nombre,
+      nombre: nombreLimpio,
       tipo_documento: form.tipo_documento,
-      documento: form.documento,
+      documento: documentoLimpio,
       tipo_vehiculo: form.tipoVehiculo || null,
       placa: form.tipoVehiculo ? form.placa : null,
       fecha: form.fecha
@@ -220,7 +235,7 @@ export default function CrearVisita({ usuarioApp }) {
     const payload = JSON.stringify({ visita_id: visita.id, qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
     toast.success('Visita creada. QR listo para compartir ✅');
-    setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: fechaHoy, tipoVehiculo: '', placa: '' }));
+    setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: hoyBogota(), tipoVehiculo: '', placa: '' }));
     setTouched({ nombre: false, documento: false, fecha: false });
     if (residenteId) cargarHistorial(residenteId);
   };
@@ -229,13 +244,17 @@ export default function CrearVisita({ usuarioApp }) {
     if (!qrPayload) return;
     const texto = `Te comparto tu acceso de visita Urbaphix:\n${qrPayload}`;
 
-    if (navigator.share) {
-      await navigator.share({ title: 'QR de visita', text: texto });
-      toast.success('Código QR compartido');
-      return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'QR de visita', text: texto });
+        toast.success('Código QR compartido');
+        return;
+      }
+      await navigator.clipboard.writeText(texto);
+      toast.success('Código QR copiado para compartir.');
+    } catch (error) {
+      toast.error(`No se pudo compartir el QR: ${error?.message || 'error inesperado'}`);
     }
-    await navigator.clipboard.writeText(texto);
-    toast.success('Código QR copiado para compartir.');
   };
 
   const compartirImagenQR = async () => {
@@ -246,15 +265,19 @@ export default function CrearVisita({ usuarioApp }) {
     const blob = await (await fetch(dataUrl)).blob();
     const file = new File([blob], 'qr-visita.png', { type: 'image/png' });
 
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ title: 'QR visita', files: [file] });
-      return;
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: 'QR visita', files: [file] });
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'qr-visita.png';
+      a.click();
+      toast.success('Imagen QR descargada');
+    } catch (error) {
+      toast.error(`No se pudo compartir la imagen del QR: ${error?.message || 'error inesperado'}`);
     }
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'qr-visita.png';
-    a.click();
-    toast.success('Imagen QR descargada');
   };
 
   const setQRDesdeHistorial = (item) => {
@@ -267,7 +290,7 @@ export default function CrearVisita({ usuarioApp }) {
       nombre: item.nombre_visitante || '',
       tipo_documento: item.tipo_documento || 'CC',
       documento: item.documento || '',
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: hoyBogota(),
       tipoVehiculo: item.tipo_vehiculo || '',
       placa: item.placa || ''
     });
@@ -287,6 +310,7 @@ export default function CrearVisita({ usuarioApp }) {
   const totalPaginasFrecuentes = Math.max(1, Math.ceil(historialBuscado.length / PAGE_SIZE));
   const paginaFrecuenteActual = Math.min(paginaFrecuentes, totalPaginasFrecuentes);
   const historialPaginado = historialBuscado.slice((paginaFrecuenteActual - 1) * PAGE_SIZE, paginaFrecuenteActual * PAGE_SIZE);
+  const quickFrecuentes = useMemo(() => visitantesSugeridos.slice(0, 5), [visitantesSugeridos]);
 
   return (
     <div className="bg-white rounded-2xl shadow p-5 space-y-4 max-w-2xl">
@@ -304,6 +328,7 @@ export default function CrearVisita({ usuarioApp }) {
           onChange={(e) => setForm({ ...form, nombre: e.target.value })}
           onBlur={(e) => {
             setTouched((prev) => ({ ...prev, nombre: true }));
+            setForm((prev) => ({ ...prev, nombre: normalizarNombre(prev.nombre) }));
             aplicarVisitanteSugerido(e.target.value, 'nombre');
           }}
         />
@@ -329,7 +354,7 @@ export default function CrearVisita({ usuarioApp }) {
           placeholder="Documento"
           list="sugerencias-documento-visitante"
           value={form.documento}
-          onChange={(e) => setForm({ ...form, documento: e.target.value })}
+          onChange={(e) => setForm({ ...form, documento: normalizarDocumento(e.target.value) })}
           onBlur={(e) => {
             setTouched((prev) => ({ ...prev, documento: true }));
             aplicarVisitanteSugerido(e.target.value, 'documento');
@@ -350,6 +375,23 @@ export default function CrearVisita({ usuarioApp }) {
           onBlur={() => setTouched((prev) => ({ ...prev, fecha: true }))}
         />
       </div>
+      {quickFrecuentes.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-600">Accesos rápidos de visitantes frecuentes</p>
+          <div className="flex flex-wrap gap-2">
+            {quickFrecuentes.map((item) => (
+              <button
+                key={`quick-${item.id}`}
+                type="button"
+                className="text-xs px-3 py-1 rounded-full border bg-white hover:bg-slate-50"
+                onClick={() => reutilizarVisita(item)}
+              >
+                {item.nombre_visitante} · {item.documento}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid md:grid-cols-3 gap-2">
         <div>{touched.nombre && erroresFormulario.nombre && <p className="text-xs text-red-600">{erroresFormulario.nombre}</p>}</div>
         <div>{touched.documento && erroresFormulario.documento && <p className="text-xs text-red-600">{erroresFormulario.documento}</p>}</div>
