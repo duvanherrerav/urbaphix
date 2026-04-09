@@ -7,14 +7,16 @@ import { crearVisita as crearVisitaService } from '../services/visitasService';
 export default function CrearVisita({ usuarioApp }) {
   const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
   const hoyBogota = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+  const fechaHoy = hoyBogota();
   const [form, setForm] = useState({
     nombre: '',
     tipo_documento: '',
     documento: '',
-    fecha: '',
+    fecha: fechaHoy,
     tipoVehiculo: '',
     placa: ''
   });
+  const [touched, setTouched] = useState({ nombre: false, documento: false, fecha: false });
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [loading, setLoading] = useState(false);
   const [qrPayload, setQrPayload] = useState(null);
@@ -128,9 +130,41 @@ export default function CrearVisita({ usuarioApp }) {
     }
     return { ok: true, mensaje: '' };
   }, [form.tipoVehiculo, form.placa]);
+  const erroresFormulario = useMemo(() => ({
+    nombre: !form.nombre.trim() ? 'Ingresa el nombre del visitante.' : '',
+    documento: !form.documento.trim() ? 'Ingresa el número de documento.' : '',
+    fecha: !form.fecha ? 'Selecciona la fecha de la visita.' : ''
+  }), [form.nombre, form.documento, form.fecha]);
+  const visitantesSugeridos = useMemo(() => {
+    const map = new Map();
+    historial.forEach((h) => {
+      const key = `${h.tipo_documento || ''}-${h.documento || ''}`;
+      if (!map.has(key)) map.set(key, h);
+    });
+    return Array.from(map.values());
+  }, [historial]);
+
+  const aplicarVisitanteSugerido = (value, campo) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return;
+    const found = visitantesSugeridos.find((h) => {
+      if (campo === 'documento') return String(h.documento || '').trim().toLowerCase() === normalized;
+      return String(h.nombre_visitante || '').trim().toLowerCase() === normalized;
+    });
+    if (!found) return;
+    setForm((prev) => ({
+      ...prev,
+      nombre: found.nombre_visitante || prev.nombre,
+      tipo_documento: found.tipo_documento || prev.tipo_documento,
+      documento: found.documento || prev.documento,
+      tipoVehiculo: found.tipo_vehiculo || prev.tipoVehiculo,
+      placa: found.placa || prev.placa
+    }));
+  };
 
   const crearVisita = async () => {
     if (!form.nombre || !form.documento || !form.fecha || !form.tipo_documento) {
+      setTouched({ nombre: true, documento: true, fecha: true });
       toast('Completa los campos obligatorios ⚠️');
       return;
     }
@@ -186,7 +220,8 @@ export default function CrearVisita({ usuarioApp }) {
     const payload = JSON.stringify({ visita_id: visita.id, qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
     toast.success('Visita creada. QR listo para compartir ✅');
-    setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: '', tipoVehiculo: '', placa: '' }));
+    setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: fechaHoy, tipoVehiculo: '', placa: '' }));
+    setTouched({ nombre: false, documento: false, fecha: false });
     if (residenteId) cargarHistorial(residenteId);
   };
 
@@ -264,9 +299,19 @@ export default function CrearVisita({ usuarioApp }) {
         <input
           className="border rounded-lg px-3 py-2"
           placeholder="Nombre visitante"
+          list="sugerencias-nombre-visitante"
           value={form.nombre}
           onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+          onBlur={(e) => {
+            setTouched((prev) => ({ ...prev, nombre: true }));
+            aplicarVisitanteSugerido(e.target.value, 'nombre');
+          }}
         />
+        <datalist id="sugerencias-nombre-visitante">
+          {visitantesSugeridos.map((v) => (
+            <option key={`name-${v.id}`} value={v.nombre_visitante || ''} />
+          ))}
+        </datalist>
 
         <select
           className="border rounded-lg px-3 py-2"
@@ -282,9 +327,19 @@ export default function CrearVisita({ usuarioApp }) {
         <input
           className="border rounded-lg px-3 py-2"
           placeholder="Documento"
+          list="sugerencias-documento-visitante"
           value={form.documento}
           onChange={(e) => setForm({ ...form, documento: e.target.value })}
+          onBlur={(e) => {
+            setTouched((prev) => ({ ...prev, documento: true }));
+            aplicarVisitanteSugerido(e.target.value, 'documento');
+          }}
         />
+        <datalist id="sugerencias-documento-visitante">
+          {visitantesSugeridos.map((v) => (
+            <option key={`doc-${v.id}`} value={v.documento || ''} />
+          ))}
+        </datalist>
 
         <input
           type="date"
@@ -292,7 +347,13 @@ export default function CrearVisita({ usuarioApp }) {
           value={form.fecha}
           min={hoyBogota()}
           onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+          onBlur={() => setTouched((prev) => ({ ...prev, fecha: true }))}
         />
+      </div>
+      <div className="grid md:grid-cols-3 gap-2">
+        <div>{touched.nombre && erroresFormulario.nombre && <p className="text-xs text-red-600">{erroresFormulario.nombre}</p>}</div>
+        <div>{touched.documento && erroresFormulario.documento && <p className="text-xs text-red-600">{erroresFormulario.documento}</p>}</div>
+        <div>{touched.fecha && erroresFormulario.fecha && <p className="text-xs text-red-600">{erroresFormulario.fecha}</p>}</div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
