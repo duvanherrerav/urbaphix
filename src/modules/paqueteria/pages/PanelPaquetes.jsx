@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { supabase } from '../../../services/supabaseClient';
 import { entregarPaquete as entregarPaqueteService, listarPaquetesConDetalle } from '../services/paquetesService';
 
 export default function PanelPaquetes({ usuarioApp }) {
@@ -30,6 +31,31 @@ export default function PanelPaquetes({ usuarioApp }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioApp?.conjunto_id, filtroEstado]);
 
+  useEffect(() => {
+    if (!usuarioApp?.conjunto_id) return undefined;
+
+    const channel = supabase
+      .channel(`paqueteria-panel-${usuarioApp.conjunto_id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'paquetes',
+        filter: `conjunto_id=eq.${usuarioApp.conjunto_id}`
+      }, () => {
+        obtenerPaquetes();
+      })
+      .subscribe();
+
+    const onChanged = () => obtenerPaquetes();
+    window.addEventListener('paqueteria:changed', onChanged);
+
+    return () => {
+      window.removeEventListener('paqueteria:changed', onChanged);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarioApp?.conjunto_id, filtroEstado, busqueda]);
+
   const entregables = useMemo(
     () => paquetes.filter((p) => p.estado === 'pendiente'),
     [paquetes]
@@ -59,6 +85,9 @@ export default function PanelPaquetes({ usuarioApp }) {
         ? 'Servicio público entregado al residente'
         : 'Paquete entregado'
     );
+    window.dispatchEvent(new CustomEvent('paqueteria:changed', {
+      detail: { action: 'delivered', paqueteId: paquete.id }
+    }));
     obtenerPaquetes();
   };
 

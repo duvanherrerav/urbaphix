@@ -63,6 +63,9 @@ export default function CrearPaquete({ usuarioApp }) {
         ? 'Servicio público recibido y notificado al residente'
         : 'Paquete registrado y notificado al residente'
     );
+    window.dispatchEvent(new CustomEvent('paqueteria:changed', {
+      detail: { action: 'created', paquete: result.paquete || null }
+    }));
     limpiarFormulario();
   };
 

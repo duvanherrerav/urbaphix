@@ -2,6 +2,7 @@ import { supabase } from '../../../services/supabaseClient';
 
 const errorMessage = (error, fallback) => error?.message || fallback;
 const TAG_SERVICIO_PUBLICO = '[SERVICIO_PUBLICO]';
+const normalizarTokenApto = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export const normalizarCategoriaPaquete = (categoria) => {
   const raw = String(categoria || '').trim().toLowerCase();
@@ -18,10 +19,11 @@ export const construirDescripcionPersistida = (descripcion, categoria) => {
 
 export const parsearCategoriaDesdeDescripcion = (descripcionRaw) => {
   const text = String(descripcionRaw || '').trim();
-  if (text.toUpperCase().startsWith(TAG_SERVICIO_PUBLICO)) {
+  const tagged = /^\[servicio[_\s]?publico\]/i.test(text);
+  if (tagged) {
     return {
       categoria: 'servicio_publico',
-      descripcion: text.replace(new RegExp(`^${TAG_SERVICIO_PUBLICO}\\s*`, 'i'), '').trim()
+      descripcion: text.replace(/^\[servicio[_\s]?publico\]\s*/i, '').trim()
     };
   }
   return { categoria: 'paquete', descripcion: text };
@@ -48,11 +50,22 @@ const resolverApartamentoId = async ({ apartamento_id, apartamento_numero, torre
   }
 
   const { data: aptos, error } = await aptoQuery.limit(2);
-  if (error || !aptos?.length) return null;
-  if (aptos.length > 1) {
+  if (!error && aptos?.length === 1) return aptos[0].id;
+  if (!error && aptos?.length > 1) {
     throw new Error('Apartamento ambiguo. Indica torre para continuar.');
   }
-  return aptos[0].id;
+
+  const fallbackQuery = supabase
+    .from('apartamentos')
+    .select('id, numero, torre_id');
+  const scopedFallback = torre_id ? fallbackQuery.eq('torre_id', torre_id) : fallbackQuery;
+  const { data: fallbackAptos, error: fallbackError } = await scopedFallback.limit(300);
+  if (fallbackError || !fallbackAptos?.length) return null;
+
+  const token = normalizarTokenApto(apartamento_numero);
+  const matches = fallbackAptos.filter((a) => normalizarTokenApto(a.numero) === token);
+  if (matches.length > 1) throw new Error('Apartamento ambiguo. Ajusta torre o escribe mejor el número.');
+  return matches[0]?.id || null;
 };
 
 const resolverUsuarioResidente = async ({ residente_id, apartamento_id }) => {

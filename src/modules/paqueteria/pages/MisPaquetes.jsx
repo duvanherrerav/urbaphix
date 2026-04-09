@@ -42,6 +42,39 @@ export default function MisPaquetes({ usuarioApp }) {
     obtenerPaquetes(usuarioApp.id);
   }, [usuarioApp?.id]);
 
+  useEffect(() => {
+    if (!usuarioApp?.id) return undefined;
+
+    let channel = null;
+    const init = async () => {
+      const { data: residente } = await supabase
+        .from('residentes')
+        .select('id')
+        .eq('usuario_id', usuarioApp.id)
+        .single();
+      if (!residente?.id) return;
+
+      channel = supabase
+        .channel(`mis-paquetes-${residente.id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'paquetes',
+          filter: `residente_id=eq.${residente.id}`
+        }, () => obtenerPaquetes(usuarioApp.id))
+        .subscribe();
+    };
+    init();
+
+    const onChanged = () => obtenerPaquetes(usuarioApp.id);
+    window.addEventListener('paqueteria:changed', onChanged);
+
+    return () => {
+      window.removeEventListener('paqueteria:changed', onChanged);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [usuarioApp?.id]);
+
   const paquetesNormalizados = useMemo(
     () => paquetes.map((raw) => {
       const parsed = parsearCategoriaDesdeDescripcion(raw.descripcion);
