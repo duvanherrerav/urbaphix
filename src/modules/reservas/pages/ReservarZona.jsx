@@ -1,28 +1,37 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import ReservaCreateCard from '../components/residente/ReservaCreateCard';
+import ReservaCard from '../components/residente/ReservaCard';
+import ReservaEmptyState from '../components/residente/ReservaEmptyState';
+import ReservaErrorBanner from '../components/residente/ReservaErrorBanner';
+import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import {
     cambiarEstadoReserva,
     crearReserva,
     getPerfilResidente,
     getRecursosComunes,
     listarBloqueos,
-    listarDocumentosReserva,
+    listarDocumentosReservas,
     listarReservas,
     registrarDocumentoReserva,
     subscribeReservasConjunto
 } from '../services/reservasService';
 
 const toFechaISO = (fecha, hora) => `${fecha}T${hora}:00`;
-
-const ESTADOS_FINALIZADOS = ['cancelada', 'rechazada', 'finalizada', 'no_show'];
+const ESTADOS_ACTIVOS = ['solicitada', 'aprobada', 'en_curso'];
+const TIMELINE_ENABLED = false;
 
 export default function ReservarZona({ usuarioApp }) {
     const [recursos, setRecursos] = useState([]);
     const [perfilResidente, setPerfilResidente] = useState(null);
     const [reservas, setReservas] = useState([]);
     const [bloqueos, setBloqueos] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [errorGeneral, setErrorGeneral] = useState('');
+    const [loadingCreate, setLoadingCreate] = useState(false);
+    const [loadingReservas, setLoadingReservas] = useState(false);
     const [subiendoSoporteId, setSubiendoSoporteId] = useState(null);
+    const [timelineOpenId, setTimelineOpenId] = useState(null);
+    const [timelineByReserva] = useState({});
     const [form, setForm] = useState({
         recurso_id: '',
         fecha: '',
@@ -34,8 +43,14 @@ export default function ReservarZona({ usuarioApp }) {
         observaciones: ''
     });
 
+    const setFormField = (field, value) => {
+        setForm((prev) => ({ ...prev, [field]: value }));
+    };
+
     const cargar = async () => {
         if (!usuarioApp?.id || !usuarioApp?.conjunto_id) return;
+        setErrorGeneral('');
+        setLoadingReservas(true);
 
         const [recursosResp, perfilResp, bloqueosResp] = await Promise.all([
             getRecursosComunes(usuarioApp.conjunto_id),
@@ -43,9 +58,9 @@ export default function ReservarZona({ usuarioApp }) {
             listarBloqueos({ conjunto_id: usuarioApp.conjunto_id })
         ]);
 
-        if (!recursosResp.ok) toast.error(recursosResp.error);
-        if (!perfilResp.ok) toast.error(perfilResp.error);
-        if (!bloqueosResp.ok) toast.error(bloqueosResp.error);
+        if (!recursosResp.ok) setErrorGeneral(recursosResp.error);
+        if (!perfilResp.ok) setErrorGeneral(perfilResp.error);
+        if (!bloqueosResp.ok) setErrorGeneral(bloqueosResp.error);
 
         setRecursos(recursosResp.data || []);
         setPerfilResidente(perfilResp.data || null);
@@ -59,20 +74,26 @@ export default function ReservarZona({ usuarioApp }) {
             });
 
             if (!reservasResp.ok) {
-                toast.error(reservasResp.error);
+                setErrorGeneral(reservasResp.error);
+                setReservas([]);
             } else {
-                const conSoportes = await Promise.all(
-                    (reservasResp.data || []).map(async (reserva) => {
-                        const docsResp = await listarDocumentosReserva(reserva.id);
-                        return {
-                            ...reserva,
-                            documentos: docsResp.ok ? docsResp.data : []
-                        };
-                    })
-                );
+                const reservaIds = (reservasResp.data || []).map((r) => r.id);
+                const docsResp = await listarDocumentosReservas(reservaIds);
+
+                if (!docsResp.ok) {
+                    setErrorGeneral(docsResp.error);
+                }
+
+                const conSoportes = (reservasResp.data || []).map((reserva) => ({
+                    ...reserva,
+                    documentos: docsResp.ok ? (docsResp.data[reserva.id] || []) : []
+                }));
+
                 setReservas(conSoportes);
             }
         }
+
+        setLoadingReservas(false);
     };
 
     useEffect(() => {
@@ -101,7 +122,7 @@ export default function ReservarZona({ usuarioApp }) {
 
     const crear = async () => {
         if (!perfilResidente?.id) return toast.error('No se encontró tu perfil de residente');
-        if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return toast.error('Completa fecha, horas y recurso');
+        if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return toast.error('Completa recurso, fecha y horas');
         if (form.hora_fin <= form.hora_inicio) return toast.error('La hora fin debe ser mayor a hora inicio');
 
         const fecha_inicio = toFechaISO(form.fecha, form.hora_inicio);
@@ -111,7 +132,7 @@ export default function ReservarZona({ usuarioApp }) {
             return toast.error('La franja elegida está bloqueada por administración');
         }
 
-        setLoading(true);
+        setLoadingCreate(true);
         const result = await crearReserva({
             conjunto_id: usuarioApp.conjunto_id,
             recurso_id: form.recurso_id,
@@ -128,7 +149,7 @@ export default function ReservarZona({ usuarioApp }) {
                 recurso_tipo: recursos.find((r) => r.id === form.recurso_id)?.tipo || null
             }
         });
-        setLoading(false);
+        setLoadingCreate(false);
 
         if (!result.ok) return toast.error(result.error);
 
@@ -146,13 +167,15 @@ export default function ReservarZona({ usuarioApp }) {
     };
 
     const cancelar = async (reservaId) => {
-        const ok = window.confirm('¿Cancelar esta reserva?');
+        const ok = window.confirm('¿Cancelar esta reserva? Esta acción no se puede deshacer.');
         if (!ok) return;
 
         const resp = await cambiarEstadoReserva({
             reserva_id: reservaId,
             estado: 'cancelada',
             usuario_id: usuarioApp.id,
+            usuario_rol: usuarioApp.rol_id,
+            usuario_residente_id: perfilResidente?.id || null,
             detalle: 'Cancelación solicitada por residente'
         });
 
@@ -164,8 +187,9 @@ export default function ReservarZona({ usuarioApp }) {
     const adjuntarSoporte = async (reservaId, file) => {
         if (!file) return;
 
-        const ruta_storage = `reservas/${reservaId}/${Date.now()}-${file.name}`;
+        const ruta_storage = `referencia-local://${reservaId}/${Date.now()}-${file.name}`;
         setSubiendoSoporteId(reservaId);
+
         const resp = await registrarDocumentoReserva({
             reserva_id: reservaId,
             conjunto_id: usuarioApp.conjunto_id,
@@ -174,71 +198,115 @@ export default function ReservarZona({ usuarioApp }) {
             tipo_documento: file.type || 'adjunto',
             subido_por: usuarioApp.id
         });
+
         setSubiendoSoporteId(null);
 
         if (!resp.ok) return toast.error(resp.error);
-        toast.success('Soporte registrado');
+        toast.success('Soporte referenciado en la reserva');
         cargar();
     };
 
     const reservasActivas = useMemo(
-        () => reservas.filter((r) => !ESTADOS_FINALIZADOS.includes(r.estado)),
+        () => reservas.filter((r) => ESTADOS_ACTIVOS.includes(r.estado)),
         [reservas]
     );
 
+    const reservasHistorial = useMemo(
+        () => reservas.filter((r) => !ESTADOS_ACTIVOS.includes(r.estado)).slice(0, 5),
+        [reservas]
+    );
+
+    const bloqueoPreview = useMemo(() => {
+        if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return false;
+        if (form.hora_fin <= form.hora_inicio) return false;
+
+        return validarBloqueo(
+            form.recurso_id,
+            toFechaISO(form.fecha, form.hora_inicio),
+            toFechaISO(form.fecha, form.hora_fin)
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.recurso_id, form.fecha, form.hora_inicio, form.hora_fin, bloqueos]);
+
     return (
         <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-5 shadow space-y-3">
-                <h2 className="text-2xl font-bold">Reservar zona común 🏟️</h2>
-                <p className="text-sm text-gray-500">Solicita cancha, salón social, logística o préstamo de enseres.</p>
-                <div className="grid md:grid-cols-2 gap-3">
-                    <select className="border rounded-lg px-3 py-2" value={form.recurso_id} onChange={(e) => setForm({ ...form, recurso_id: e.target.value })}>
-                        <option value="">Selecciona recurso</option>
-                        {recursos.map((r) => <option key={r.id} value={r.id}>{r.nombre} · {r.tipo}</option>)}
-                    </select>
-                    <select className="border rounded-lg px-3 py-2" value={form.tipo_reserva} onChange={(e) => setForm({ ...form, tipo_reserva: e.target.value })}>
-                        <option value="recreativa">Recreativa</option>
-                        <option value="logistica">Logística</option>
-                        <option value="prestamo">Préstamo</option>
-                    </select>
-                    <input type="date" className="border rounded-lg px-3 py-2" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-                    <input type="time" className="border rounded-lg px-3 py-2" value={form.hora_inicio} onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })} />
-                    <input type="time" className="border rounded-lg px-3 py-2" value={form.hora_fin} onChange={(e) => setForm({ ...form, hora_fin: e.target.value })} />
-                    <input className="border rounded-lg px-3 py-2" placeholder="Subtipo (opcional)" value={form.subtipo} onChange={(e) => setForm({ ...form, subtipo: e.target.value })} />
-                    <input className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Motivo (opcional)" value={form.motivo} onChange={(e) => setForm({ ...form, motivo: e.target.value })} />
-                    <textarea className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Observaciones (opcional)" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white shadow">
+                <h1 className="text-2xl font-bold">Mis reservas</h1>
+                <p className="text-sm text-blue-100">Gestiona tus solicitudes de zonas comunes de forma simple y clara.</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="bg-white/20 px-2 py-1 rounded-full">Activas: {reservasActivas.length}</span>
+                    <span className="bg-white/20 px-2 py-1 rounded-full">Historial: {reservasHistorial.length}</span>
+                    <span className="bg-white/20 px-2 py-1 rounded-full">Recursos: {recursos.length}</span>
                 </div>
-                <button onClick={crear} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-                    {loading ? 'Creando...' : 'Crear solicitud'}
-                </button>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 shadow space-y-3">
-                <h3 className="text-lg font-semibold">Mis reservas activas ({reservasActivas.length})</h3>
-                {reservasActivas.map((r) => (
-                    <div key={r.id} className="border rounded-xl p-3 space-y-2">
-                        <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'} · {r.estado}</p>
-                        <p className="text-sm text-gray-500">{new Date(r.fecha_inicio).toLocaleString()} → {new Date(r.fecha_fin).toLocaleString()}</p>
-                        <p className="text-sm text-gray-500">Tipo: {r.tipo_reserva}{r.subtipo ? ` · ${r.subtipo}` : ''}</p>
-                        <p className="text-sm text-gray-500">Soportes: {r.documentos?.length || 0}</p>
-                        <div className="flex flex-wrap gap-2">
-                            {['solicitada', 'aprobada'].includes(r.estado) && (
-                                <button className="border rounded px-2 py-1 text-sm" onClick={() => cancelar(r.id)}>Cancelar</button>
-                            )}
-                            <label className="border rounded px-2 py-1 text-sm cursor-pointer">
-                                {subiendoSoporteId === r.id ? 'Subiendo...' : 'Adjuntar soporte'}
-                                <input
-                                    type="file"
-                                    className="hidden"
-                                    onChange={(e) => adjuntarSoporte(r.id, e.target.files?.[0])}
-                                    disabled={subiendoSoporteId === r.id}
-                                />
-                            </label>
+            <ReservaErrorBanner message={errorGeneral} onRetry={cargar} />
+
+            <ReservaCreateCard
+                form={form}
+                recursos={recursos}
+                loading={loadingCreate}
+                onChange={setFormField}
+                onSubmit={crear}
+                perfilMissing={!perfilResidente?.id}
+                bloqueoDetectado={bloqueoPreview}
+            />
+
+            <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
+                <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-lg font-semibold">Mis reservas activas ({reservasActivas.length})</h3>
+                    {loadingReservas && <p className="text-xs text-slate-500">Actualizando...</p>}
+                </div>
+
+                {reservasActivas.length === 0 && (
+                    <ReservaEmptyState
+                        title="No tienes reservas activas"
+                        description="Cuando crees una solicitud aparecerá aquí para seguimiento y acciones rápidas."
+                        actionLabel="Crear una reserva"
+                        onAction={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    />
+                )}
+
+                <div className="space-y-3">
+                    {reservasActivas.map((r) => (
+                        <ReservaCard
+                            key={r.id}
+                            reserva={r}
+                            canCancel={['solicitada', 'aprobada'].includes(r.estado)}
+                            onCancel={cancelar}
+                            onAttach={adjuntarSoporte}
+                            uploading={subiendoSoporteId === r.id}
+                            timelineEnabled={TIMELINE_ENABLED}
+                            onToggleTimeline={(reservaId) => setTimelineOpenId((prev) => prev === reservaId ? null : reservaId)}
+                            timelineOpen={timelineOpenId === r.id}
+                            timelineItems={timelineByReserva[r.id] || []}
+                        />
+                    ))}
+                </div>
+            </section>
+
+            <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
+                <h3 className="text-lg font-semibold">Historial reciente</h3>
+
+                {reservasHistorial.length === 0 && (
+                    <ReservaEmptyState
+                        title="Aún no tienes historial"
+                        description="Las reservas finalizadas, canceladas o rechazadas aparecerán en esta sección."
+                    />
+                )}
+
+                <div className="space-y-2">
+                    {reservasHistorial.map((r) => (
+                        <div key={r.id} className="border rounded-lg p-3 flex items-center justify-between gap-2">
+                            <div>
+                                <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
+                                <p className="text-xs text-slate-500">{new Date(r.fecha_inicio).toLocaleString()} → {new Date(r.fecha_fin).toLocaleString()}</p>
+                            </div>
+                            <ReservaStatusBadge estado={r.estado} />
                         </div>
-                    </div>
-                ))}
-                {reservasActivas.length === 0 && <p className="text-sm text-gray-500">No tienes reservas activas.</p>}
-            </div>
+                    ))}
+                </div>
+            </section>
         </div>
     );
 }
