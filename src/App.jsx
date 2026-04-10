@@ -20,6 +20,9 @@ const NotificacionesPagos = lazy(() => import('./modules/contabilidad/components
 const EstadoCuenta = lazy(() => import('./modules/contabilidad/components/EstadoCuenta'));
 const ListaIncidentes = lazy(() => import('./modules/seguridad/pages/ListaIncidentes'));
 const ReportarIncidente = lazy(() => import('./modules/seguridad/pages/ReportarIncidente'));
+const ReservarZona = lazy(() => import('./modules/reservas/pages/ReservarZona'));
+const PanelReservasAdmin = lazy(() => import('./modules/reservas/pages/PanelReservasAdmin'));
+const PanelReservasVigilancia = lazy(() => import('./modules/reservas/pages/PanelReservasVigilancia'));
 
 function App() {
 
@@ -227,6 +230,10 @@ function App() {
               <button onClick={() => setModulo('incidentes')} className={menuBtn}>
                 🚨 Incidentes
               </button>
+
+              <button onClick={() => setModulo('reservas')} className={menuBtn}>
+                🏟️ Reservas
+              </button>
             </>
           )}
 
@@ -244,6 +251,10 @@ function App() {
               <button onClick={() => setModulo('incidentes')} className={menuBtn}>
                 🚨 Reportar incidente
               </button>
+
+              <button onClick={() => setModulo('reservas')} className={menuBtn}>
+                🏟️ Reservas
+              </button>
             </>
           )}
 
@@ -260,6 +271,10 @@ function App() {
 
               <button onClick={() => setModulo('pagos')} className={menuBtn}>
                 💰 Mis pagos
+              </button>
+
+              <button onClick={() => setModulo('reservas')} className={menuBtn}>
+                🏟️ Reservas
               </button>
             </>
           )}
@@ -355,6 +370,10 @@ function App() {
                 {moduloActual === 'incidentes' && (
                   <ListaIncidentes usuarioApp={usuarioApp} />
                 )}
+
+                {moduloActual === 'reservas' && (
+                  <PanelReservasAdmin usuarioApp={usuarioApp} />
+                )}
               </>
             )}
 
@@ -377,6 +396,10 @@ function App() {
                 {moduloActual === 'incidentes' && (
                   <ReportarIncidente user={usuarioApp} />
                 )}
+
+                {moduloActual === 'reservas' && (
+                  <PanelReservasVigilancia usuarioApp={usuarioApp} />
+                )}
               </>
             )}
 
@@ -393,6 +416,10 @@ function App() {
 
                 {moduloActual === 'pagos' && (
                   <MisPagos usuarioApp={usuarioApp} />
+                )}
+
+                {moduloActual === 'reservas' && (
+                  <ReservarZona usuarioApp={usuarioApp} />
                 )}
               </>
             )}
