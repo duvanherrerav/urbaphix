@@ -26,6 +26,25 @@ const BASE_RESERVA_SELECT = `
   recursos_comunes ( id, nombre, tipo, requiere_aprobacion, tiempo_buffer_min )
 `;
 
+export const humanizeReservaError = (error, fallback = 'No se pudo completar la operación') => {
+    const message = err(error, fallback);
+    const lowered = String(message || '').toLowerCase();
+
+    if (lowered.includes('row-level security') || lowered.includes('permission denied')) {
+        return 'No tienes permisos para esta acción en tu conjunto o perfil.';
+    }
+
+    if (lowered.includes('reservas_zonas_no_solape') || lowered.includes('conflict')) {
+        return 'Ya existe una reserva activa en ese horario para el recurso seleccionado.';
+    }
+
+    if (lowered.includes('network') || lowered.includes('fetch')) {
+        return 'No hay conexión disponible. Intenta nuevamente.';
+    }
+
+    return message;
+};
+
 export const getRecursosComunes = async (conjuntoId) => {
     const { data, error } = await supabase
         .from('recursos_comunes')
@@ -34,11 +53,9 @@ export const getRecursosComunes = async (conjuntoId) => {
         .eq('activo', true)
         .order('nombre', { ascending: true });
 
-    if (error) return { ok: false, data: [], error: err(error, 'No se pudieron cargar recursos') };
+    if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudieron cargar recursos') };
     return { ok: true, data: data || [], error: null };
 };
-
-
 
 export const crearRecursoComun = async ({
     conjunto_id,
@@ -70,7 +87,7 @@ export const crearRecursoComun = async ({
         .select('id, conjunto_id, nombre, tipo, activo, capacidad, requiere_aprobacion, requiere_deposito, deposito_valor, tiempo_buffer_min, reglas')
         .single();
 
-    if (error || !data) return { ok: false, data: null, error: err(error, 'No se pudo crear recurso') };
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo crear recurso') };
     return { ok: true, data, error: null };
 };
 
@@ -81,7 +98,7 @@ export const getPerfilResidente = async (usuarioId) => {
         .eq('usuario_id', usuarioId)
         .single();
 
-    if (error || !data) return { ok: false, data: null, error: err(error, 'No se encontró perfil de residente') };
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se encontró perfil de residente') };
     return { ok: true, data, error: null };
 };
 
@@ -119,7 +136,7 @@ export const crearReserva = async ({
         .select(BASE_RESERVA_SELECT)
         .single();
 
-    if (error || !data) return { ok: false, data: null, error: err(error, 'No se pudo crear la reserva') };
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo crear la reserva') };
 
     await registrarEventoReserva({
         reserva_id: data.id,
@@ -153,7 +170,7 @@ export const listarReservas = async ({
     if (fecha_hasta) q = q.lte('fecha_fin', fecha_hasta);
 
     const { data, error } = await q;
-    if (error) return { ok: false, data: [], error: err(error, 'No se pudieron cargar reservas') };
+    if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudieron cargar reservas') };
     return { ok: true, data: data || [], error: null };
 };
 
@@ -176,7 +193,7 @@ export const cambiarEstadoReserva = async ({
         .single();
 
     if (errorReservaActual || !reservaActual) {
-        return { ok: false, data: null, error: err(errorReservaActual, 'No se encontró la reserva a actualizar') };
+        return { ok: false, data: null, error: humanizeReservaError(errorReservaActual, 'No se encontró la reserva a actualizar') };
     }
 
     const validacion = puedeTransicionarReserva({
@@ -204,7 +221,7 @@ export const cambiarEstadoReserva = async ({
         .select(BASE_RESERVA_SELECT)
         .single();
 
-    if (error || !data) return { ok: false, data: null, error: err(error, 'No se pudo actualizar estado') };
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo actualizar estado') };
 
     await registrarEventoReserva({
         reserva_id,
@@ -224,7 +241,7 @@ export const registrarEventoReserva = async ({ reserva_id, conjunto_id, actor_id
         .select('id, reserva_id, accion, detalle, actor_id, metadata, created_at')
         .single();
 
-    if (error) return { ok: false, data: null, error: err(error, 'No se pudo registrar evento') };
+    if (error) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo registrar evento') };
     return { ok: true, data, error: null };
 };
 
@@ -235,7 +252,7 @@ export const listarEventosReserva = async (reservaId) => {
         .eq('reserva_id', reservaId)
         .order('created_at', { ascending: false });
 
-    if (error) return { ok: false, data: [], error: err(error, 'No se pudo cargar bitácora') };
+    if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudo cargar bitácora') };
     return { ok: true, data: data || [], error: null };
 };
 
@@ -249,7 +266,7 @@ export const listarBloqueos = async ({ conjunto_id, recurso_id = null }) => {
     if (recurso_id) q = q.eq('recurso_id', recurso_id);
 
     const { data, error } = await q;
-    if (error) return { ok: false, data: [], error: err(error, 'No se pudieron cargar bloqueos') };
+    if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudieron cargar bloqueos') };
     return { ok: true, data: data || [], error: null };
 };
 
@@ -260,13 +277,13 @@ export const crearBloqueo = async ({ conjunto_id, recurso_id, fecha_inicio, fech
         .select('id, conjunto_id, recurso_id, fecha_inicio, fecha_fin, motivo, creado_por, created_at')
         .single();
 
-    if (error || !data) return { ok: false, data: null, error: err(error, 'No se pudo crear bloqueo') };
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo crear bloqueo') };
     return { ok: true, data, error: null };
 };
 
 export const eliminarBloqueo = async (bloqueoId) => {
     const { error } = await supabase.from('reservas_bloqueos').delete().eq('id', bloqueoId);
-    if (error) return { ok: false, error: err(error, 'No se pudo eliminar bloqueo') };
+    if (error) return { ok: false, error: humanizeReservaError(error, 'No se pudo eliminar bloqueo') };
     return { ok: true, error: null };
 };
 
@@ -277,8 +294,28 @@ export const listarDocumentosReserva = async (reservaId) => {
         .eq('reserva_id', reservaId)
         .order('created_at', { ascending: false });
 
-    if (error) return { ok: false, data: [], error: err(error, 'No se pudieron cargar soportes') };
+    if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudieron cargar soportes') };
     return { ok: true, data: data || [], error: null };
+};
+
+export const listarDocumentosReservas = async (reservaIds = []) => {
+    if (!reservaIds.length) return { ok: true, data: {}, error: null };
+
+    const { data, error } = await supabase
+        .from('reservas_documentos')
+        .select('id, reserva_id, conjunto_id, nombre_archivo, ruta_storage, tipo_documento, subido_por, created_at')
+        .in('reserva_id', reservaIds)
+        .order('created_at', { ascending: false });
+
+    if (error) return { ok: false, data: {}, error: humanizeReservaError(error, 'No se pudieron cargar soportes') };
+
+    const byReserva = (data || []).reduce((acc, doc) => {
+        if (!acc[doc.reserva_id]) acc[doc.reserva_id] = [];
+        acc[doc.reserva_id].push(doc);
+        return acc;
+    }, {});
+
+    return { ok: true, data: byReserva, error: null };
 };
 
 export const registrarDocumentoReserva = async ({
@@ -295,7 +332,7 @@ export const registrarDocumentoReserva = async ({
         .select('id, reserva_id, conjunto_id, nombre_archivo, ruta_storage, tipo_documento, subido_por, created_at')
         .single();
 
-    if (error || !data) return { ok: false, data: null, error: err(error, 'No se pudo guardar soporte') };
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo registrar soporte') };
     return { ok: true, data, error: null };
 };
 

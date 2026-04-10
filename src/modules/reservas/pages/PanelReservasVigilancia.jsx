@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { cambiarEstadoReserva, listarReservas, subscribeReservasConjunto } from '../services/reservasService';
+import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 
 export default function PanelReservasVigilancia({ usuarioApp }) {
     const [reservas, setReservas] = useState([]);
@@ -62,7 +63,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
 
             {reservas.map((r) => (
                 <div key={r.id} className="border rounded-xl p-3 space-y-2">
-                    <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'} · {r.estado}</p>
+                    <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
                     <p className="text-sm text-gray-500">{new Date(r.fecha_inicio).toLocaleString()} → {new Date(r.fecha_fin).toLocaleString()}</p>
                     <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
 
