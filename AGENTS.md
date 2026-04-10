@@ -10,6 +10,11 @@ Antes de escribir código, revisar en este orden:
 3. `src/services/`
 4. módulos del proyecto que ya consumen Supabase
 
+## Mantenimiento de documentación
+- Si cambian tablas, columnas, FKs o políticas RLS, actualizar `docs/database-schema.md`.
+- Si cambian migraciones o estructura de datos, verificar consistencia entre `supabase/migrations/` y `docs/database-schema.md`.
+- Nunca asumir que la documentación está actualizada; validarla antes de proponer cambios grandes.
+
 ## Reglas obligatorias
 - No inventar tablas.
 - No inventar columnas.
