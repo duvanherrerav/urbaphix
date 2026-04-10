@@ -153,6 +153,8 @@ export default function ReservarZona({ usuarioApp }) {
             reserva_id: reservaId,
             estado: 'cancelada',
             usuario_id: usuarioApp.id,
+            usuario_rol: usuarioApp.rol_id,
+            usuario_residente_id: perfilResidente?.id || null,
             detalle: 'Cancelación solicitada por residente'
         });
 

@@ -41,6 +41,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
             reserva_id: id,
             estado,
             usuario_id: usuarioApp.id,
+            usuario_rol: usuarioApp.rol_id,
             detalle
         });
 

@@ -60,6 +60,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
             reserva_id: id,
             estado,
             usuario_id: usuarioApp.id,
+            usuario_rol: usuarioApp.rol_id,
             detalle: `Gestión admin: ${estado}`
         });
         if (!resp.ok) return toast.error(resp.error);

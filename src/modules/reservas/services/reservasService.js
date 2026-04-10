@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { esEstadoReservaValido, puedeTransicionarReserva } from '../domain/reservaStateMachine';
 
 const err = (error, fallback) => error?.message || fallback;
 
@@ -156,7 +157,39 @@ export const listarReservas = async ({
     return { ok: true, data: data || [], error: null };
 };
 
-export const cambiarEstadoReserva = async ({ reserva_id, estado, usuario_id = null, detalle = null }) => {
+export const cambiarEstadoReserva = async ({
+    reserva_id,
+    estado,
+    usuario_id = null,
+    usuario_rol = null,
+    usuario_residente_id = null,
+    detalle = null
+}) => {
+    if (!esEstadoReservaValido(estado)) {
+        return { ok: false, data: null, error: `Estado objetivo inválido: ${estado}` };
+    }
+
+    const { data: reservaActual, error: errorReservaActual } = await supabase
+        .from('reservas_zonas')
+        .select('id, estado, residente_id, conjunto_id')
+        .eq('id', reserva_id)
+        .single();
+
+    if (errorReservaActual || !reservaActual) {
+        return { ok: false, data: null, error: err(errorReservaActual, 'No se encontró la reserva a actualizar') };
+    }
+
+    const validacion = puedeTransicionarReserva({
+        estadoActual: reservaActual.estado,
+        estadoObjetivo: estado,
+        rolUsuario: usuario_rol,
+        esDueno: usuario_rol === 'residente' && usuario_residente_id === reservaActual.residente_id
+    });
+
+    if (!validacion.ok) {
+        return { ok: false, data: null, error: validacion.error };
+    }
+
     const payload = { estado };
 
     if (estado === 'aprobada') payload.aprobada_por = usuario_id;

@@ -566,7 +566,7 @@ Tablas detectadas en `public`:
 - `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, NOT NULL)
 - `recurso_id` (uuid, NOT NULL)
-- `residente_id` (uuid, nullable)
+- `residente_id` (uuid, NOT NULL)
 - `apartamento_id` (uuid, nullable)
 - `aprobada_por` (uuid, nullable)
 - `rechazada_por` (uuid, nullable)
