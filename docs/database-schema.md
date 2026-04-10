@@ -1,26 +1,26 @@
 # Esquema de Base de Datos - Urbaphix
 
 ## Descripción general
-Urbaphix usa Supabase Postgres y trabaja principalmente sobre el esquema `public`.
+Urbaphix usa Supabase Postgres sobre el esquema `public`.
 
-Este documento es la fuente de verdad funcional para:
-- desarrollo asistido con Codex
+Este documento sirve como fuente de verdad funcional para:
+- Codex / ChatGPT conectado al repositorio
+- desarrollo frontend/backend
 - consultas SQL
-- integración frontend/backend
-- validación de tablas, campos, relaciones y políticas RLS
+- validación de tablas, columnas, relaciones y políticas RLS
 
-## Convenciones
-- Esquema principal: `public`
-- Claves primarias mayoritariamente en `uuid`
-- Relaciones mediante llaves foráneas
-- Seguridad apoyada en políticas RLS
-- No asumir columnas o relaciones fuera de este documento y de `supabase/migrations`
+## Reglas de uso
+- No inventar tablas.
+- No inventar columnas.
+- No asumir FKs fuera de este documento o de `supabase/migrations`.
+- Respetar RLS en toda consulta, inserción o actualización.
+- Cuando se agregue una tabla o campo nuevo, actualizar este documento.
 
 ---
 
-# Inventario de tablas
+# Inventario completo de tablas
 
-Tablas actuales detectadas en `public`:
+Tablas detectadas en `public`:
 
 - accesos
 - apartamentos
@@ -54,13 +54,13 @@ Tablas actuales detectadas en `public`:
 
 ---
 
-# Tablas y campos
+# Diccionario de tablas
 
-## Tabla: accesos
-**Descripción:** registro operativo de ingresos/salidas validados por vigilancia.
+## 1. accesos
+**Descripción:** registro operativo de ingreso y salida validado por vigilancia.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `visita_id` (uuid, nullable)
 - `vigilante_id` (uuid, nullable)
 - `fecha_ingreso` (timestamp without time zone, nullable)
@@ -70,15 +70,17 @@ Tablas actuales detectadas en `public`:
 - `vigilante_id` → `usuarios_app.id`
 
 ### RLS
-- INSERT permitido para usuarios con rol `vigilancia`
+- `insert accesos vigilancia`
+  - comando: `INSERT`
+  - condición: rol autenticado debe ser `vigilancia`
 
 ---
 
-## Tabla: apartamentos
-**Descripción:** unidades residenciales dentro de un conjunto.
+## 2. apartamentos
+**Descripción:** unidades habitacionales del conjunto.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, nullable)
 - `torre_id` (uuid, nullable)
 - `numero` (text, nullable)
@@ -91,33 +93,35 @@ Tablas actuales detectadas en `public`:
 - `torre_id` → `torres.id`
 
 ### RLS
-- No quedaron políticas visibles en los extractos cargados
+- No visible en los TXT cargados
 
 ---
 
-## Tabla: archivos
-**Descripción:** archivos asociados a módulos o referencias internas.
+## 3. archivos
+**Descripción:** archivos o soportes asociados a módulos internos.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `referencia_id` (uuid, nullable)
 - `url` (text, nullable)
 - `modulo` (text, nullable)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
 
 ### Relaciones
-- No se observó FK explícita en los extractos
+- No visible FK explícita en los TXT cargados
 
 ### RLS
-- SELECT permitido (`archivos por conjunto`) con `qual = true`
+- `archivos por conjunto`
+  - comando: `SELECT`
+  - condición: `true`
 
 ---
 
-## Tabla: comunicados
-**Descripción:** publicaciones o comunicados del conjunto.
+## 4. comunicados
+**Descripción:** comunicados publicados para residentes.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, nullable)
 - `titulo` (text, nullable)
 - `contenido` (text, nullable)
@@ -127,16 +131,20 @@ Tablas actuales detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- SELECT por mismo conjunto
-- INSERT para rol `admin`
+- `comunicados por conjunto`
+  - comando: `SELECT`
+  - condición: mismo `conjunto_id` del usuario autenticado
+- `crear comunicados admin`
+  - comando: `INSERT`
+  - condición: rol `admin`
 
 ---
 
-## Tabla: config_pagos
-**Descripción:** configuración de recaudo o instrucciones de pago por conjunto.
+## 5. config_pagos
+**Descripción:** configuración de pagos por conjunto.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, NOT NULL)
 - `tipo` (text, NOT NULL)
 - `url_pago` (text, nullable)
@@ -148,33 +156,35 @@ Tablas actuales detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- SELECT permitido (`lectura config pagos`)
+- `lectura config pagos`
+  - comando: `SELECT`
+  - condición: `true`
 
 ---
 
-## Tabla: conjuntos
-**Descripción:** entidad principal de cada conjunto residencial.
+## 6. conjuntos
+**Descripción:** entidad principal del multiconjunto.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `nombre` (text, NOT NULL)
 - `direccion` (text, nullable)
 - `ciudad` (text, nullable)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
 
 ### Relaciones
-- Tabla padre de múltiples módulos multi-conjunto
+- tabla padre de múltiples módulos
 
 ### RLS
-- No quedaron políticas visibles en los extractos cargados
+- No visible en los TXT cargados
 
 ---
 
-## Tabla: incidentes
-**Descripción:** incidentes de seguridad o novedades reportadas.
+## 7. incidentes
+**Descripción:** incidentes o novedades de seguridad.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, nullable)
 - `reportado_por` (uuid, nullable)
 - `nivel` (text, nullable)
@@ -186,21 +196,25 @@ Tablas actuales detectadas en `public`:
 - `reportado_por` → `usuarios_app.id`
 
 ### RLS
-- INSERT para rol `vigilancia`
-- SELECT por mismo conjunto
+- `crear incidentes vigilancia`
+  - comando: `INSERT`
+  - condición: rol `vigilancia`
+- `incidentes por conjunto`
+  - comando: `SELECT`
+  - condición: mismo `conjunto_id`
 
 ---
 
-## Tabla: multas
+## 8. multas
 **Descripción:** multas aplicadas a residentes.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, nullable)
 - `residente_id` (uuid, nullable)
 - `motivo` (text, nullable)
 - `valor` (numeric, nullable)
-- `estado` (text, nullable, default: `'pendiente'`)
+- `estado` (text, nullable, default: `'pendiente'::text`)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
 
 ### Relaciones
@@ -208,16 +222,20 @@ Tablas actuales detectadas en `public`:
 - `residente_id` → `residentes.id`
 
 ### RLS
-- INSERT para rol `admin`
-- SELECT por mismo conjunto
+- `crear multas admin`
+  - comando: `INSERT`
+  - condición: rol `admin`
+- `multas por conjunto`
+  - comando: `SELECT`
+  - condición: mismo `conjunto_id`
 
 ---
 
-## Tabla: notificaciones
-**Descripción:** notificaciones del sistema dirigidas a usuarios.
+## 9. notificaciones
+**Descripción:** notificaciones del sistema por usuario.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `usuario_id` (uuid, nullable)
 - `titulo` (text, nullable)
 - `mensaje` (text, nullable)
@@ -229,16 +247,23 @@ Tablas actuales detectadas en `public`:
 - `usuario_id` → `usuarios_app.id`
 
 ### RLS
-- INSERT permitido para usuario autenticado
-- SELECT de sus propias notificaciones (`usuario_id = auth.uid()`)
+- `insert notificaciones permitido`
+  - comando: `INSERT`
+  - condición: `auth.uid() IS NOT NULL`
+- `notificaciones usuario`
+  - comando: `SELECT`
+  - condición: `usuario_id = auth.uid()`
+- `ver mis notificaciones`
+  - comando: `SELECT`
+  - condición: `usuario_id = auth.uid()`
 
 ---
 
-## Tabla: pagos
-**Descripción:** pagos administrativos u otros conceptos por residente/conjunto.
+## 10. pagos
+**Descripción:** pagos administrativos u otros conceptos.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, nullable)
 - `residente_id` (uuid, nullable)
 - `concepto` (text, nullable)
@@ -246,7 +271,7 @@ Tablas actuales detectadas en `public`:
 - `fecha_pago` (date, nullable)
 - `estado` (text, nullable)
 - `comprobante_url` (text, nullable)
-- `tipo_pago` (text, nullable, default: `'administracion'`)
+- `tipo_pago` (text, nullable, default: `'administracion'::text`)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
 
 ### Relaciones
@@ -254,25 +279,35 @@ Tablas actuales detectadas en `public`:
 - `residente_id` → `residentes.id`
 
 ### RLS
-- INSERT para admin
-- INSERT restringido al mismo conjunto del admin
-- SELECT por mismo conjunto
-- UPDATE general de comprobante
-- UPDATE para admin
+- `crear pagos admin`
+  - comando: `INSERT`
+  - condición: usuario admin
+- `crear pagos admin conjunto`
+  - comando: `INSERT`
+  - condición: admin del mismo conjunto
+- `pagos multi conjunto`
+  - comando: `SELECT`
+  - condición: mismo `conjunto_id`
+- `update comprobante pagos`
+  - comando: `UPDATE`
+  - condición: `true`
+- `update pagos admin`
+  - comando: `UPDATE`
+  - condición: rol `admin`
 
 ---
 
-## Tabla: paquetes
-**Descripción:** control de paquetería recibida y entregada.
+## 11. paquetes
+**Descripción:** recepción y entrega de paquetes.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, nullable)
 - `apartamento_id` (uuid, nullable)
 - `residente_id` (uuid, nullable)
 - `recibido_por` (uuid, nullable)
 - `descripcion` (text, nullable)
-- `estado` (text, nullable, default: `'pendiente'`)
+- `estado` (text, nullable, default: `'pendiente'::text`)
 - `fecha_recibido` (timestamp without time zone, nullable, default: `now()`)
 - `fecha_entrega` (timestamp without time zone, nullable)
 - `created_at` (timestamp without time zone, nullable)
@@ -284,18 +319,26 @@ Tablas actuales detectadas en `public`:
 - `recibido_por` → `usuarios_app.id`
 
 ### RLS
-- INSERT para rol `vigilancia`
-- SELECT por mismo conjunto
-- SELECT para el residente dueño del paquete
-- UPDATE para rol `vigilancia`
+- `insert paquetes vigilancia`
+  - comando: `INSERT`
+  - condición: rol `vigilancia`
+- `paquetes por conjunto`
+  - comando: `SELECT`
+  - condición: mismo `conjunto_id`
+- `paquetes residente`
+  - comando: `SELECT`
+  - condición: paquete del residente autenticado
+- `update paquetes vigilancia`
+  - comando: `UPDATE`
+  - condición: rol `vigilancia`
 
 ---
 
-## Tabla: parqueaderos
-**Descripción:** parqueaderos del conjunto.
+## 12. parqueaderos
+**Descripción:** parqueaderos definidos para el conjunto.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, nullable)
 - `numero` (text, nullable)
 - `tipo` (text, nullable)
@@ -305,36 +348,40 @@ Tablas actuales detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- No quedaron políticas visibles en los extractos cargados
+- No visible en los TXT cargados
 
 ---
 
-## Tabla: pqr
-**Descripción:** peticiones, quejas y reclamos generados por residentes.
+## 13. pqr
+**Descripción:** peticiones, quejas y reclamos.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `residente_id` (uuid, nullable)
 - `asunto` (text, nullable)
 - `descripcion` (text, nullable)
 - `respuesta` (text, nullable)
-- `estado` (text, nullable, default: `'abierto'`)
+- `estado` (text, nullable, default: `'abierto'::text`)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
 
 ### Relaciones
 - `residente_id` → `residentes.id`
 
 ### RLS
-- INSERT para rol `residente`
-- SELECT solo de PQR del propio residente
+- `crear pqr residente`
+  - comando: `INSERT`
+  - condición: rol `residente`
+- `pqr por residente`
+  - comando: `SELECT`
+  - condición: PQR del propio residente
 
 ---
 
-## Tabla: recursos_comunes
-**Descripción:** catálogo operativo de recursos comunes reservables.
+## 14. recursos_comunes
+**Descripción:** catálogo detallado de recursos comunes reservables.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, NOT NULL)
 - `nombre` (text, NOT NULL)
 - `tipo` (text, NOT NULL)
@@ -344,7 +391,7 @@ Tablas actuales detectadas en `public`:
 - `requiere_aprobacion` (boolean, NOT NULL, default: `true`)
 - `requiere_deposito` (boolean, NOT NULL, default: `false`)
 - `deposito_valor` (numeric, nullable)
-- `reglas` (jsonb, NOT NULL, default: `{}`)
+- `reglas` (jsonb, NOT NULL, default: `'{}'::jsonb`)
 - `tiempo_buffer_min` (integer, NOT NULL, default: `0`)
 - `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
 - `updated_at` (timestamp without time zone, NOT NULL, default: `now()`)
@@ -353,16 +400,20 @@ Tablas actuales detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- SELECT por mismo conjunto
-- ALL para admin del mismo conjunto mediante `fn_auth_conjunto_id()` y `fn_auth_rol()`
+- `recursos_admin_write`
+  - comando: `ALL`
+  - condición: mismo conjunto y rol `admin`
+- `recursos_select_conjunto`
+  - comando: `SELECT`
+  - condición: mismo conjunto vía `fn_auth_conjunto_id()`
 
 ---
 
-## Tabla: registro_visitas
-**Descripción:** flujo principal de visitas, validación, QR e ingreso/salida.
+## 15. registro_visitas
+**Descripción:** flujo principal de visitas, QR, validación e ingreso/salida.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `visitante_id` (uuid, NOT NULL)
 - `conjunto_id` (uuid, NOT NULL)
 - `apartamento_id` (uuid, nullable)
@@ -370,7 +421,7 @@ Tablas actuales detectadas en `public`:
 - `fecha_visita` (date, NOT NULL)
 - `hora_ingreso` (timestamp without time zone, nullable)
 - `hora_salida` (timestamp without time zone, nullable)
-- `estado` (text, NOT NULL, default: `'pendiente'`)
+- `estado` (text, NOT NULL, default: `'pendiente'::text`)
 - `qr_code` (text, NOT NULL)
 - `notas` (text, nullable)
 - `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
@@ -383,40 +434,52 @@ Tablas actuales detectadas en `public`:
 - `validado_por` → `usuarios_app.id`
 
 ### RLS
-- INSERT para visitas del propio residente
-- SELECT de visitas propias
-- SELECT para usuarios del mismo conjunto
-- UPDATE para `vigilancia` o `admin`
+- `registro_visitas_insert_propios`
+  - comando: `INSERT`
+  - condición: el visitante pertenece a un residente autenticado
+- `registro_visitas_select_propios`
+  - comando: `SELECT`
+  - condición: visitas del propio residente
+- `registro_visitas_select_same_conjunto`
+  - comando: `SELECT`
+  - condición: usuario del mismo conjunto o relación indirecta por visitante/residente
+- `registro_visitas_update_vigilancia_admin`
+  - comando: `UPDATE`
+  - condición: rol `vigilancia` o `admin`
 
 ---
 
-## Tabla: reservas
-**Descripción:** módulo de reservas simple asociado a zonas comunes.
+## 16. reservas
+**Descripción:** módulo simple de reservas de zonas comunes.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `zona_id` (uuid, nullable)
 - `residente_id` (uuid, nullable)
 - `fecha` (date, nullable)
 - `hora_inicio` (time without time zone, nullable)
 - `hora_fin` (time without time zone, nullable)
-- `estado` (text, nullable, default: `'pendiente'`)
+- `estado` (text, nullable, default: `'pendiente'::text`)
 
 ### Relaciones
 - `zona_id` → `zonas_comunes.id`
 - `residente_id` → `residentes.id`
 
 ### RLS
-- INSERT para rol `residente`
-- SELECT por conjunto a través de `zonas_comunes`
+- `crear reservas residente`
+  - comando: `INSERT`
+  - condición: rol `residente`
+- `reservas por conjunto`
+  - comando: `SELECT`
+  - condición: zona del mismo conjunto
 
 ---
 
-## Tabla: reservas_bloqueos
-**Descripción:** bloqueos administrativos de recursos comunes por rango de tiempo.
+## 17. reservas_bloqueos
+**Descripción:** bloqueos administrativos de un recurso común por fecha/hora.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, NOT NULL)
 - `recurso_id` (uuid, NOT NULL)
 - `creado_por` (uuid, nullable)
@@ -431,16 +494,20 @@ Tablas actuales detectadas en `public`:
 - `creado_por` → `usuarios_app.id`
 
 ### RLS
-- SELECT por mismo conjunto
-- ALL para admin del mismo conjunto
+- `bloqueos_admin_write`
+  - comando: `ALL`
+  - condición: mismo conjunto y rol `admin`
+- `bloqueos_select_conjunto`
+  - comando: `SELECT`
+  - condición: mismo conjunto
 
 ---
 
-## Tabla: reservas_documentos
-**Descripción:** documentos asociados a reservas de zonas.
+## 18. reservas_documentos
+**Descripción:** documentos anexos a una reserva de zonas.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `reserva_id` (uuid, NOT NULL)
 - `conjunto_id` (uuid, NOT NULL)
 - `subido_por` (uuid, nullable)
@@ -455,22 +522,26 @@ Tablas actuales detectadas en `public`:
 - `subido_por` → `usuarios_app.id`
 
 ### RLS
-- INSERT por mismo conjunto
-- SELECT por mismo conjunto
+- `docs_insert_conjunto`
+  - comando: `INSERT`
+  - condición: mismo conjunto
+- `docs_select_conjunto`
+  - comando: `SELECT`
+  - condición: mismo conjunto
 
 ---
 
-## Tabla: reservas_eventos
-**Descripción:** bitácora de eventos/acciones de una reserva de zonas.
+## 19. reservas_eventos
+**Descripción:** bitácora de eventos de reservas.
 
 ### Campos
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `reserva_id` (uuid, NOT NULL)
 - `conjunto_id` (uuid, NOT NULL)
 - `actor_id` (uuid, nullable)
 - `accion` (text, NOT NULL)
 - `detalle` (text, nullable)
-- `metadata` (jsonb, NOT NULL, default: `{}`)
+- `metadata` (jsonb, NOT NULL, default: `'{}'::jsonb`)
 - `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
 
 ### Relaciones
@@ -479,29 +550,33 @@ Tablas actuales detectadas en `public`:
 - `actor_id` → `usuarios_app.id`
 
 ### RLS
-- INSERT por mismo conjunto
-- SELECT por mismo conjunto
+- `eventos_insert_conjunto`
+  - comando: `INSERT`
+  - condición: mismo conjunto
+- `eventos_select_conjunto`
+  - comando: `SELECT`
+  - condición: mismo conjunto
 
 ---
 
-## Tabla: reservas_zonas
-**Descripción:** módulo más robusto de reservas de recursos comunes.
+## 20. reservas_zonas
+**Descripción:** módulo robusto de reservas de recursos comunes.
 
-### Campos confirmados
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `conjunto_id` (uuid, NOT NULL)
 - `recurso_id` (uuid, NOT NULL)
-- `residente_id` (uuid, FK)
-- `apartamento_id` (uuid, FK)
-- `aprobada_por` (uuid, FK)
-- `rechazada_por` (uuid, FK)
-- `checkin_por` (uuid, FK)
-- `checkout_por` (uuid, FK)
-- `estado` (text, NOT NULL, default: `'solicitada'`)
-- `tipo_reserva` (text, NOT NULL, default: `'recreativa'`)
+- `residente_id` (uuid, nullable)
+- `apartamento_id` (uuid, nullable)
+- `aprobada_por` (uuid, nullable)
+- `rechazada_por` (uuid, nullable)
+- `checkin_por` (uuid, nullable)
+- `checkout_por` (uuid, nullable)
+- `tipo_reserva` (text, NOT NULL, default: `'recreativa'::text`)
 - `subtipo` (text, nullable)
 - `motivo` (text, nullable)
 - `observaciones` (text, nullable)
+- `estado` (text, NOT NULL, default: `'solicitada'::text`)
 - `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
 - `updated_at` (timestamp without time zone, NOT NULL, default: `now()`)
 
@@ -516,17 +591,20 @@ Tablas actuales detectadas en `public`:
 - `checkout_por` → `usuarios_app.id`
 
 ### RLS
-- INSERT para admin o residente del mismo conjunto
-- SELECT para admin, vigilancia o residente dueño
-- UPDATE para admin, vigilancia o residente dueño
+- `reservas_insert_residente_admin`
+  - comando: `INSERT`
+  - condición: admin del mismo conjunto o residente dueño
+- `reservas_select_admin_vigilancia_residente`
+  - comando: `SELECT`
+  - condición: admin, vigilancia o residente dueño del mismo conjunto
 
 ---
 
-## Tabla: residentes
-**Descripción:** relación entre usuario app y unidad residencial.
+## 21. residentes
+**Descripción:** puente entre usuario app, apartamento y conjunto.
 
-### Campos confirmados
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `usuario_id` (uuid, nullable)
 - `conjunto_id` (uuid, nullable)
 - `apartamento_id` (uuid, nullable)
@@ -537,126 +615,142 @@ Tablas actuales detectadas en `public`:
 - `apartamento_id` → `apartamentos.id`
 
 ### RLS
-- SELECT para admin
-- INSERT para admin
-- SELECT multi-conjunto
-- SELECT mismo conjunto
+- `residentes crear admin`
+  - comando: `INSERT`
+  - condición: rol `admin`
+- `residentes multi conjunto`
+  - comando: `SELECT`
+  - condición: mismo `conjunto_id`
+- `residentes_select_same_conjunto`
+  - comando: `SELECT`
+  - condición: mismo conjunto por relación con `usuarios_app`
 
 ---
 
-## Tabla: roles
-**Descripción:** catálogo de roles de la aplicación.
+## 22. roles
+**Descripción:** catálogo de roles de aplicación.
 
-### Campos confirmados
-- `id` (text, PK lógica)
+### Campos
+- `id` (text, NOT NULL)
 - `nombre` (text, NOT NULL)
 
 ### Relaciones
-- Referenciada por `usuarios_app.rol_id`
+- `usuarios_app.rol_id` → `roles.id`
 
 ### RLS
-- No quedaron políticas visibles en los extractos cargados
+- No visible en los TXT cargados
 
 ---
 
-## Tabla: tipos_documento
+## 23. tipos_documento
 **Descripción:** catálogo de tipos de documento.
 
-### Campos confirmados
+### Campos
 - `id` (bigint, NOT NULL)
 - `codigo` (text, NOT NULL)
 - `nombre` (text, NOT NULL)
 - `activo` (boolean, NOT NULL, default: `true`)
 
 ### Relaciones
-- Referenciada por `visitantes.tipo_documento` → `tipos_documento.codigo`
+- `visitantes.tipo_documento` → `tipos_documento.codigo`
 
 ### RLS
-- SELECT para usuarios autenticados
+- `tipos_documento_select_authenticated`
+  - comando: `SELECT`
+  - condición: `true`
 
 ---
 
-## Tabla: torres
-**Descripción:** torres o bloques por conjunto.
+## 24. torres
+**Descripción:** torres o bloques del conjunto.
 
-### Campos confirmados
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `nombre` (text, nullable)
+- `created_at` (timestamp without time zone, nullable)
 - `pisos` (integer, nullable)
 - `conjunto_id` (uuid, nullable)
-- `created_at` (timestamp without time zone, nullable)
 
 ### Relaciones
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- No quedaron políticas visibles en los extractos cargados
+- No visible en los TXT cargados
 
 ---
 
-## Tabla: trasteos
-**Descripción:** solicitudes o registros de trasteos.
+## 25. trasteos
+**Descripción:** solicitudes o registros de mudanzas/trasteos.
 
-### Campos confirmados
-- `id` (uuid, PK, default: `gen_random_uuid()`)
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
 - `residente_id` (uuid, nullable)
 - `conjunto_id` (uuid, nullable)
 - `fecha` (date, nullable)
-- `estado` (text, nullable, default: `'pendiente'`)
+- `estado` (text, nullable, default: `'pendiente'::text`)
 
 ### Relaciones
 - `residente_id` → `residentes.id`
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- No quedaron políticas visibles en los extractos cargados
+- No visible en los TXT cargados
 
 ---
 
-## Tabla: usuarios_app
-**Descripción:** usuarios de la aplicación asociados a auth y conjunto.
+## 26. usuarios_app
+**Descripción:** usuarios internos de la aplicación ligados a auth.
 
-### Campos confirmados en extractos
-- `id` (uuid, PK lógica esperada)
+### Campos
+- `id` (uuid, PK lógica / visible por relación)
 - `nombre` (text, nullable)
 - `email` (text, nullable)
 - `telefono` (text, nullable)
-- `rol_id` (text / FK)
-- `conjunto_id` (uuid / FK)
+- `rol_id` (text, nullable)
+- `conjunto_id` (uuid, nullable)
 
 ### Relaciones
 - `rol_id` → `roles.id`
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- SELECT general (`lectura usuarios`)
-- SELECT propio (`id = auth.uid()`)
-- UPDATE propio (`id = auth.uid()`)
+- `lectura usuarios`
+  - comando: `SELECT`
+  - condición: `true`
+- `usuario puede verse`
+  - comando: `SELECT`
+  - condición: `id = auth.uid()`
+- `usuarios actualizar su info`
+  - comando: `UPDATE`
+  - condición: `id = auth.uid()`
 
 ---
 
-## Tabla: vehiculos
+## 27. vehiculos
 **Descripción:** vehículos asociados a residentes.
 
 ### Campos confirmados en extractos
-- `residente_id` (uuid, FK)
+- `residente_id` (uuid, nullable)
 
 ### Relaciones
 - `residente_id` → `residentes.id`
 
 ### RLS
-- No quedaron políticas visibles en los extractos cargados
+- No visible en los TXT cargados
+
+### Nota
+- Los TXT cargados no mostraron más columnas de `vehiculos`
 
 ---
 
-## Tabla: visitantes
-**Descripción:** visitantes registrados por residentes o administrados por conjunto.
+## 28. visitantes
+**Descripción:** visitantes registrados por residentes.
 
 ### Campos confirmados en extractos
 - `id` (uuid, PK lógica esperada)
-- `residente_id` (uuid, FK)
-- `conjunto_id` (uuid, FK)
-- `tipo_documento` (text, FK a código)
+- `residente_id` (uuid, nullable)
+- `conjunto_id` (uuid, nullable)
+- `tipo_documento` (text, nullable)
 
 ### Relaciones
 - `residente_id` → `residentes.id`
@@ -664,32 +758,43 @@ Tablas actuales detectadas en `public`:
 - `tipo_documento` → `tipos_documento.codigo`
 
 ### RLS
-- INSERT propios
-- SELECT propios
-- SELECT mismo conjunto
-- UPDATE propios
+- `visitantes_insert_propios`
+  - comando: `INSERT`
+  - condición: visitante ligado a residente del usuario autenticado
+- `visitantes_select_propios`
+  - comando: `SELECT`
+  - condición: visitantes del propio residente
+- `visitantes_select_same_conjunto`
+  - comando: `SELECT`
+  - condición: mismo conjunto
+- `visitantes_update_propios`
+  - comando: `UPDATE`
+  - condición: visitante del propio residente
 
 ---
 
-## Tabla: zonas_comunes
+## 29. zonas_comunes
 **Descripción:** catálogo simple de zonas comunes.
 
 ### Campos confirmados en extractos
-- `conjunto_id` (uuid, FK)
+- `conjunto_id` (uuid, nullable)
 
 ### Relaciones
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- La tabla `reservas` la usa para filtrar por conjunto
-- No quedaron políticas directas visibles en los extractos cargados
+- No visible en los TXT cargados
+
+### Nota
+- La tabla `reservas` depende de `zonas_comunes.id`
+- Los TXT cargados no mostraron más columnas de `zonas_comunes`
 
 ---
 
-# Relaciones clave (resumen)
+# Mapa de relaciones clave
 
-## Multi-conjunto
-Las tablas con relación explícita a `conjuntos` incluyen, entre otras:
+## Relación con conjuntos
+Tablas con FK directa a `conjuntos.id`:
 - apartamentos
 - comunicados
 - config_pagos
@@ -711,8 +816,8 @@ Las tablas con relación explícita a `conjuntos` incluyen, entre otras:
 - visitantes
 - zonas_comunes
 
-## Usuario / Auth
-Las tablas relacionadas con `usuarios_app` incluyen:
+## Relación con usuarios_app
+Tablas con FK a `usuarios_app.id`:
 - accesos
 - incidentes
 - notificaciones
@@ -724,8 +829,8 @@ Las tablas relacionadas con `usuarios_app` incluyen:
 - reservas_zonas
 - residentes
 
-## Residente
-Las tablas relacionadas con `residentes` incluyen:
+## Relación con residentes
+Tablas con FK a `residentes.id`:
 - multas
 - pagos
 - paquetes
@@ -738,17 +843,23 @@ Las tablas relacionadas con `residentes` incluyen:
 
 ---
 
-# Resumen de RLS por tabla
+# Resumen general de RLS
 
-## Seguridad basada en rol
-Se observan reglas explícitas para:
+## Roles y patrones detectados
+Patrones de control vistos en las políticas:
 - `admin`
 - `vigilancia`
 - `residente`
 - `authenticated`
 - `public`
 
-## Tablas con políticas visibles en los TXT
+## Funciones usadas en políticas
+- `auth.uid()`
+- `fn_auth_conjunto_id()`
+- `fn_auth_rol()`
+- `fn_auth_residente_id()`
+
+## Tablas con políticas visibles
 - accesos
 - archivos
 - comunicados
@@ -771,36 +882,29 @@ Se observan reglas explícitas para:
 - usuarios_app
 - visitantes
 
-## Funciones usadas en políticas
-Se observan referencias a:
-- `auth.uid()`
-- `fn_auth_conjunto_id()`
-- `fn_auth_rol()`
-- `fn_auth_residente_id()`
+---
+
+# Notas para Codex
+
+1. Urbaphix es multi-conjunto y muchas consultas deben filtrar por `conjunto_id`.
+2. En varias tablas el acceso depende de `auth.uid()` y de relaciones con `residentes`.
+3. No asumir que todas las tablas tienen RLS visible en este documento.
+4. Si una implementación requiere una columna no listada aquí, revisar primero `supabase/migrations/` o confirmar en Supabase.
+5. Para tablas parcialmente visibles (`vehiculos`, `visitantes`, `zonas_comunes`), no inventar columnas faltantes.
 
 ---
 
-# Reglas para desarrollo con IA / Codex
+# Estado del documento
 
-- No inventar tablas ni columnas.
-- No asumir FKs si no están documentadas aquí o en migraciones.
-- Antes de cambiar backend, revisar este archivo y `supabase/migrations/`.
-- Respetar siempre RLS.
-- Cuando se agregue una nueva tabla o columna, actualizar este documento.
+Este archivo fue construido desde:
+- `Tablas.txt`
+- `Campos.txt`
+- `Llaves_FK.txt`
+- `Politicas.txt`
 
----
-
-# Estado actual del documento
-
-Este documento fue construido a partir de:
-- listado de tablas
-- extracto de campos
-- extracto de llaves foráneas
-- extracto de políticas RLS
-
-Si en el futuro se requiere una versión 100% exhaustiva, se debe complementar con:
-- constraints únicos
+Puede ampliarse más adelante con:
 - índices
+- constraints únicos
 - triggers
 - funciones SQL
-- columnas faltantes de tablas parcialmente visibles en los TXT
+- columnas faltantes de tablas no completamente visibles en los TXT
