@@ -9,8 +9,10 @@ export default function ReservaCreateCard({
     disponibilidadLoading = false,
     slotsDisponibles = [],
     horarioInvalido = false,
+    horarioMensaje = 'Este horario no está disponible.',
     sugerencias = [],
-    onSugerirHorario = null
+    onSugerirHorario = null,
+    minFecha = ''
 }) {
     return (
         <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
@@ -33,9 +35,15 @@ export default function ReservaCreateCard({
                     <option value="prestamo">Préstamo</option>
                 </select>
 
-                <input type="date" className="border rounded-lg px-3 py-2" value={form.fecha} onChange={(e) => onChange('fecha', e.target.value)} />
-                <input type="time" className="border rounded-lg px-3 py-2" value={form.hora_inicio} onChange={(e) => onChange('hora_inicio', e.target.value)} />
-                <input type="time" className="border rounded-lg px-3 py-2" value={form.hora_fin} onChange={(e) => onChange('hora_fin', e.target.value)} />
+                <input type="date" min={minFecha} className="border rounded-lg px-3 py-2" value={form.fecha} onChange={(e) => onChange('fecha', e.target.value)} />
+                <label className="text-sm text-slate-600">
+                    Hora de inicio
+                    <input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={form.hora_inicio} onChange={(e) => onChange('hora_inicio', e.target.value)} />
+                </label>
+                <label className="text-sm text-slate-600">
+                    Hora de fin
+                    <input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={form.hora_fin} onChange={(e) => onChange('hora_fin', e.target.value)} />
+                </label>
                 <input className="border rounded-lg px-3 py-2" placeholder="Subtipo (opcional)" value={form.subtipo} onChange={(e) => onChange('subtipo', e.target.value)} />
                 <input className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Motivo (opcional)" value={form.motivo} onChange={(e) => onChange('motivo', e.target.value)} />
                 <textarea className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Observaciones (opcional)" value={form.observaciones} onChange={(e) => onChange('observaciones', e.target.value)} />
@@ -55,7 +63,7 @@ export default function ReservaCreateCard({
 
             {horarioInvalido && (
                 <p className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">
-                    Este horario no está disponible.
+                    {horarioMensaje}
                 </p>
             )}
 

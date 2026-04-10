@@ -22,6 +22,28 @@ const toFechaISO = (fecha, hora) => `${fecha}T${hora}:00`;
 const ESTADOS_ACTIVOS = ['solicitada', 'aprobada', 'en_curso'];
 const TIMELINE_ENABLED = false;
 
+const getTodayBogota = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(new Date());
+    const byType = Object.fromEntries(parts.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
+    return `${byType.year}-${byType.month}-${byType.day}`;
+};
+
+const getNowTimeBogota = () => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'America/Bogota',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    }).formatToParts(new Date());
+    const byType = Object.fromEntries(parts.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
+    return `${byType.hour}:${byType.minute}`;
+};
+
 export default function ReservarZona({ usuarioApp }) {
     const [recursos, setRecursos] = useState([]);
     const [perfilResidente, setPerfilResidente] = useState(null);
@@ -37,6 +59,7 @@ export default function ReservarZona({ usuarioApp }) {
     const [sugerenciasHorario, setSugerenciasHorario] = useState([]);
     const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
     const [horarioInvalido, setHorarioInvalido] = useState(false);
+    const [mensajeHorario, setMensajeHorario] = useState('');
     const [form, setForm] = useState({
         recurso_id: '',
         fecha: '',
@@ -156,6 +179,16 @@ export default function ReservarZona({ usuarioApp }) {
         if (!perfilResidente?.id) return toast.error('No se encontró tu perfil de residente');
         if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return toast.error('Completa recurso, fecha y horas');
         if (form.hora_fin <= form.hora_inicio) return toast.error('La hora fin debe ser mayor a hora inicio');
+        if (form.fecha < getTodayBogota()) return toast.error('No puedes reservar fechas pasadas');
+
+        if (form.fecha === getTodayBogota()) {
+            const ahora = getNowTimeBogota();
+            if (form.hora_inicio < ahora) {
+                setHorarioInvalido(true);
+                setMensajeHorario('Parte de la franja ya pasó. Selecciona un horario futuro para hoy.');
+                return toast.error('No puedes reservar una hora pasada para hoy');
+            }
+        }
 
         const fecha_inicio = toFechaISO(form.fecha, form.hora_inicio);
         const fecha_fin = toFechaISO(form.fecha, form.hora_fin);
@@ -163,11 +196,13 @@ export default function ReservarZona({ usuarioApp }) {
         const existeSlotExacto = slotsDisponibles.some((slot) => slot.inicio === form.hora_inicio && slot.fin === form.hora_fin);
         if (!existeSlotExacto) {
             setHorarioInvalido(true);
+            setMensajeHorario('Este horario no está disponible.');
             const alternativas = slotsDisponibles.slice(0, 4).map((slot) => `${slot.inicio} - ${slot.fin}`);
             setSugerenciasHorario(alternativas);
             return toast.error('Este horario no está disponible');
         }
         setHorarioInvalido(false);
+        setMensajeHorario('');
         setSugerenciasHorario([]);
 
         if (validarBloqueo(form.recurso_id, fecha_inicio, fecha_fin)) {
@@ -215,6 +250,7 @@ export default function ReservarZona({ usuarioApp }) {
             hora_fin: slot.fin
         }));
         setHorarioInvalido(false);
+        setMensajeHorario('');
         setSugerenciasHorario([]);
     };
 
@@ -305,8 +341,10 @@ export default function ReservarZona({ usuarioApp }) {
                 disponibilidadLoading={loadingDisponibilidad}
                 slotsDisponibles={slotsDisponibles}
                 horarioInvalido={horarioInvalido}
+                horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
                 sugerencias={sugerenciasHorario}
                 onSugerirHorario={aplicarSlotSugerido}
+                minFecha={getTodayBogota()}
             />
 
             <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">

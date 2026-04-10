@@ -32,6 +32,40 @@ const addMinutes = (isoDate, minutes) => new Date(new Date(isoDate).getTime() + 
 
 const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && aEnd > bStart;
 
+const pad2 = (n) => String(n).padStart(2, '0');
+
+const formatLocalDateTime = (date) => (
+    `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+    + `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+);
+
+const formatHHMM = (date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+
+const getBogotaNowParts = () => {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Bogota',
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    const parts = formatter.formatToParts(new Date());
+    const byType = Object.fromEntries(parts.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
+    return {
+        date: `${byType.year}-${byType.month}-${byType.day}`,
+        time: `${byType.hour}:${byType.minute}:${byType.second}`
+    };
+};
+
+const isReservaEnPasadoBogota = (fecha_inicio, fecha_fin) => {
+    const now = getBogotaNowParts();
+    const nowComparable = `${now.date}T${now.time}`;
+    return fecha_inicio < nowComparable || fecha_fin <= nowComparable;
+};
+
 export const humanizeReservaError = (error, fallback = 'No se pudo completar la operación') => {
     const message = err(error, fallback);
     const lowered = String(message || '').toLowerCase();
@@ -121,6 +155,10 @@ export const crearReserva = async ({
     observaciones = null,
     metadata = {}
 }) => {
+    if (isReservaEnPasadoBogota(fecha_inicio, fecha_fin)) {
+        return { ok: false, data: null, error: 'No puedes crear reservas en horarios pasados (hora de Bogotá).' };
+    }
+
     const validacionDisponibilidad = await validarDisponibilidadReserva({
         conjunto_id,
         recurso_id,
@@ -360,8 +398,8 @@ export const validarDisponibilidadReserva = async ({
     }
 
     const bufferMin = Number(recurso.tiempo_buffer_min || 0);
-    const inicioConBuffer = addMinutes(fecha_inicio, -bufferMin).toISOString();
-    const finConBuffer = addMinutes(fecha_fin, bufferMin).toISOString();
+    const inicioConBuffer = formatLocalDateTime(addMinutes(fecha_inicio, -bufferMin));
+    const finConBuffer = formatLocalDateTime(addMinutes(fecha_fin, bufferMin));
 
     let qReservas = supabase
         .from('reservas_zonas')
@@ -488,19 +526,23 @@ export const getDisponibilidadRecurso = async ({
     ];
 
     const slots = [];
+    const bogotaNow = getBogotaNowParts();
+    const esHoyBogota = fecha === bogotaNow.date;
     let cursor = new Date(inicio);
     while (addMinutes(cursor, duracionMin) <= fin) {
         const slotStart = new Date(cursor);
         const slotEnd = addMinutes(cursor, duracionMin);
+        const slotStartComparable = `${fecha}T${formatHHMM(slotStart)}:00`;
+        const nowComparable = `${bogotaNow.date}T${bogotaNow.time}`;
+        const paso = esHoyBogota && slotStartComparable < nowComparable;
         const ocupado = franjaOcupada.some((f) => overlaps(slotStart, slotEnd, f.inicio, f.fin));
 
-        if (!ocupado) {
-            const hhmm = (d) => d.toISOString().slice(11, 16);
+        if (!ocupado && !paso) {
             slots.push({
-                inicio: hhmm(slotStart),
-                fin: hhmm(slotEnd),
-                fecha_inicio: slotStart.toISOString(),
-                fecha_fin: slotEnd.toISOString()
+                inicio: formatHHMM(slotStart),
+                fin: formatHHMM(slotEnd),
+                fecha_inicio: `${fecha}T${formatHHMM(slotStart)}:00`,
+                fecha_fin: `${fecha}T${formatHHMM(slotEnd)}:00`
             });
         }
 
