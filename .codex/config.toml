@@ -1,0 +1,7 @@
+model = "gpt-5-codex"
+
+[project]
+environment = "urbaphix"
+
+[context]
+schema_doc = "docs/database-schema.md"
