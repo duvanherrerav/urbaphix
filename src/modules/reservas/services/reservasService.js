@@ -26,6 +26,46 @@ const BASE_RESERVA_SELECT = `
   recursos_comunes ( id, nombre, tipo, requiere_aprobacion, tiempo_buffer_min )
 `;
 
+const ESTADOS_ACTIVOS_RESERVA = ['solicitada', 'aprobada', 'en_curso'];
+
+const addMinutes = (isoDate, minutes) => new Date(new Date(isoDate).getTime() + (minutes * 60 * 1000));
+
+const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && aEnd > bStart;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+const formatLocalDateTime = (date) => (
+    `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+    + `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+);
+
+const formatHHMM = (date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+
+const getBogotaNowParts = () => {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Bogota',
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    const parts = formatter.formatToParts(new Date());
+    const byType = Object.fromEntries(parts.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
+    return {
+        date: `${byType.year}-${byType.month}-${byType.day}`,
+        time: `${byType.hour}:${byType.minute}:${byType.second}`
+    };
+};
+
+const isReservaEnPasadoBogota = (fecha_inicio, fecha_fin) => {
+    const now = getBogotaNowParts();
+    const nowComparable = `${now.date}T${now.time}`;
+    return fecha_inicio < nowComparable || fecha_fin <= nowComparable;
+};
+
 export const humanizeReservaError = (error, fallback = 'No se pudo completar la operación') => {
     const message = err(error, fallback);
     const lowered = String(message || '').toLowerCase();
@@ -115,6 +155,27 @@ export const crearReserva = async ({
     observaciones = null,
     metadata = {}
 }) => {
+    if (isReservaEnPasadoBogota(fecha_inicio, fecha_fin)) {
+        return { ok: false, data: null, error: 'No puedes crear reservas en horarios pasados (hora de Bogotá).' };
+    }
+
+    const validacionDisponibilidad = await validarDisponibilidadReserva({
+        conjunto_id,
+        recurso_id,
+        fecha_inicio,
+        fecha_fin
+    });
+
+    if (!validacionDisponibilidad.ok) {
+        return { ok: false, data: null, error: validacionDisponibilidad.error };
+    }
+
+    if (!validacionDisponibilidad.data.disponible) {
+        const sugerencias = validacionDisponibilidad.data.sugerencias?.slice(0, 3) || [];
+        const suffix = sugerencias.length ? ` Te sugerimos: ${sugerencias.join(', ')}` : '';
+        return { ok: false, data: null, error: `Este horario no está disponible.${suffix}` };
+    }
+
     const payload = {
         conjunto_id,
         recurso_id,
@@ -266,7 +327,7 @@ export const listarBloqueos = async ({ conjunto_id, recurso_id = null }) => {
     if (recurso_id) q = q.eq('recurso_id', recurso_id);
 
     const { data, error } = await q;
-    if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudieron cargar bloqueos') };    
+    if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudieron cargar bloqueos') };
     return { ok: true, data: data || [], error: null };
 };
 
@@ -316,6 +377,179 @@ export const listarDocumentosReservas = async (reservaIds = []) => {
     }, {});
 
     return { ok: true, data: byReserva, error: null };
+};
+
+export const validarDisponibilidadReserva = async ({
+    conjunto_id,
+    recurso_id,
+    fecha_inicio,
+    fecha_fin,
+    reserva_id_excluir = null
+}) => {
+    const { data: recurso, error: errorRecurso } = await supabase
+        .from('recursos_comunes')
+        .select('id, tiempo_buffer_min')
+        .eq('id', recurso_id)
+        .eq('conjunto_id', conjunto_id)
+        .single();
+
+    if (errorRecurso || !recurso) {
+        return { ok: false, data: null, error: humanizeReservaError(errorRecurso, 'No se pudo validar disponibilidad del recurso') };
+    }
+
+    const bufferMin = Number(recurso.tiempo_buffer_min || 0);
+    const inicioConBuffer = formatLocalDateTime(addMinutes(fecha_inicio, -bufferMin));
+    const finConBuffer = formatLocalDateTime(addMinutes(fecha_fin, bufferMin));
+
+    let qReservas = supabase
+        .from('reservas_zonas')
+        .select('id, fecha_inicio, fecha_fin, estado')
+        .eq('conjunto_id', conjunto_id)
+        .eq('recurso_id', recurso_id)
+        .in('estado', ESTADOS_ACTIVOS_RESERVA)
+        .lt('fecha_inicio', finConBuffer)
+        .gt('fecha_fin', inicioConBuffer);
+
+    if (reserva_id_excluir) qReservas = qReservas.neq('id', reserva_id_excluir);
+
+    const { data: reservasActivas, error: errorReservas } = await qReservas;
+    if (errorReservas) return { ok: false, data: null, error: humanizeReservaError(errorReservas, 'No se pudo validar solapes de reserva') };
+
+    const { data: bloqueos, error: errorBloqueos } = await supabase
+        .from('reservas_bloqueos')
+        .select('id, fecha_inicio, fecha_fin')
+        .eq('conjunto_id', conjunto_id)
+        .eq('recurso_id', recurso_id)
+        .lt('fecha_inicio', finConBuffer)
+        .gt('fecha_fin', inicioConBuffer);
+
+    if (errorBloqueos) return { ok: false, data: null, error: humanizeReservaError(errorBloqueos, 'No se pudo validar bloqueos del recurso') };
+
+    const inicio = new Date(fecha_inicio);
+    const fin = new Date(fecha_fin);
+
+    const conflictoReserva = (reservasActivas || []).some((r) => {
+        const rInicio = addMinutes(r.fecha_inicio, -bufferMin);
+        const rFin = addMinutes(r.fecha_fin, bufferMin);
+        return overlaps(inicio, fin, rInicio, rFin);
+    });
+
+    const conflictoBloqueo = (bloqueos || []).some((b) =>
+        overlaps(inicio, fin, new Date(b.fecha_inicio), new Date(b.fecha_fin))
+    );
+
+    const disponible = !conflictoReserva && !conflictoBloqueo;
+    let sugerencias = [];
+    if (!disponible) {
+        const fecha = new Date(fecha_inicio).toISOString().slice(0, 10);
+        const duracionMin = Math.max(30, Math.round((fin.getTime() - inicio.getTime()) / (60 * 1000)));
+        const dispResp = await getDisponibilidadRecurso({ conjunto_id, recurso_id, fecha, duracionMin });
+        if (dispResp.ok) {
+            sugerencias = (dispResp.data.slots || []).slice(0, 4).map((s) => `${s.inicio} - ${s.fin}`);
+        }
+    }
+
+    return {
+        ok: true,
+        data: {
+            disponible,
+            conflictoReserva,
+            conflictoBloqueo,
+            bufferMin,
+            sugerencias
+        },
+        error: null
+    };
+};
+
+export const getDisponibilidadRecurso = async ({
+    conjunto_id,
+    recurso_id,
+    fecha,
+    inicioJornada = '06:00',
+    finJornada = '22:00',
+    duracionMin = 60,
+    intervaloMin = 30
+}) => {
+    const { data: recurso, error: errorRecurso } = await supabase
+        .from('recursos_comunes')
+        .select('id, tiempo_buffer_min')
+        .eq('id', recurso_id)
+        .eq('conjunto_id', conjunto_id)
+        .single();
+
+    if (errorRecurso || !recurso) {
+        return { ok: false, data: null, error: humanizeReservaError(errorRecurso, 'No se pudo cargar disponibilidad del recurso') };
+    }
+
+    const bufferMin = Number(recurso.tiempo_buffer_min || 0);
+    const dayStart = `${fecha}T00:00:00`;
+    const dayEnd = `${fecha}T23:59:59`;
+
+    const { data: reservas, error: errorReservas } = await supabase
+        .from('reservas_zonas')
+        .select('id, fecha_inicio, fecha_fin, estado')
+        .eq('conjunto_id', conjunto_id)
+        .eq('recurso_id', recurso_id)
+        .in('estado', ESTADOS_ACTIVOS_RESERVA)
+        .lt('fecha_inicio', dayEnd)
+        .gt('fecha_fin', dayStart);
+
+    if (errorReservas) return { ok: false, data: null, error: humanizeReservaError(errorReservas, 'No se pudo cargar reservas activas del recurso') };
+
+    const { data: bloqueos, error: errorBloqueos } = await supabase
+        .from('reservas_bloqueos')
+        .select('id, fecha_inicio, fecha_fin')
+        .eq('conjunto_id', conjunto_id)
+        .eq('recurso_id', recurso_id)
+        .lt('fecha_inicio', dayEnd)
+        .gt('fecha_fin', dayStart);
+
+    if (errorBloqueos) return { ok: false, data: null, error: humanizeReservaError(errorBloqueos, 'No se pudo cargar bloqueos del recurso') };
+
+    const [jornadaStartH, jornadaStartM] = inicioJornada.split(':').map(Number);
+    const [jornadaEndH, jornadaEndM] = finJornada.split(':').map(Number);
+    const inicio = new Date(`${fecha}T00:00:00`);
+    inicio.setHours(jornadaStartH, jornadaStartM, 0, 0);
+    const fin = new Date(`${fecha}T00:00:00`);
+    fin.setHours(jornadaEndH, jornadaEndM, 0, 0);
+
+    const franjaOcupada = [
+        ...(reservas || []).map((r) => ({
+            inicio: addMinutes(r.fecha_inicio, -bufferMin),
+            fin: addMinutes(r.fecha_fin, bufferMin)
+        })),
+        ...(bloqueos || []).map((b) => ({
+            inicio: new Date(b.fecha_inicio),
+            fin: new Date(b.fecha_fin)
+        }))
+    ];
+
+    const slots = [];
+    const bogotaNow = getBogotaNowParts();
+    const esHoyBogota = fecha === bogotaNow.date;
+    let cursor = new Date(inicio);
+    while (addMinutes(cursor, duracionMin) <= fin) {
+        const slotStart = new Date(cursor);
+        const slotEnd = addMinutes(cursor, duracionMin);
+        const slotStartComparable = `${fecha}T${formatHHMM(slotStart)}:00`;
+        const nowComparable = `${bogotaNow.date}T${bogotaNow.time}`;
+        const paso = esHoyBogota && slotStartComparable < nowComparable;
+        const ocupado = franjaOcupada.some((f) => overlaps(slotStart, slotEnd, f.inicio, f.fin));
+
+        if (!ocupado && !paso) {
+            slots.push({
+                inicio: formatHHMM(slotStart),
+                fin: formatHHMM(slotEnd),
+                fecha_inicio: `${fecha}T${formatHHMM(slotStart)}:00`,
+                fecha_fin: `${fecha}T${formatHHMM(slotEnd)}:00`
+            });
+        }
+
+        cursor = addMinutes(cursor, intervaloMin);
+    }
+
+    return { ok: true, data: { slots, bufferMin }, error: null };
 };
 
 export const registrarDocumentoReserva = async ({

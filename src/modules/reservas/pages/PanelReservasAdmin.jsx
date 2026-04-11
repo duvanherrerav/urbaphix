@@ -12,6 +12,7 @@ import {
     eliminarBloqueo
 } from '../services/reservasService';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
+import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
 
 export default function PanelReservasAdmin({ usuarioApp }) {
     const [reservas, setReservas] = useState([]);
@@ -138,7 +139,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                 {reservas.map((r) => (
                     <div key={r.id} className="border rounded-xl p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
-                        <p className="text-sm text-gray-500">{new Date(r.fecha_inicio).toLocaleString()} → {new Date(r.fecha_fin).toLocaleString()}</p>
+                        <p className="text-sm text-gray-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
                         <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
                         {r.estado === 'solicitada' && (
                             <div className="flex gap-2 mt-2">
@@ -150,7 +151,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                         {eventosPorReserva[r.id]?.length > 0 && (
                             <ul className="text-xs text-gray-600 list-disc pl-4">
                                 {eventosPorReserva[r.id].map((ev) => (
-                                    <li key={ev.id}>{ev.accion} · {new Date(ev.created_at).toLocaleString()} · {ev.detalle || 'Sin detalle'}</li>
+                                    <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
                                 ))}
                             </ul>
                         )}
@@ -195,7 +196,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                 <div className="space-y-2">
                     {bloqueos.map((b) => (
                         <div key={b.id} className="border rounded p-2 flex items-center justify-between">
-                            <p className="text-sm">{b.recursos_comunes?.nombre || b.recurso_id} · {new Date(b.fecha_inicio).toLocaleString()} → {new Date(b.fecha_fin).toLocaleString()} · {b.motivo}</p>
+                            <p className="text-sm">{b.recursos_comunes?.nombre || b.recurso_id} · {formatDateRangeBogota(b.fecha_inicio, b.fecha_fin)} · {b.motivo}</p>
                             <button className="text-xs border rounded px-2 py-1" onClick={() => borrarBloqueo(b.id)}>Eliminar</button>
                         </div>
                     ))}

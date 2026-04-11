@@ -393,7 +393,7 @@ Tablas detectadas en `public`:
 - `deposito_valor` (numeric, nullable)
 - `reglas` (jsonb, NOT NULL, default: `'{}'::jsonb`)
 - `tiempo_buffer_min` (integer, NOT NULL, default: `0`)
-- `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
 - `updated_at` (timestamp without time zone, NOT NULL, default: `now()`)
 
 ### Relaciones
@@ -424,7 +424,7 @@ Tablas detectadas en `public`:
 - `estado` (text, NOT NULL, default: `'pendiente'::text`)
 - `qr_code` (text, NOT NULL)
 - `notas` (text, nullable)
-- `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
 - `updated_at` (timestamp without time zone, NOT NULL, default: `now()`)
 
 ### Relaciones
@@ -486,7 +486,7 @@ Tablas detectadas en `public`:
 - `motivo` (text, NOT NULL)
 - `fecha_inicio` (timestamp without time zone, NOT NULL)
 - `fecha_fin` (timestamp without time zone, NOT NULL)
-- `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
 
 ### Relaciones
 - `conjunto_id` → `conjuntos.id`
@@ -514,7 +514,7 @@ Tablas detectadas en `public`:
 - `nombre_archivo` (text, NOT NULL)
 - `ruta_storage` (text, NOT NULL)
 - `tipo_documento` (text, nullable)
-- `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
 
 ### Relaciones
 - `reserva_id` → `reservas_zonas.id`
@@ -542,7 +542,7 @@ Tablas detectadas en `public`:
 - `accion` (text, NOT NULL)
 - `detalle` (text, nullable)
 - `metadata` (jsonb, NOT NULL, default: `'{}'::jsonb`)
-- `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
 
 ### Relaciones
 - `reserva_id` → `reservas_zonas.id`
@@ -577,8 +577,8 @@ Tablas detectadas en `public`:
 - `motivo` (text, nullable)
 - `observaciones` (text, nullable)
 - `estado` (text, NOT NULL, default: `'solicitada'::text`)
-- `created_at` (timestamp without time zone, NOT NULL, default: `now()`)
-- `updated_at` (timestamp without time zone, NOT NULL, default: `now()`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
+- `updated_at` (timestamp with time zone, NOT NULL, default: `now()`)
 
 ### Relaciones
 - `conjunto_id` → `conjuntos.id`

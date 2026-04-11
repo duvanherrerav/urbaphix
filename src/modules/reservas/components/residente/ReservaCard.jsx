@@ -1,4 +1,5 @@
 import ReservaStatusBadge from '../shared/ReservaStatusBadge';
+import { formatDateRangeBogota, formatDateTimeBogota } from '../../utils/dateTimeBogota';
 
 export default function ReservaCard({
     reserva,
@@ -16,7 +17,7 @@ export default function ReservaCard({
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <p className="font-semibold text-slate-900">{reserva.recursos_comunes?.nombre || 'Recurso común'}</p>
-                    <p className="text-xs text-slate-500">{new Date(reserva.fecha_inicio).toLocaleString()} → {new Date(reserva.fecha_fin).toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">{formatDateRangeBogota(reserva.fecha_inicio, reserva.fecha_fin)}</p>
                 </div>
                 <ReservaStatusBadge estado={reserva.estado} />
             </div>
@@ -56,7 +57,7 @@ export default function ReservaCard({
                 <ul className="text-xs text-slate-600 list-disc pl-4 space-y-1">
                     {timelineItems.length === 0 && <li>Sin eventos disponibles.</li>}
                     {timelineItems.map((ev) => (
-                        <li key={ev.id}>{ev.accion} · {new Date(ev.created_at).toLocaleString()} · {ev.detalle || 'Sin detalle'}</li>
+                        <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
                     ))}
                 </ul>
             )}

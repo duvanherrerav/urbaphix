@@ -5,9 +5,11 @@ import ReservaCard from '../components/residente/ReservaCard';
 import ReservaEmptyState from '../components/residente/ReservaEmptyState';
 import ReservaErrorBanner from '../components/residente/ReservaErrorBanner';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
+import { formatDateRangeBogota, getNowBogotaTimeHHMM, getTodayBogotaDate } from '../utils/dateTimeBogota';
 import {
     cambiarEstadoReserva,
     crearReserva,
+    getDisponibilidadRecurso,
     getPerfilResidente,
     getRecursosComunes,
     listarBloqueos,
@@ -32,6 +34,11 @@ export default function ReservarZona({ usuarioApp }) {
     const [subiendoSoporteId, setSubiendoSoporteId] = useState(null);
     const [timelineOpenId, setTimelineOpenId] = useState(null);
     const [timelineByReserva] = useState({});
+    const [slotsDisponibles, setSlotsDisponibles] = useState([]);
+    const [sugerenciasHorario, setSugerenciasHorario] = useState([]);
+    const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
+    const [horarioInvalido, setHorarioInvalido] = useState(false);
+    const [mensajeHorario, setMensajeHorario] = useState('');
     const [form, setForm] = useState({
         recurso_id: '',
         fecha: '',
@@ -109,6 +116,33 @@ export default function ReservarZona({ usuarioApp }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [usuarioApp?.conjunto_id]);
 
+    useEffect(() => {
+        const cargarDisponibilidad = async () => {
+            if (!usuarioApp?.conjunto_id || !form.recurso_id || !form.fecha) {
+                setSlotsDisponibles([]);
+                return;
+            }
+
+            setLoadingDisponibilidad(true);
+            const resp = await getDisponibilidadRecurso({
+                conjunto_id: usuarioApp.conjunto_id,
+                recurso_id: form.recurso_id,
+                fecha: form.fecha
+            });
+            setLoadingDisponibilidad(false);
+
+            if (!resp.ok) {
+                setErrorGeneral(resp.error);
+                setSlotsDisponibles([]);
+                return;
+            }
+
+            setSlotsDisponibles(resp.data.slots || []);
+        };
+
+        cargarDisponibilidad();
+    }, [usuarioApp?.conjunto_id, form.recurso_id, form.fecha]);
+
     const validarBloqueo = (recursoId, fechaInicio, fechaFin) => {
         return bloqueos.some((b) => {
             if (b.recurso_id !== recursoId) return false;
@@ -124,9 +158,31 @@ export default function ReservarZona({ usuarioApp }) {
         if (!perfilResidente?.id) return toast.error('No se encontró tu perfil de residente');
         if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return toast.error('Completa recurso, fecha y horas');
         if (form.hora_fin <= form.hora_inicio) return toast.error('La hora fin debe ser mayor a hora inicio');
+        if (form.fecha < getTodayBogotaDate()) return toast.error('No puedes reservar fechas pasadas');
+
+        if (form.fecha === getTodayBogotaDate()) {
+            const ahora = getNowBogotaTimeHHMM();
+            if (form.hora_inicio < ahora) {
+                setHorarioInvalido(true);
+                setMensajeHorario('Parte de la franja ya pasó. Selecciona un horario futuro para hoy.');
+                return toast.error('No puedes reservar una hora pasada para hoy');
+            }
+        }
 
         const fecha_inicio = toFechaISO(form.fecha, form.hora_inicio);
         const fecha_fin = toFechaISO(form.fecha, form.hora_fin);
+
+        const existeSlotExacto = slotsDisponibles.some((slot) => slot.inicio === form.hora_inicio && slot.fin === form.hora_fin);
+        if (!existeSlotExacto) {
+            setHorarioInvalido(true);
+            setMensajeHorario('Este horario no está disponible.');
+            const alternativas = slotsDisponibles.slice(0, 4).map((slot) => `${slot.inicio} - ${slot.fin}`);
+            setSugerenciasHorario(alternativas);
+            return toast.error('Este horario no está disponible');
+        }
+        setHorarioInvalido(false);
+        setMensajeHorario('');
+        setSugerenciasHorario([]);
 
         if (validarBloqueo(form.recurso_id, fecha_inicio, fecha_fin)) {
             return toast.error('La franja elegida está bloqueada por administración');
@@ -164,6 +220,17 @@ export default function ReservarZona({ usuarioApp }) {
             observaciones: ''
         }));
         cargar();
+    };
+
+    const aplicarSlotSugerido = (slot) => {
+        setForm((prev) => ({
+            ...prev,
+            hora_inicio: slot.inicio,
+            hora_fin: slot.fin
+        }));
+        setHorarioInvalido(false);
+        setMensajeHorario('');
+        setSugerenciasHorario([]);
     };
 
     const cancelar = async (reservaId) => {
@@ -250,6 +317,13 @@ export default function ReservarZona({ usuarioApp }) {
                 onSubmit={crear}
                 perfilMissing={!perfilResidente?.id}
                 bloqueoDetectado={bloqueoPreview}
+                disponibilidadLoading={loadingDisponibilidad}
+                slotsDisponibles={slotsDisponibles}
+                horarioInvalido={horarioInvalido}
+                horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
+                sugerencias={sugerenciasHorario}
+                onSugerirHorario={aplicarSlotSugerido}
+                minFecha={getTodayBogotaDate()}
             />
 
             <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
@@ -300,7 +374,7 @@ export default function ReservarZona({ usuarioApp }) {
                         <div key={r.id} className="border rounded-lg p-3 flex items-center justify-between gap-2">
                             <div>
                                 <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
-                                <p className="text-xs text-slate-500">{new Date(r.fecha_inicio).toLocaleString()} → {new Date(r.fecha_fin).toLocaleString()}</p>
+                                <p className="text-xs text-slate-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
                             </div>
                             <ReservaStatusBadge estado={r.estado} />
                         </div>
