@@ -15,7 +15,19 @@ import {
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
 
-const DISPONIBILIDAD_DEFAULT = {
+const GRUPOS_DIAS = [
+    { key: 'lun_vie', label: 'Lunes a viernes' },
+    { key: 'sabado', label: 'Sábado' },
+    { key: 'domingo', label: 'Domingo' }
+];
+
+const MODO_OPCIONES = [
+    { value: 'slots', label: 'Franjas automáticas' },
+    { value: 'bloques_fijos', label: 'Bloques fijos' }
+];
+
+const buildDefaultDia = () => ({
+    activo: true,
     modo: 'slots',
     slots: {
         hora_apertura: '06:00',
@@ -24,7 +36,7 @@ const DISPONIBILIDAD_DEFAULT = {
         intervalo_min: 30
     },
     bloques_fijos: []
-};
+});
 
 const buildRecursoFormDefault = () => ({
     nombre: '',
@@ -32,12 +44,11 @@ const buildRecursoFormDefault = () => ({
     descripcion: '',
     capacidad: '',
     tiempo_buffer_min: 0,
-    disponibilidad_modo: 'slots',
-    hora_apertura: DISPONIBILIDAD_DEFAULT.slots.hora_apertura,
-    hora_cierre: DISPONIBILIDAD_DEFAULT.slots.hora_cierre,
-    duracion_min: DISPONIBILIDAD_DEFAULT.slots.duracion_min,
-    intervalo_min: DISPONIBILIDAD_DEFAULT.slots.intervalo_min,
-    bloques_fijos: []
+    disponibilidad_semanal: {
+        lun_vie: buildDefaultDia(),
+        sabado: { ...buildDefaultDia(), slots: { ...buildDefaultDia().slots, hora_apertura: '08:00', hora_cierre: '20:00' } },
+        domingo: { ...buildDefaultDia(), activo: false }
+    }
 });
 
 const toMinutes = (hhmm = '') => {
@@ -47,71 +58,86 @@ const toMinutes = (hhmm = '') => {
     return (h * 60) + m;
 };
 
+const sanitizeBloqueId = (value = '') => value
+    .toString()
+    .normalize('NFD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    || `bloque_${Date.now()}`;
+
 const normalizarDisponibilidadDesdeRecurso = (recurso) => {
     const disponibilidad = recurso?.reglas?.disponibilidad || {};
-    const modo = disponibilidad?.modo === 'bloques_fijos' ? 'bloques_fijos' : 'slots';
-    const slots = disponibilidad?.slots || {};
-    const bloques = Array.isArray(disponibilidad?.bloques_fijos) ? disponibilidad.bloques_fijos : [];
+    const semanal = disponibilidad?.semanal || {};
+    const form = buildRecursoFormDefault();
+
+    GRUPOS_DIAS.forEach(({ key }) => {
+        const cfg = semanal[key] || {};
+        const slots = cfg.slots || {};
+        const bloques = Array.isArray(cfg.bloques_fijos) ? cfg.bloques_fijos : [];
+        form.disponibilidad_semanal[key] = {
+            activo: cfg.activo !== false,
+            modo: cfg.modo === 'bloques_fijos' ? 'bloques_fijos' : 'slots',
+            slots: {
+                hora_apertura: slots.hora_apertura || form.disponibilidad_semanal[key].slots.hora_apertura,
+                hora_cierre: slots.hora_cierre || form.disponibilidad_semanal[key].slots.hora_cierre,
+                duracion_min: Number(slots.duracion_min || form.disponibilidad_semanal[key].slots.duracion_min),
+                intervalo_min: Number(slots.intervalo_min || form.disponibilidad_semanal[key].slots.intervalo_min)
+            },
+            bloques_fijos: bloques.map((b, idx) => ({
+                nombre: b.label || `Bloque ${idx + 1}`,
+                hora_inicio: b.hora_inicio || '08:00',
+                hora_fin: b.hora_fin || '09:00'
+            }))
+        };
+    });
 
     return {
-        ...buildRecursoFormDefault(),
+        ...form,
         nombre: recurso?.nombre || '',
         tipo: recurso?.tipo || 'salon_social',
         descripcion: recurso?.descripcion || '',
         capacidad: recurso?.capacidad ?? '',
-        tiempo_buffer_min: Number(recurso?.tiempo_buffer_min || 0),
-        disponibilidad_modo: modo,
-        hora_apertura: slots?.hora_apertura || DISPONIBILIDAD_DEFAULT.slots.hora_apertura,
-        hora_cierre: slots?.hora_cierre || DISPONIBILIDAD_DEFAULT.slots.hora_cierre,
-        duracion_min: Number(slots?.duracion_min || DISPONIBILIDAD_DEFAULT.slots.duracion_min),
-        intervalo_min: Number(slots?.intervalo_min || DISPONIBILIDAD_DEFAULT.slots.intervalo_min),
-        bloques_fijos: bloques.map((b, idx) => ({
-            id: b?.id || `bloque_${idx + 1}`,
-            label: b?.label || `Bloque ${idx + 1}`,
-            hora_inicio: b?.hora_inicio || '08:00',
-            hora_fin: b?.hora_fin || '09:00'
-        }))
+        tiempo_buffer_min: Number(recurso?.tiempo_buffer_min || 0)
     };
 };
 
-const validarDisponibilidad = (form) => {
-    if (Number(form.tiempo_buffer_min) < 0) return 'El tiempo buffer no puede ser negativo';
+const validarDia = (diaCfg, diaLabel) => {
+    if (!diaCfg.activo) return null;
 
-    if (form.disponibilidad_modo === 'slots') {
-        const apertura = toMinutes(form.hora_apertura);
-        const cierre = toMinutes(form.hora_cierre);
-        const duracion = Number(form.duracion_min);
-        const intervalo = Number(form.intervalo_min);
+    if (diaCfg.modo === 'slots') {
+        const apertura = toMinutes(diaCfg.slots.hora_apertura);
+        const cierre = toMinutes(diaCfg.slots.hora_cierre);
+        const duracion = Number(diaCfg.slots.duracion_min);
+        const intervalo = Number(diaCfg.slots.intervalo_min);
 
-        if (apertura === null || cierre === null) return 'Hora de apertura/cierre inválida';
-        if (apertura >= cierre) return 'hora_apertura debe ser menor a hora_cierre';
-        if (!Number.isFinite(duracion) || duracion < 15) return 'duracion_min debe ser un número mayor o igual a 15';
-        if (!Number.isFinite(intervalo) || intervalo < 5) return 'intervalo_min debe ser un número mayor o igual a 5';
-        if ((apertura + duracion) > cierre) return 'La duración no cabe dentro de la jornada configurada';
+        if (apertura === null || cierre === null) return `${diaLabel}: horas inválidas`;
+        if (apertura >= cierre) return `${diaLabel}: la hora de inicio debe ser menor a la hora final`;
+        if (!Number.isFinite(duracion) || duracion < 15) return `${diaLabel}: la duración mínima debe ser de al menos 15 minutos`;
+        if (!Number.isFinite(intervalo) || intervalo < 5) return `${diaLabel}: el intervalo debe ser de al menos 5 minutos`;
+        if ((apertura + duracion) > cierre) return `${diaLabel}: la duración no cabe dentro del horario disponible`;
         return null;
     }
 
-    if (!form.bloques_fijos.length) return 'Debes configurar al menos un bloque fijo';
+    if (!diaCfg.bloques_fijos.length) return `${diaLabel}: agrega al menos un bloque fijo`;
 
-    const bloques = form.bloques_fijos.map((b) => ({
+    const bloques = diaCfg.bloques_fijos.map((b) => ({
         ...b,
         inicioMin: toMinutes(b.hora_inicio),
         finMin: toMinutes(b.hora_fin)
     }));
 
     for (const b of bloques) {
-        if (!b.id?.trim()) return 'Cada bloque debe tener id';
-        if (!b.label?.trim()) return 'Cada bloque debe tener label';
-        if (b.inicioMin === null || b.finMin === null) return 'Cada bloque debe tener horas válidas';
-        if (b.inicioMin >= b.finMin) return `Bloque ${b.label} tiene rango inválido`;
+        if (!b.nombre?.trim()) return `${diaLabel}: todos los bloques deben tener nombre`;
+        if (b.inicioMin === null || b.finMin === null) return `${diaLabel}: todos los bloques deben tener horas válidas`;
+        if (b.inicioMin >= b.finMin) return `${diaLabel}: hay bloques con hora de inicio mayor o igual a la hora final`;
     }
 
     const ordenados = [...bloques].sort((a, b) => a.inicioMin - b.inicioMin);
     for (let i = 1; i < ordenados.length; i += 1) {
-        const prev = ordenados[i - 1];
-        const curr = ordenados[i];
-        if (curr.inicioMin < prev.finMin) {
-            return `Bloques solapados: ${prev.label} y ${curr.label}`;
+        if (ordenados[i].inicioMin < ordenados[i - 1].finMin) {
+            return `${diaLabel}: hay bloques que se solapan entre sí`;
         }
     }
 
@@ -119,32 +145,37 @@ const validarDisponibilidad = (form) => {
 };
 
 const buildDisponibilidadPayload = (form) => {
-    if (form.disponibilidad_modo === 'slots') {
-        return {
-            version: 1,
-            timezone: 'America/Bogota',
-            modo: 'slots',
+    const semanal = {};
+
+    GRUPOS_DIAS.forEach(({ key }) => {
+        const cfg = form.disponibilidad_semanal[key];
+        semanal[key] = {
+            activo: Boolean(cfg.activo),
+            modo: cfg.modo,
             slots: {
-                hora_apertura: form.hora_apertura,
-                hora_cierre: form.hora_cierre,
-                duracion_min: Number(form.duracion_min),
-                intervalo_min: Number(form.intervalo_min)
+                hora_apertura: cfg.slots.hora_apertura,
+                hora_cierre: cfg.slots.hora_cierre,
+                duracion_min: Number(cfg.slots.duracion_min),
+                intervalo_min: Number(cfg.slots.intervalo_min)
             },
-            bloques_fijos: []
+            bloques_fijos: (cfg.bloques_fijos || []).map((b) => ({
+                id: sanitizeBloqueId(b.nombre),
+                label: b.nombre.trim(),
+                hora_inicio: b.hora_inicio,
+                hora_fin: b.hora_fin
+            }))
         };
-    }
+    });
 
     return {
-        version: 1,
+        version: 2,
         timezone: 'America/Bogota',
-        modo: 'bloques_fijos',
-        slots: { ...DISPONIBILIDAD_DEFAULT.slots },
-        bloques_fijos: form.bloques_fijos.map((b) => ({
-            id: b.id.trim(),
-            label: b.label.trim(),
-            hora_inicio: b.hora_inicio,
-            hora_fin: b.hora_fin
-        }))
+        semanal,
+        // compatibilidad legacy (motor residente toma día de semanal, pero conservamos estos campos)
+        activo: semanal.lun_vie.activo,
+        modo: semanal.lun_vie.modo,
+        slots: semanal.lun_vie.slots,
+        bloques_fijos: semanal.lun_vie.bloques_fijos
     };
 };
 
@@ -228,42 +259,46 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         setRecursoForm((s) => ({ ...s, [field]: value }));
     };
 
-    const agregarBloqueFijo = () => {
+    const updateDiaConfig = (diaKey, updater) => {
         setRecursoForm((s) => ({
             ...s,
-            bloques_fijos: [
-                ...s.bloques_fijos,
-                {
-                    id: `bloque_${s.bloques_fijos.length + 1}`,
-                    label: `Bloque ${s.bloques_fijos.length + 1}`,
-                    hora_inicio: '08:00',
-                    hora_fin: '09:00'
-                }
-            ]
+            disponibilidad_semanal: {
+                ...s.disponibilidad_semanal,
+                [diaKey]: updater(s.disponibilidad_semanal[diaKey])
+            }
         }));
     };
 
-    const editarBloqueFijo = (index, field, value) => {
-        setRecursoForm((s) => ({
-            ...s,
-            bloques_fijos: s.bloques_fijos.map((b, idx) => idx === index ? { ...b, [field]: value } : b)
+    const agregarBloqueFijo = (diaKey) => {
+        updateDiaConfig(diaKey, (dia) => ({
+            ...dia,
+            bloques_fijos: [...dia.bloques_fijos, { nombre: `Bloque ${dia.bloques_fijos.length + 1}`, hora_inicio: '08:00', hora_fin: '09:00' }]
         }));
     };
 
-    const eliminarBloqueFijo = (index) => {
-        setRecursoForm((s) => ({
-            ...s,
-            bloques_fijos: s.bloques_fijos.filter((_, idx) => idx !== index)
+    const editarBloqueFijo = (diaKey, index, field, value) => {
+        updateDiaConfig(diaKey, (dia) => ({
+            ...dia,
+            bloques_fijos: dia.bloques_fijos.map((b, idx) => idx === index ? { ...b, [field]: value } : b)
+        }));
+    };
+
+    const eliminarBloqueFijo = (diaKey, index) => {
+        updateDiaConfig(diaKey, (dia) => ({
+            ...dia,
+            bloques_fijos: dia.bloques_fijos.filter((_, idx) => idx !== index)
         }));
     };
 
     const guardarRecurso = async () => {
         if (!recursoForm.nombre || !recursoForm.tipo) return toast.error('Nombre y tipo son obligatorios');
+        if (Number(recursoForm.tiempo_buffer_min) < 0) return toast.error('El tiempo de separación no puede ser negativo');
 
-        const errorValidacion = validarDisponibilidad(recursoForm);
-        if (errorValidacion) return toast.error(errorValidacion);
+        for (const dia of GRUPOS_DIAS) {
+            const error = validarDia(recursoForm.disponibilidad_semanal[dia.key], dia.label);
+            if (error) return toast.error(error);
+        }
 
-        const reglasDisponibilidad = buildDisponibilidadPayload(recursoForm);
         const payload = {
             conjunto_id: usuarioApp.conjunto_id,
             nombre: recursoForm.nombre.trim(),
@@ -272,7 +307,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
             capacidad: recursoForm.capacidad ? Number(recursoForm.capacidad) : null,
             tiempo_buffer_min: Number(recursoForm.tiempo_buffer_min || 0),
             reglas: {
-                disponibilidad: reglasDisponibilidad
+                disponibilidad: buildDisponibilidadPayload(recursoForm)
             }
         };
 
@@ -282,24 +317,20 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
         if (!resp.ok) return toast.error(resp.error);
         toast.success(recursoEditId ? 'Recurso actualizado' : 'Recurso creado');
-
-        if (!recursoEditId) {
-            setRecursoForm(buildRecursoFormDefault());
-        }
-
+        if (!recursoEditId) setRecursoForm(buildRecursoFormDefault());
         cargar();
     };
 
     const crearBloqueoAdmin = async () => {
         if (!bloqueoForm.recurso_id || !bloqueoForm.fecha || !bloqueoForm.hora_inicio || !bloqueoForm.hora_fin || !bloqueoForm.motivo) {
-            return toast.error('Completa recurso, horario y motivo del bloqueo');
+            return toast.error('Completa recurso, horario y motivo del cierre temporal');
         }
 
         const fecha_inicio = `${bloqueoForm.fecha}T${bloqueoForm.hora_inicio}:00`;
         const fecha_fin = `${bloqueoForm.fecha}T${bloqueoForm.hora_fin}:00`;
 
         if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) {
-            return toast.error('La hora fin del bloqueo debe ser mayor');
+            return toast.error('La hora final debe ser mayor a la hora inicial');
         }
 
         const resp = await crearBloqueo({
@@ -312,17 +343,17 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         });
 
         if (!resp.ok) return toast.error(resp.error);
-        toast.success('Bloqueo creado');
+        toast.success('Cierre temporal registrado');
         setBloqueoForm({ recurso_id: '', fecha: '', hora_inicio: '', hora_fin: '', motivo: '' });
         cargar();
     };
 
     const borrarBloqueo = async (id) => {
-        const ok = window.confirm('¿Eliminar bloqueo?');
+        const ok = window.confirm('¿Eliminar este cierre temporal?');
         if (!ok) return;
         const resp = await eliminarBloqueo(id);
         if (!resp.ok) return toast.error(resp.error);
-        toast.success('Bloqueo eliminado');
+        toast.success('Cierre temporal eliminado');
         cargar();
     };
 
@@ -356,7 +387,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
             </div>
 
             <div className="bg-white rounded-2xl p-5 shadow space-y-3">
-                <h3 className="text-lg font-semibold">Registrar / editar recurso común</h3>
+                <h3 className="text-lg font-semibold">Configurar recurso común</h3>
+                <p className="text-sm text-slate-600">Define horarios por día para que residentes solo vean opciones válidas de reserva.</p>
 
                 <select className="border rounded-lg px-3 py-2 w-full" value={recursoEditId} onChange={(e) => setRecursoEditId(e.target.value)}>
                     <option value="">Crear nuevo recurso</option>
@@ -364,7 +396,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                 </select>
 
                 <div className="grid md:grid-cols-2 gap-3">
-                    <input className="border rounded-lg px-3 py-2" placeholder="Nombre recurso" value={recursoForm.nombre} onChange={(e) => onChangeRecursoForm('nombre', e.target.value)} />
+                    <input className="border rounded-lg px-3 py-2" placeholder="Nombre del recurso" value={recursoForm.nombre} onChange={(e) => onChangeRecursoForm('nombre', e.target.value)} />
                     <select className="border rounded-lg px-3 py-2" value={recursoForm.tipo} onChange={(e) => onChangeRecursoForm('tipo', e.target.value)}>
                         <option value="salon_social">Salón social</option>
                         <option value="cancha">Cancha</option>
@@ -380,54 +412,72 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
                 <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
                     <h4 className="font-semibold">Configuración de disponibilidad</h4>
-                    <div className="grid md:grid-cols-2 gap-3">
-                        <select className="border rounded-lg px-3 py-2" value={recursoForm.disponibilidad_modo} onChange={(e) => onChangeRecursoForm('disponibilidad_modo', e.target.value)}>
-                            <option value="slots">slots</option>
-                            <option value="bloques_fijos">bloques_fijos</option>
-                        </select>
-                        <input
-                            type="number"
-                            min="0"
-                            className="border rounded-lg px-3 py-2"
-                            placeholder="tiempo_buffer_min"
-                            value={recursoForm.tiempo_buffer_min}
-                            onChange={(e) => onChangeRecursoForm('tiempo_buffer_min', e.target.value)}
-                        />
-                    </div>
+                    <label className="text-sm text-slate-700 block">
+                        Tiempo de separación entre reservas (minutos)
+                        <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => onChangeRecursoForm('tiempo_buffer_min', e.target.value)} />
+                    </label>
 
-                    {recursoForm.disponibilidad_modo === 'slots' && (
-                        <div className="grid md:grid-cols-2 gap-3">
-                            <label className="text-sm text-slate-700">hora_apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.hora_apertura} onChange={(e) => onChangeRecursoForm('hora_apertura', e.target.value)} /></label>
-                            <label className="text-sm text-slate-700">hora_cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.hora_cierre} onChange={(e) => onChangeRecursoForm('hora_cierre', e.target.value)} /></label>
-                            <label className="text-sm text-slate-700">duracion_min<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.duracion_min} onChange={(e) => onChangeRecursoForm('duracion_min', e.target.value)} /></label>
-                            <label className="text-sm text-slate-700">intervalo_min<input type="number" min="5" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.intervalo_min} onChange={(e) => onChangeRecursoForm('intervalo_min', e.target.value)} /></label>
-                        </div>
-                    )}
+                    <div className="space-y-3">
+                        {GRUPOS_DIAS.map((dia) => {
+                            const cfg = recursoForm.disponibilidad_semanal[dia.key];
+                            return (
+                                <div key={dia.key} className="bg-white border rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h5 className="font-medium">{dia.label}</h5>
+                                        <label className="text-sm flex items-center gap-2">
+                                            <input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />
+                                            Disponible
+                                        </label>
+                                    </div>
 
-                    {recursoForm.disponibilidad_modo === 'bloques_fijos' && (
-                        <div className="space-y-2">
-                            <button type="button" className="text-xs border rounded px-2 py-1" onClick={agregarBloqueFijo}>Agregar bloque</button>
-                            {recursoForm.bloques_fijos.map((bloque, idx) => (
-                                <div key={`${bloque.id}-${idx}`} className="grid md:grid-cols-5 gap-2 items-end border rounded-lg p-2 bg-white">
-                                    <label className="text-xs">id<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.id} onChange={(e) => editarBloqueFijo(idx, 'id', e.target.value)} /></label>
-                                    <label className="text-xs">label<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.label} onChange={(e) => editarBloqueFijo(idx, 'label', e.target.value)} /></label>
-                                    <label className="text-xs">hora_inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editarBloqueFijo(idx, 'hora_inicio', e.target.value)} /></label>
-                                    <label className="text-xs">hora_fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editarBloqueFijo(idx, 'hora_fin', e.target.value)} /></label>
-                                    <button type="button" className="text-xs border rounded px-2 py-1 h-8" onClick={() => eliminarBloqueFijo(idx)}>Eliminar</button>
+                                    {cfg.activo && (
+                                        <>
+                                            <label className="text-sm block">
+                                                Tipo de horario
+                                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.modo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, modo: e.target.value }))}>
+                                                    {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                </select>
+                                            </label>
+
+                                            {cfg.modo === 'slots' && (
+                                                <div className="grid md:grid-cols-2 gap-2">
+                                                    <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
+                                                    <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_cierre} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: e.target.value } }))} /></label>
+                                                    <label className="text-sm">Duración de cada reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.duracion_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, duracion_min: e.target.value } }))} /></label>
+                                                    <label className="text-sm">Cada cuánto inicia una franja (min)<input type="number" min="5" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
+                                                </div>
+                                            )}
+
+                                            {cfg.modo === 'bloques_fijos' && (
+                                                <div className="space-y-2">
+                                                    <p className="text-xs text-slate-500">Define bloques con nombre y horario (ejemplo: Mañana, Tarde).</p>
+                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => agregarBloqueFijo(dia.key)}>Agregar bloque</button>
+                                                    {cfg.bloques_fijos.map((bloque, idx) => (
+                                                        <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
+                                                            <label className="text-xs md:col-span-2">Nombre del bloque<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.nombre} onChange={(e) => editarBloqueFijo(dia.key, idx, 'nombre', e.target.value)} /></label>
+                                                            <label className="text-xs">Hora de inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editarBloqueFijo(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
+                                                            <label className="text-xs">Hora de fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editarBloqueFijo(dia.key, idx, 'hora_fin', e.target.value)} /></label>
+                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => eliminarBloqueFijo(dia.key, idx)}>Eliminar bloque</button>
+                                                        </div>
+                                                    ))}
+                                                    {cfg.bloques_fijos.length === 0 && <p className="text-xs text-slate-500">Aún no hay bloques.</p>}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
-                            ))}
-                            {recursoForm.bloques_fijos.length === 0 && (
-                                <p className="text-xs text-slate-500">No hay bloques fijos configurados.</p>
-                            )}
-                        </div>
-                    )}
+                            );
+                        })}
+                    </div>
                 </div>
 
                 <button className="bg-indigo-700 text-white px-3 py-2 rounded" onClick={guardarRecurso}>{recursoEditId ? 'Guardar cambios' : 'Crear recurso'}</button>
             </div>
 
             <div className="bg-white rounded-2xl p-5 shadow space-y-3">
-                <h3 className="text-lg font-semibold">Bloqueos operativos</h3>
+                <h3 className="text-lg font-semibold">Cerrar temporalmente un recurso</h3>
+                <p className="text-sm text-slate-600">Úsalo para mantenimiento, eventos internos, novedades operativas o cierres temporales.</p>
+
                 <div className="grid md:grid-cols-2 gap-3">
                     <select className="border rounded-lg px-3 py-2" value={bloqueoForm.recurso_id} onChange={(e) => setBloqueoForm((s) => ({ ...s, recurso_id: e.target.value }))}>
                         <option value="">Selecciona recurso</option>
@@ -436,9 +486,9 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                     <input type="date" className="border rounded-lg px-3 py-2" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
                     <input type="time" className="border rounded-lg px-3 py-2" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
                     <input type="time" className="border rounded-lg px-3 py-2" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
-                    <input className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Motivo" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
+                    <input className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Motivo del cierre temporal" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
                 </div>
-                <button className="bg-slate-800 text-white px-3 py-2 rounded" onClick={crearBloqueoAdmin}>Crear bloqueo</button>
+                <button className="bg-slate-800 text-white px-3 py-2 rounded" onClick={crearBloqueoAdmin}>Registrar cierre temporal</button>
                 <div className="space-y-2">
                     {bloqueos.map((b) => (
                         <div key={b.id} className="border rounded p-2 flex items-center justify-between">
@@ -446,7 +496,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                             <button className="text-xs border rounded px-2 py-1" onClick={() => borrarBloqueo(b.id)}>Eliminar</button>
                         </div>
                     ))}
-                    {bloqueos.length === 0 && <p className="text-sm text-gray-500">No hay bloqueos registrados.</p>}
+                    {bloqueos.length === 0 && <p className="text-sm text-gray-500">No hay cierres temporales registrados.</p>}
                 </div>
             </div>
         </div>

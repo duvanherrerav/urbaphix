@@ -31,13 +31,49 @@ const DISPONIBILIDAD_DEFAULT = Object.freeze({
     version: 1,
     timezone: 'America/Bogota',
     modo: 'slots',
+    activo: true,
     slots: {
         hora_apertura: '06:00',
         hora_cierre: '22:00',
         duracion_min: 60,
         intervalo_min: 30
     },
-    bloques_fijos: []
+    bloques_fijos: [],
+    semanal: {
+        lun_vie: {
+            activo: true,
+            modo: 'slots',
+            slots: {
+                hora_apertura: '06:00',
+                hora_cierre: '22:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        },
+        sabado: {
+            activo: true,
+            modo: 'slots',
+            slots: {
+                hora_apertura: '06:00',
+                hora_cierre: '22:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        },
+        domingo: {
+            activo: false,
+            modo: 'slots',
+            slots: {
+                hora_apertura: '06:00',
+                hora_cierre: '22:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        }
+    }
 });
 
 const addMinutes = (isoDate, minutes) => new Date(new Date(isoDate).getTime() + (minutes * 60 * 1000));
@@ -65,6 +101,12 @@ const toMinutes = (hhmm) => {
 const fromMinutesToHHMM = (min) => `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`;
 
 const buildDateTimeFromMinutes = (fecha, minutes) => `${fecha}T${fromMinutesToHHMM(minutes)}:00`;
+const getDayGroupKey = (fecha) => {
+    const day = new Date(`${fecha}T00:00:00`).getDay(); // 0=domingo
+    if (day >= 1 && day <= 5) return 'lun_vie';
+    if (day === 6) return 'sabado';
+    return 'domingo';
+};
 
 const getBogotaNowParts = () => {
     const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -85,42 +127,26 @@ const getBogotaNowParts = () => {
     };
 };
 
-const normalizarDisponibilidad = (reglas = {}, { duracionOverride = null } = {}) => {
-    const base = {
-        version: 1,
-        timezone: DISPONIBILIDAD_DEFAULT.timezone,
-        modo: DISPONIBILIDAD_DEFAULT.modo,
-        slots: { ...DISPONIBILIDAD_DEFAULT.slots },
-        bloques_fijos: []
-    };
+const normalizarConfiguracionDia = (rawConfig = {}, baseSlots = DISPONIBILIDAD_DEFAULT.slots, { duracionOverride = null } = {}) => {
+    const config = isPlainObject(rawConfig) ? rawConfig : {};
+    const slotsCfg = isPlainObject(config.slots) ? config.slots : {};
+    const modo = config.modo === 'bloques_fijos' ? 'bloques_fijos' : 'slots';
+    const activo = config.activo !== false;
 
-    const disponibilidad = isPlainObject(reglas?.disponibilidad) ? reglas.disponibilidad : {};
-    if (disponibilidad.modo === 'bloques_fijos' || disponibilidad.modo === 'slots') {
-        base.modo = disponibilidad.modo;
-    }
-
-    const slotsCfg = isPlainObject(disponibilidad.slots) ? disponibilidad.slots : {};
-    const apertura = toMinutes(slotsCfg.hora_apertura ?? base.slots.hora_apertura);
-    const cierre = toMinutes(slotsCfg.hora_cierre ?? base.slots.hora_cierre);
-    const aperturaMin = apertura ?? toMinutes(base.slots.hora_apertura);
-    const cierreMin = cierre ?? toMinutes(base.slots.hora_cierre);
+    const apertura = toMinutes(slotsCfg.hora_apertura ?? baseSlots.hora_apertura);
+    const cierre = toMinutes(slotsCfg.hora_cierre ?? baseSlots.hora_cierre);
+    const aperturaMin = apertura ?? toMinutes(baseSlots.hora_apertura);
+    const cierreMin = cierre ?? toMinutes(baseSlots.hora_cierre);
     const aperturaFinal = aperturaMin;
-    const cierreFinal = cierreMin > aperturaFinal ? cierreMin : toMinutes(base.slots.hora_cierre);
+    const cierreFinal = cierreMin > aperturaFinal ? cierreMin : toMinutes(baseSlots.hora_cierre);
 
     const duracionRaw = Number.isFinite(Number(duracionOverride))
         ? Number(duracionOverride)
-        : Number(slotsCfg.duracion_min ?? base.slots.duracion_min);
-    const intervaloRaw = Number(slotsCfg.intervalo_min ?? base.slots.intervalo_min);
+        : Number(slotsCfg.duracion_min ?? baseSlots.duracion_min);
+    const intervaloRaw = Number(slotsCfg.intervalo_min ?? baseSlots.intervalo_min);
 
-    base.slots = {
-        hora_apertura: fromMinutesToHHMM(aperturaFinal),
-        hora_cierre: fromMinutesToHHMM(cierreFinal),
-        duracion_min: clamp(Math.round(duracionRaw || 60), 15, 24 * 60),
-        intervalo_min: clamp(Math.round(intervaloRaw || 30), 5, 24 * 60)
-    };
-
-    const bloquesRaw = Array.isArray(disponibilidad.bloques_fijos) ? disponibilidad.bloques_fijos : [];
-    base.bloques_fijos = bloquesRaw
+    const bloquesRaw = Array.isArray(config.bloques_fijos) ? config.bloques_fijos : [];
+    const bloques_fijos = bloquesRaw
         .map((b, idx) => {
             if (!isPlainObject(b)) return null;
             const inicioMin = toMinutes(b.hora_inicio);
@@ -135,8 +161,60 @@ const normalizarDisponibilidad = (reglas = {}, { duracionOverride = null } = {})
         })
         .filter(Boolean);
 
-    if (base.modo === 'bloques_fijos' && base.bloques_fijos.length === 0) {
-        base.modo = 'slots';
+    return {
+        activo,
+        modo: modo === 'bloques_fijos' && bloques_fijos.length === 0 ? 'slots' : modo,
+        slots: {
+            hora_apertura: fromMinutesToHHMM(aperturaFinal),
+            hora_cierre: fromMinutesToHHMM(cierreFinal),
+            duracion_min: clamp(Math.round(duracionRaw || 60), 15, 24 * 60),
+            intervalo_min: clamp(Math.round(intervaloRaw || 30), 5, 24 * 60)
+        },
+        bloques_fijos
+    };
+};
+
+const normalizarDisponibilidad = (reglas = {}, { duracionOverride = null, fecha = null } = {}) => {
+    const base = {
+        version: 1,
+        timezone: DISPONIBILIDAD_DEFAULT.timezone,
+        modo: DISPONIBILIDAD_DEFAULT.modo,
+        activo: true,
+        slots: { ...DISPONIBILIDAD_DEFAULT.slots },
+        bloques_fijos: [],
+        semanal: JSON.parse(JSON.stringify(DISPONIBILIDAD_DEFAULT.semanal)),
+        dia_grupo: fecha ? getDayGroupKey(fecha) : null
+    };
+
+    const disponibilidad = isPlainObject(reglas?.disponibilidad) ? reglas.disponibilidad : {};
+    const legacy = normalizarConfiguracionDia(disponibilidad, DISPONIBILIDAD_DEFAULT.slots, { duracionOverride });
+    base.modo = legacy.modo;
+    base.activo = legacy.activo;
+    base.slots = legacy.slots;
+    base.bloques_fijos = legacy.bloques_fijos;
+
+    const semanalRaw = isPlainObject(disponibilidad.semanal) ? disponibilidad.semanal : {};
+    const groups = ['lun_vie', 'sabado', 'domingo'];
+    groups.forEach((group) => {
+        const cfg = normalizarConfiguracionDia(
+            semanalRaw[group] || {
+                activo: base.activo,
+                modo: base.modo,
+                slots: base.slots,
+                bloques_fijos: base.bloques_fijos
+            },
+            base.slots,
+            { duracionOverride }
+        );
+        base.semanal[group] = cfg;
+    });
+
+    if (base.dia_grupo && base.semanal[base.dia_grupo]) {
+        const cfgDia = base.semanal[base.dia_grupo];
+        base.activo = cfgDia.activo;
+        base.modo = cfgDia.modo;
+        base.slots = cfgDia.slots;
+        base.bloques_fijos = cfgDia.bloques_fijos;
     }
 
     return base;
@@ -597,7 +675,7 @@ export const getDisponibilidadRecurso = async ({
     }
 
     const bufferMin = Number(recurso.tiempo_buffer_min || 0);
-    const config = normalizarDisponibilidad(recurso.reglas || {}, { duracionOverride: duracionMin });
+    const config = normalizarDisponibilidad(recurso.reglas || {}, { duracionOverride: duracionMin, fecha });
     const dayStart = `${fecha}T00:00:00`;
     const dayEnd = `${fecha}T23:59:59`;
 
@@ -636,6 +714,20 @@ export const getDisponibilidadRecurso = async ({
     }));
 
     const candidatos = [];
+    if (!config.activo) {
+        return {
+            ok: true,
+            data: {
+                franjas: [],
+                slots: [],
+                bufferMin,
+                config,
+                fallbackAplicado: !isPlainObject(recurso.reglas?.disponibilidad)
+            },
+            error: null
+        };
+    }
+
     if (config.modo === 'slots') {
         const aperturaMin = toMinutes(config.slots.hora_apertura);
         const cierreMin = toMinutes(config.slots.hora_cierre);
