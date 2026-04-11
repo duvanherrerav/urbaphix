@@ -43,6 +43,10 @@ const buildRecursoFormDefault = () => ({
     tipo: 'salon_social',
     descripcion: '',
     capacidad: '',
+    requiere_deposito: false,
+    deposito_valor: '',
+    deposito_tipo: 'reembolsable',
+    deposito_observacion: '',
     tiempo_buffer_min: 0,
     disponibilidad_semanal: {
         lun_vie: buildDefaultDia(),
@@ -118,6 +122,12 @@ const normalizarDisponibilidadDesdeRecurso = (recurso) => {
         tipo: recurso?.tipo || 'salon_social',
         descripcion: recurso?.descripcion || '',
         capacidad: recurso?.capacidad ?? '',
+        requiere_deposito: recurso?.requiere_deposito === true,
+        deposito_valor: recurso?.deposito_valor ?? '',
+        deposito_tipo: ['reembolsable', 'no_reembolsable'].includes(recurso?.reglas?.deposito?.tipo)
+            ? recurso.reglas.deposito.tipo
+            : 'reembolsable',
+        deposito_observacion: recurso?.reglas?.deposito?.observacion || '',
         tiempo_buffer_min: Number(recurso?.tiempo_buffer_min || 0),
         festivos: {
             activo: festivos.activo === true,
@@ -202,10 +212,7 @@ const buildDisponibilidadPayload = (form) => {
         semanal[key] = buildDiaPayload(form.disponibilidad_semanal[key]);
     });
 
-    const festivosEspecial = {
-        ...buildDiaPayload({ ...form.festivos.especial, activo: true }),
-        activo: undefined
-    };
+    const festivosEspecial = buildDiaPayload({ ...form.festivos.especial, activo: true });
 
     return {
         version: 3,
@@ -220,7 +227,6 @@ const buildDisponibilidadPayload = (form) => {
                 bloques_fijos: festivosEspecial.bloques_fijos
             }
         },
-        // Compatibilidad con nodos previos
         activo: semanal.lun_vie.activo,
         modo: semanal.lun_vie.modo,
         slots: semanal.lun_vie.slots,
@@ -241,13 +247,11 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     const cargar = async () => {
         if (!usuarioApp?.conjunto_id) return;
         setLoading(true);
-
         const [reservasResp, recursosResp, bloqueosResp] = await Promise.all([
             listarReservas({ conjunto_id: usuarioApp.conjunto_id, limit: 300 }),
             getRecursosComunes(usuarioApp.conjunto_id),
             listarBloqueos({ conjunto_id: usuarioApp.conjunto_id })
         ]);
-
         setLoading(false);
 
         if (!reservasResp.ok) return toast.error(reservasResp.error);
@@ -272,10 +276,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [usuarioApp?.conjunto_id]);
 
-    const recursoEnEdicion = useMemo(
-        () => recursos.find((r) => r.id === recursoEditId) || null,
-        [recursos, recursoEditId]
-    );
+    const recursoEnEdicion = useMemo(() => recursos.find((r) => r.id === recursoEditId) || null, [recursos, recursoEditId]);
 
     useEffect(() => {
         if (!recursoEnEdicion) {
@@ -356,6 +357,10 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     const guardarRecurso = async () => {
         if (!recursoForm.nombre || !recursoForm.tipo) return toast.error('Nombre y tipo son obligatorios');
         if (Number(recursoForm.tiempo_buffer_min) < 0) return toast.error('El tiempo de separación no puede ser negativo');
+        if (recursoForm.requiere_deposito) {
+            if (!(Number(recursoForm.deposito_valor) > 0)) return toast.error('El valor del depósito debe ser mayor a 0');
+            if (!['reembolsable', 'no_reembolsable'].includes(recursoForm.deposito_tipo)) return toast.error('Debes definir tipo de depósito');
+        }
 
         for (const dia of GRUPOS_DIAS) {
             const error = validarDia(recursoForm.disponibilidad_semanal[dia.key], dia.label);
@@ -373,9 +378,17 @@ export default function PanelReservasAdmin({ usuarioApp }) {
             tipo: recursoForm.tipo,
             descripcion: recursoForm.descripcion?.trim() || null,
             capacidad: recursoForm.capacidad ? Number(recursoForm.capacidad) : null,
+            requiere_deposito: Boolean(recursoForm.requiere_deposito),
+            deposito_valor: recursoForm.requiere_deposito ? Number(recursoForm.deposito_valor) : null,
             tiempo_buffer_min: Number(recursoForm.tiempo_buffer_min || 0),
             reglas: {
-                disponibilidad: buildDisponibilidadPayload(recursoForm)
+                disponibilidad: buildDisponibilidadPayload(recursoForm),
+                deposito: recursoForm.requiere_deposito
+                    ? {
+                        tipo: recursoForm.deposito_tipo,
+                        observacion: recursoForm.deposito_observacion?.trim() || null
+                    }
+                    : {}
             }
         };
 
@@ -390,19 +403,14 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     };
 
     const crearBloqueoAdmin = async () => {
-        if (!bloqueoForm.recurso_id || !bloqueoForm.fecha || !bloqueoForm.hora_inicio || !bloqueoForm.hora_fin || !bloqueoForm.motivo) {
-            return toast.error('Completa recurso, horario y motivo del cierre temporal');
-        }
-
-        const fecha_inicio = `${bloqueoForm.fecha}T${bloqueoForm.hora_inicio}:00`;
-        const fecha_fin = `${bloqueoForm.fecha}T${bloqueoForm.hora_fin}:00`;
+        if (!bloqueoForm.recurso_id || !bloqueoForm.fecha || !bloqueoForm.hora_inicio || !bloqueoForm.hora_fin || !bloqueoForm.motivo) return toast.error('Completa recurso, horario y motivo del cierre temporal');
         if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) return toast.error('La hora final debe ser mayor a la hora inicial');
 
         const resp = await crearBloqueo({
             conjunto_id: usuarioApp.conjunto_id,
             recurso_id: bloqueoForm.recurso_id,
-            fecha_inicio,
-            fecha_fin,
+            fecha_inicio: `${bloqueoForm.fecha}T${bloqueoForm.hora_inicio}:00`,
+            fecha_fin: `${bloqueoForm.fecha}T${bloqueoForm.hora_fin}:00`,
             motivo: bloqueoForm.motivo,
             creado_por: usuarioApp.id
         });
@@ -471,7 +479,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
             <div className="bg-white rounded-2xl p-5 shadow space-y-3">
                 <h3 className="text-lg font-semibold">Configurar recurso común</h3>
-                <p className="text-sm text-slate-600">Define horarios por día para que residentes solo vean opciones válidas de reserva.</p>
+                <p className="text-sm text-slate-600">Define disponibilidad, festivos y depósito del recurso.</p>
 
                 <select className="border rounded-lg px-3 py-2 w-full" value={recursoEditId} onChange={(e) => setRecursoEditId(e.target.value)}>
                     <option value="">Crear nuevo recurso</option>
@@ -494,6 +502,30 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                 </div>
 
                 <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
+                    <h4 className="font-semibold">Depósito</h4>
+                    <label className="text-sm flex items-center gap-2">
+                        <input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />
+                        ¿Requiere depósito?
+                    </label>
+                    {recursoForm.requiere_deposito && (
+                        <div className="grid md:grid-cols-2 gap-3">
+                            <label className="text-sm">Valor del depósito (COP)
+                                <input type="number" min="1" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_valor} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_valor: e.target.value }))} />
+                            </label>
+                            <label className="text-sm">Tipo de depósito
+                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_tipo: e.target.value }))}>
+                                    <option value="reembolsable">Reembolsable</option>
+                                    <option value="no_reembolsable">No reembolsable</option>
+                                </select>
+                            </label>
+                            <label className="text-sm md:col-span-2">Observación (opcional)
+                                <textarea className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_observacion} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_observacion: e.target.value }))} />
+                            </label>
+                        </div>
+                    )}
+                </div>
+
+                <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
                     <h4 className="font-semibold">Configuración de disponibilidad</h4>
                     <label className="text-sm text-slate-700 block">
                         Tiempo de separación entre reservas (minutos)
@@ -511,7 +543,6 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         Disponible
                                     </label>
                                 </div>
-
                                 {cfg.activo && (
                                     <>
                                         <label className="text-sm block">Tipo de horario
@@ -519,7 +550,6 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                             </select>
                                         </label>
-
                                         {cfg.modo === 'slots' && (
                                             <div className="grid md:grid-cols-2 gap-2">
                                                 <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
@@ -528,7 +558,6 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="5" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
                                             </div>
                                         )}
-
                                         {cfg.modo === 'bloques_fijos' && (
                                             <div className="space-y-2">
                                                 <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
@@ -554,7 +583,6 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                             <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
                             Disponible en festivos
                         </label>
-
                         {recursoForm.festivos.activo && (
                             <>
                                 <label className="text-sm block">Aplicar horario de festivo
@@ -564,7 +592,6 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         <option value="especial">Usar horario especial</option>
                                     </select>
                                 </label>
-
                                 {recursoForm.festivos.usar === 'especial' && (
                                     <div className="space-y-2 border rounded-lg p-2">
                                         <label className="text-sm block">Tipo de horario especial
@@ -572,7 +599,6 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                             </select>
                                         </label>
-
                                         {recursoForm.festivos.especial.modo === 'slots' && (
                                             <div className="grid md:grid-cols-2 gap-2">
                                                 <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: e.target.value } } }))} /></label>
@@ -581,7 +607,6 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="5" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
                                             </div>
                                         )}
-
                                         {recursoForm.festivos.especial.modo === 'bloques_fijos' && (
                                             <div className="space-y-2">
                                                 <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>

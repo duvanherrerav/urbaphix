@@ -162,6 +162,16 @@ export default function ReservarZona({ usuarioApp }) {
         () => franjasDisponibles.find((f) => f.id === form.franja_id) || null,
         [franjasDisponibles, form.franja_id]
     );
+    const depositoRecursoSeleccionado = useMemo(() => {
+        const recurso = recursos.find((r) => r.id === form.recurso_id);
+        if (!recurso) return null;
+        return {
+            requiere: recurso.requiere_deposito === true,
+            valor: recurso.deposito_valor,
+            tipo: recurso.reglas?.deposito?.tipo || null,
+            observacion: recurso.reglas?.deposito?.observacion || null
+        };
+    }, [recursos, form.recurso_id]);
 
     const crear = async () => {
         if (!perfilResidente?.id) return toast.error('No se encontró tu perfil de residente');
@@ -318,6 +328,7 @@ export default function ReservarZona({ usuarioApp }) {
                 disponibilidadConfig={disponibilidadConfig}
                 fallbackConfigAplicado={fallbackConfigAplicado}
                 mensajeDisponibilidad={mensajeDisponibilidad}
+                depositoConfig={depositoRecursoSeleccionado}
                 horarioInvalido={horarioInvalido}
                 horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
                 sugerencias={sugerenciasHorario}
