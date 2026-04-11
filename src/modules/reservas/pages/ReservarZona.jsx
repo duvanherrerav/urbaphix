@@ -37,6 +37,7 @@ export default function ReservarZona({ usuarioApp }) {
     const [fallbackConfigAplicado, setFallbackConfigAplicado] = useState(false);
     const [sugerenciasHorario, setSugerenciasHorario] = useState([]);
     const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
+    const [mensajeDisponibilidad, setMensajeDisponibilidad] = useState('');
     const [horarioInvalido, setHorarioInvalido] = useState(false);
     const [mensajeHorario, setMensajeHorario] = useState('');
     const [form, setForm] = useState({
@@ -125,6 +126,7 @@ export default function ReservarZona({ usuarioApp }) {
                 setFranjasDisponibles([]);
                 setDisponibilidadConfig(null);
                 setFallbackConfigAplicado(false);
+                setMensajeDisponibilidad('');
                 return;
             }
 
@@ -142,6 +144,7 @@ export default function ReservarZona({ usuarioApp }) {
                 setFranjasDisponibles([]);
                 setDisponibilidadConfig(null);
                 setFallbackConfigAplicado(false);
+                setMensajeDisponibilidad('');
                 return;
             }
 
@@ -149,6 +152,7 @@ export default function ReservarZona({ usuarioApp }) {
             setFranjasDisponibles(resp.data.franjas || []);
             setDisponibilidadConfig(resp.data.config || null);
             setFallbackConfigAplicado(Boolean(resp.data.fallbackAplicado));
+            setMensajeDisponibilidad(resp.data.mensaje || '');
         };
 
         cargarDisponibilidad();
@@ -313,6 +317,7 @@ export default function ReservarZona({ usuarioApp }) {
                 franjaSeleccionadaId={form.franja_id}
                 disponibilidadConfig={disponibilidadConfig}
                 fallbackConfigAplicado={fallbackConfigAplicado}
+                mensajeDisponibilidad={mensajeDisponibilidad}
                 horarioInvalido={horarioInvalido}
                 horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
                 sugerencias={sugerenciasHorario}

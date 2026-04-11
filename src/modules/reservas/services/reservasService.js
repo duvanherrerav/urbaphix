@@ -1,5 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 import { esEstadoReservaValido, puedeTransicionarReserva } from '../domain/reservaStateMachine';
+import { isColombiaHoliday } from '../utils/colombiaHolidays';
 
 const err = (error, fallback) => error?.message || fallback;
 
@@ -68,6 +69,20 @@ const DISPONIBILIDAD_DEFAULT = Object.freeze({
             slots: {
                 hora_apertura: '06:00',
                 hora_cierre: '22:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        }
+    },
+    festivos: {
+        activo: false,
+        usar: 'sabado',
+        especial: {
+            modo: 'slots',
+            slots: {
+                hora_apertura: '08:00',
+                hora_cierre: '16:00',
                 duracion_min: 60,
                 intervalo_min: 30
             },
@@ -183,7 +198,9 @@ const normalizarDisponibilidad = (reglas = {}, { duracionOverride = null, fecha 
         slots: { ...DISPONIBILIDAD_DEFAULT.slots },
         bloques_fijos: [],
         semanal: JSON.parse(JSON.stringify(DISPONIBILIDAD_DEFAULT.semanal)),
-        dia_grupo: fecha ? getDayGroupKey(fecha) : null
+        dia_grupo: fecha ? getDayGroupKey(fecha) : null,
+        es_festivo: Boolean(fecha && isColombiaHoliday(fecha)),
+        festivos: JSON.parse(JSON.stringify(DISPONIBILIDAD_DEFAULT.festivos))
     };
 
     const disponibilidad = isPlainObject(reglas?.disponibilidad) ? reglas.disponibilidad : {};
@@ -209,7 +226,39 @@ const normalizarDisponibilidad = (reglas = {}, { duracionOverride = null, fecha 
         base.semanal[group] = cfg;
     });
 
-    if (base.dia_grupo && base.semanal[base.dia_grupo]) {
+    const festivosRaw = isPlainObject(disponibilidad.festivos) ? disponibilidad.festivos : {};
+    const especialNormalizado = normalizarConfiguracionDia(
+        festivosRaw.especial || {},
+        base.slots,
+        { duracionOverride }
+    );
+    base.festivos = {
+        activo: festivosRaw.activo === true,
+        usar: ['sabado', 'domingo', 'especial'].includes(festivosRaw.usar) ? festivosRaw.usar : 'sabado',
+        especial: {
+            modo: especialNormalizado.modo,
+            slots: especialNormalizado.slots,
+            bloques_fijos: especialNormalizado.bloques_fijos
+        }
+    };
+
+    if (base.es_festivo) {
+        if (!base.festivos.activo) {
+            base.activo = false;
+        } else if (base.festivos.usar === 'sabado' || base.festivos.usar === 'domingo') {
+            const cfg = base.semanal[base.festivos.usar];
+            base.activo = cfg.activo;
+            base.modo = cfg.modo;
+            base.slots = cfg.slots;
+            base.bloques_fijos = cfg.bloques_fijos;
+        } else {
+            const cfg = base.festivos.especial;
+            base.activo = true;
+            base.modo = cfg.modo;
+            base.slots = cfg.slots;
+            base.bloques_fijos = cfg.bloques_fijos;
+        }
+    } else if (base.dia_grupo && base.semanal[base.dia_grupo]) {
         const cfgDia = base.semanal[base.dia_grupo];
         base.activo = cfgDia.activo;
         base.modo = cfgDia.modo;
@@ -722,6 +771,7 @@ export const getDisponibilidadRecurso = async ({
                 slots: [],
                 bufferMin,
                 config,
+                mensaje: config.es_festivo ? 'Este recurso no está disponible en días festivos.' : null,
                 fallbackAplicado: !isPlainObject(recurso.reglas?.disponibilidad)
             },
             error: null

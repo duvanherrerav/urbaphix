@@ -40,6 +40,7 @@ export default function ReservaCreateCard({
     franjaSeleccionadaId = '',
     disponibilidadConfig = null,
     fallbackConfigAplicado = false,
+    mensajeDisponibilidad = '',
     horarioInvalido = false,
     horarioMensaje = 'Este horario no está disponible.',
     sugerencias = [],
@@ -115,6 +116,11 @@ export default function ReservaCreateCard({
             <div className="space-y-2">
                 <p className="text-xs font-semibold text-slate-600">Franjas disponibles</p>
                 {disponibilidadLoading && <p className="text-xs text-slate-500">Calculando disponibilidad...</p>}
+                {!disponibilidadLoading && mensajeDisponibilidad && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        {mensajeDisponibilidad}
+                    </p>
+                )}
                 {!disponibilidadLoading && disponibles.length === 0 && (
                     <p className="text-xs text-slate-500">No hay franjas disponibles para esta fecha.</p>
                 )}
