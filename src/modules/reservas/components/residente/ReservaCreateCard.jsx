@@ -41,6 +41,7 @@ export default function ReservaCreateCard({
     disponibilidadConfig = null,
     fallbackConfigAplicado = false,
     mensajeDisponibilidad = '',
+    depositoConfig = null,
     horarioInvalido = false,
     horarioMensaje = 'Este horario no está disponible.',
     sugerencias = [],
@@ -111,6 +112,15 @@ export default function ReservaCreateCard({
                 <p className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">
                     {horarioMensaje}
                 </p>
+            )}
+
+            {depositoConfig?.requiere && (
+                <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+                    <p className="font-semibold">Este recurso requiere depósito.</p>
+                    <p>Valor: ${Number(depositoConfig.valor || 0).toLocaleString('es-CO')} COP</p>
+                    {depositoConfig.tipo && <p>Tipo: {depositoConfig.tipo === 'no_reembolsable' ? 'No reembolsable' : 'Reembolsable'}</p>}
+                    {depositoConfig.observacion && <p>Nota: {depositoConfig.observacion}</p>}
+                </div>
             )}
 
             <div className="space-y-2">
