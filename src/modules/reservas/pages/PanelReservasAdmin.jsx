@@ -101,8 +101,8 @@ const normalizarDisponibilidadDesdeRecurso = (recurso) => {
             slots: {
                 hora_apertura: slots.hora_apertura || form.disponibilidad_semanal[key].slots.hora_apertura,
                 hora_cierre: slots.hora_cierre || form.disponibilidad_semanal[key].slots.hora_cierre,
-                duracion_min: Number(slots.duracion_min || form.disponibilidad_semanal[key].slots.duracion_min),
-                intervalo_min: Number(slots.intervalo_min || form.disponibilidad_semanal[key].slots.intervalo_min)
+                duracion_min: Number(slots.duracion_min ?? form.disponibilidad_semanal[key].slots.duracion_min),
+                intervalo_min: Number(slots.intervalo_min ?? form.disponibilidad_semanal[key].slots.intervalo_min)
             },
             bloques_fijos: bloques.map((b, idx) => ({
                 nombre: b.label || `Bloque ${idx + 1}`,
@@ -137,8 +137,8 @@ const normalizarDisponibilidadDesdeRecurso = (recurso) => {
                 slots: {
                     hora_apertura: especialSlots.hora_apertura || form.festivos.especial.slots.hora_apertura,
                     hora_cierre: especialSlots.hora_cierre || form.festivos.especial.slots.hora_cierre,
-                    duracion_min: Number(especialSlots.duracion_min || form.festivos.especial.slots.duracion_min),
-                    intervalo_min: Number(especialSlots.intervalo_min || form.festivos.especial.slots.intervalo_min)
+                    duracion_min: Number(especialSlots.duracion_min ?? form.festivos.especial.slots.duracion_min),
+                    intervalo_min: Number(especialSlots.intervalo_min ?? form.festivos.especial.slots.intervalo_min)
                 },
                 bloques_fijos: especialBloques.map((b, idx) => ({
                     nombre: b.label || `Bloque festivo ${idx + 1}`,
@@ -162,7 +162,7 @@ const validarDia = (diaCfg, diaLabel) => {
         if (apertura === null || cierre === null) return `${diaLabel}: horas inválidas`;
         if (apertura >= cierre) return `${diaLabel}: la hora de inicio debe ser menor a la hora final`;
         if (!Number.isFinite(duracion) || duracion < 15) return `${diaLabel}: la duración mínima debe ser de al menos 15 minutos`;
-        if (!Number.isFinite(intervalo) || intervalo < 5) return `${diaLabel}: el intervalo debe ser de al menos 5 minutos`;
+        if (!Number.isFinite(intervalo) || intervalo < 0) return `${diaLabel}: el intervalo no puede ser negativo`;
         if ((apertura + duracion) > cierre) return `${diaLabel}: la duración no cabe dentro del horario disponible`;
         return null;
     }
@@ -555,7 +555,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
                                                 <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_cierre} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: e.target.value } }))} /></label>
                                                 <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.duracion_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, duracion_min: e.target.value } }))} /></label>
-                                                <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="5" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
+                                                <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
                                             </div>
                                         )}
                                         {cfg.modo === 'bloques_fijos' && (
@@ -604,7 +604,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: e.target.value } } }))} /></label>
                                                 <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: e.target.value } } }))} /></label>
                                                 <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.duracion_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, duracion_min: e.target.value } } }))} /></label>
-                                                <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="5" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
+                                                <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
                                             </div>
                                         )}
                                         {recursoForm.festivos.especial.modo === 'bloques_fijos' && (

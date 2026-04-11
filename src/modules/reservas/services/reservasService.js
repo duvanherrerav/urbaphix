@@ -176,14 +176,19 @@ const normalizarConfiguracionDia = (rawConfig = {}, baseSlots = DISPONIBILIDAD_D
         })
         .filter(Boolean);
 
+    const duracionNormalizada = clamp(Math.round(duracionRaw ?? 60), 15, 24 * 60);
+    const intervaloNormalizado = Number.isFinite(intervaloRaw) && Number(intervaloRaw) <= 0
+        ? 0
+        : clamp(Math.round(intervaloRaw ?? 30), 5, 24 * 60);
+
     return {
         activo,
         modo: modo === 'bloques_fijos' && bloques_fijos.length === 0 ? 'slots' : modo,
         slots: {
             hora_apertura: fromMinutesToHHMM(aperturaFinal),
             hora_cierre: fromMinutesToHHMM(cierreFinal),
-            duracion_min: clamp(Math.round(duracionRaw || 60), 15, 24 * 60),
-            intervalo_min: clamp(Math.round(intervaloRaw || 30), 5, 24 * 60)
+            duracion_min: duracionNormalizada,
+            intervalo_min: intervaloNormalizado
         },
         bloques_fijos
     };
@@ -783,6 +788,7 @@ export const getDisponibilidadRecurso = async ({
         const cierreMin = toMinutes(config.slots.hora_cierre);
         const duracion = config.slots.duracion_min;
         const intervalo = config.slots.intervalo_min;
+        const paso = intervalo > 0 ? intervalo : duracion;
 
         let cursorMin = aperturaMin;
         while ((cursorMin + duracion) <= cierreMin) {
@@ -791,7 +797,7 @@ export const getDisponibilidadRecurso = async ({
                 inicioMin: cursorMin,
                 finMin: cursorMin + duracion
             });
-            cursorMin += intervalo;
+            cursorMin += paso;
         }
     } else {
         config.bloques_fijos.forEach((b) => {
