@@ -5,6 +5,7 @@ import ReservaCard from '../components/residente/ReservaCard';
 import ReservaEmptyState from '../components/residente/ReservaEmptyState';
 import ReservaErrorBanner from '../components/residente/ReservaErrorBanner';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
+import { formatDateRangeBogota, getNowBogotaTimeHHMM, getTodayBogotaDate } from '../utils/dateTimeBogota';
 import {
     cambiarEstadoReserva,
     crearReserva,
@@ -21,28 +22,6 @@ import {
 const toFechaISO = (fecha, hora) => `${fecha}T${hora}:00`;
 const ESTADOS_ACTIVOS = ['solicitada', 'aprobada', 'en_curso'];
 const TIMELINE_ENABLED = false;
-
-const getTodayBogota = () => {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Bogota',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).formatToParts(new Date());
-    const byType = Object.fromEntries(parts.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
-    return `${byType.year}-${byType.month}-${byType.day}`;
-};
-
-const getNowTimeBogota = () => {
-    const parts = new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'America/Bogota',
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit'
-    }).formatToParts(new Date());
-    const byType = Object.fromEntries(parts.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
-    return `${byType.hour}:${byType.minute}`;
-};
 
 export default function ReservarZona({ usuarioApp }) {
     const [recursos, setRecursos] = useState([]);
@@ -179,10 +158,10 @@ export default function ReservarZona({ usuarioApp }) {
         if (!perfilResidente?.id) return toast.error('No se encontró tu perfil de residente');
         if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return toast.error('Completa recurso, fecha y horas');
         if (form.hora_fin <= form.hora_inicio) return toast.error('La hora fin debe ser mayor a hora inicio');
-        if (form.fecha < getTodayBogota()) return toast.error('No puedes reservar fechas pasadas');
+        if (form.fecha < getTodayBogotaDate()) return toast.error('No puedes reservar fechas pasadas');
 
-        if (form.fecha === getTodayBogota()) {
-            const ahora = getNowTimeBogota();
+        if (form.fecha === getTodayBogotaDate()) {
+            const ahora = getNowBogotaTimeHHMM();
             if (form.hora_inicio < ahora) {
                 setHorarioInvalido(true);
                 setMensajeHorario('Parte de la franja ya pasó. Selecciona un horario futuro para hoy.');
@@ -344,7 +323,7 @@ export default function ReservarZona({ usuarioApp }) {
                 horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
                 sugerencias={sugerenciasHorario}
                 onSugerirHorario={aplicarSlotSugerido}
-                minFecha={getTodayBogota()}
+                minFecha={getTodayBogotaDate()}
             />
 
             <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
@@ -395,7 +374,7 @@ export default function ReservarZona({ usuarioApp }) {
                         <div key={r.id} className="border rounded-lg p-3 flex items-center justify-between gap-2">
                             <div>
                                 <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
-                                <p className="text-xs text-slate-500">{new Date(r.fecha_inicio).toLocaleString()} → {new Date(r.fecha_fin).toLocaleString()}</p>
+                                <p className="text-xs text-slate-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
                             </div>
                             <ReservaStatusBadge estado={r.estado} />
                         </div>
