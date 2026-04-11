@@ -1,12 +1,18 @@
 const BOGOTA_TZ = 'America/Bogota';
 
-const NAIVE_TS_REGEX = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/;
+const NAIVE_TS_REGEX = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/;
+const OFFSET_TS_REGEX = /(Z|[+-]\d{2}:\d{2})$/;
 
 const toBogotaDate = (value) => {
     if (!value) return null;
     if (value instanceof Date) return value;
 
     if (typeof value === 'string') {
+        if (OFFSET_TS_REGEX.test(value)) {
+            const parsedWithOffset = new Date(value);
+            if (!Number.isNaN(parsedWithOffset.getTime())) return parsedWithOffset;
+        }
+
         const match = value.match(NAIVE_TS_REGEX);
         if (match) {
             const [, y, m, d, hh, mm, ss = '00'] = match;
