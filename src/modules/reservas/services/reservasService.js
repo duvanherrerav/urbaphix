@@ -213,6 +213,41 @@ export const crearRecursoComun = async ({
     return { ok: true, data, error: null };
 };
 
+export const actualizarRecursoComun = async ({
+    recurso_id,
+    conjunto_id,
+    nombre,
+    tipo,
+    descripcion = null,
+    capacidad = null,
+    requiere_aprobacion = true,
+    requiere_deposito = false,
+    deposito_valor = null,
+    tiempo_buffer_min = 0,
+    reglas = {}
+}) => {
+    const { data, error } = await supabase
+        .from('recursos_comunes')
+        .update({
+            nombre,
+            tipo,
+            descripcion,
+            capacidad,
+            requiere_aprobacion,
+            requiere_deposito,
+            deposito_valor,
+            tiempo_buffer_min,
+            reglas
+        })
+        .eq('id', recurso_id)
+        .eq('conjunto_id', conjunto_id)
+        .select('id, conjunto_id, nombre, tipo, activo, capacidad, requiere_aprobacion, requiere_deposito, deposito_valor, tiempo_buffer_min, reglas')
+        .single();
+
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo actualizar recurso') };
+    return { ok: true, data, error: null };
+};
+
 export const getPerfilResidente = async (usuarioId) => {
     const { data, error } = await supabase
         .from('residentes')
