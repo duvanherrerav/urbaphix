@@ -12,14 +12,12 @@ import {
     getDisponibilidadRecurso,
     getPerfilResidente,
     getRecursosComunes,
-    listarBloqueos,
     listarDocumentosReservas,
     listarReservas,
     registrarDocumentoReserva,
     subscribeReservasConjunto
 } from '../services/reservasService';
 
-const toFechaISO = (fecha, hora) => `${fecha}T${hora}:00`;
 const ESTADOS_ACTIVOS = ['solicitada', 'aprobada', 'en_curso'];
 const TIMELINE_ENABLED = false;
 
@@ -27,7 +25,6 @@ export default function ReservarZona({ usuarioApp }) {
     const [recursos, setRecursos] = useState([]);
     const [perfilResidente, setPerfilResidente] = useState(null);
     const [reservas, setReservas] = useState([]);
-    const [bloqueos, setBloqueos] = useState([]);
     const [errorGeneral, setErrorGeneral] = useState('');
     const [loadingCreate, setLoadingCreate] = useState(false);
     const [loadingReservas, setLoadingReservas] = useState(false);
@@ -35,6 +32,9 @@ export default function ReservarZona({ usuarioApp }) {
     const [timelineOpenId, setTimelineOpenId] = useState(null);
     const [timelineByReserva] = useState({});
     const [slotsDisponibles, setSlotsDisponibles] = useState([]);
+    const [franjasDisponibles, setFranjasDisponibles] = useState([]);
+    const [disponibilidadConfig, setDisponibilidadConfig] = useState(null);
+    const [fallbackConfigAplicado, setFallbackConfigAplicado] = useState(false);
     const [sugerenciasHorario, setSugerenciasHorario] = useState([]);
     const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
     const [horarioInvalido, setHorarioInvalido] = useState(false);
@@ -42,8 +42,7 @@ export default function ReservarZona({ usuarioApp }) {
     const [form, setForm] = useState({
         recurso_id: '',
         fecha: '',
-        hora_inicio: '',
-        hora_fin: '',
+        franja_id: '',
         tipo_reserva: 'recreativa',
         subtipo: '',
         motivo: '',
@@ -51,7 +50,13 @@ export default function ReservarZona({ usuarioApp }) {
     });
 
     const setFormField = (field, value) => {
-        setForm((prev) => ({ ...prev, [field]: value }));
+        setForm((prev) => {
+            const next = { ...prev, [field]: value };
+            if (field === 'recurso_id' || field === 'fecha') {
+                next.franja_id = '';
+            }
+            return next;
+        });
     };
 
     const cargar = async () => {
@@ -59,19 +64,16 @@ export default function ReservarZona({ usuarioApp }) {
         setErrorGeneral('');
         setLoadingReservas(true);
 
-        const [recursosResp, perfilResp, bloqueosResp] = await Promise.all([
+        const [recursosResp, perfilResp] = await Promise.all([
             getRecursosComunes(usuarioApp.conjunto_id),
-            getPerfilResidente(usuarioApp.id),
-            listarBloqueos({ conjunto_id: usuarioApp.conjunto_id })
+            getPerfilResidente(usuarioApp.id)
         ]);
 
         if (!recursosResp.ok) setErrorGeneral(recursosResp.error);
         if (!perfilResp.ok) setErrorGeneral(perfilResp.error);
-        if (!bloqueosResp.ok) setErrorGeneral(bloqueosResp.error);
 
         setRecursos(recursosResp.data || []);
         setPerfilResidente(perfilResp.data || null);
-        setBloqueos(bloqueosResp.data || []);
 
         if (perfilResp.data?.id) {
             const reservasResp = await listarReservas({
@@ -120,6 +122,9 @@ export default function ReservarZona({ usuarioApp }) {
         const cargarDisponibilidad = async () => {
             if (!usuarioApp?.conjunto_id || !form.recurso_id || !form.fecha) {
                 setSlotsDisponibles([]);
+                setFranjasDisponibles([]);
+                setDisponibilidadConfig(null);
+                setFallbackConfigAplicado(false);
                 return;
             }
 
@@ -134,59 +139,49 @@ export default function ReservarZona({ usuarioApp }) {
             if (!resp.ok) {
                 setErrorGeneral(resp.error);
                 setSlotsDisponibles([]);
+                setFranjasDisponibles([]);
+                setDisponibilidadConfig(null);
+                setFallbackConfigAplicado(false);
                 return;
             }
 
             setSlotsDisponibles(resp.data.slots || []);
+            setFranjasDisponibles(resp.data.franjas || []);
+            setDisponibilidadConfig(resp.data.config || null);
+            setFallbackConfigAplicado(Boolean(resp.data.fallbackAplicado));
         };
 
         cargarDisponibilidad();
     }, [usuarioApp?.conjunto_id, form.recurso_id, form.fecha]);
 
-    const validarBloqueo = (recursoId, fechaInicio, fechaFin) => {
-        return bloqueos.some((b) => {
-            if (b.recurso_id !== recursoId) return false;
-            const bInicio = new Date(b.fecha_inicio).getTime();
-            const bFin = new Date(b.fecha_fin).getTime();
-            const fInicio = new Date(fechaInicio).getTime();
-            const fFin = new Date(fechaFin).getTime();
-            return fInicio < bFin && fFin > bInicio;
-        });
-    };
+    const franjaSeleccionada = useMemo(
+        () => franjasDisponibles.find((f) => f.id === form.franja_id) || null,
+        [franjasDisponibles, form.franja_id]
+    );
 
     const crear = async () => {
         if (!perfilResidente?.id) return toast.error('No se encontró tu perfil de residente');
-        if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return toast.error('Completa recurso, fecha y horas');
-        if (form.hora_fin <= form.hora_inicio) return toast.error('La hora fin debe ser mayor a hora inicio');
+        if (!form.recurso_id || !form.fecha || !form.franja_id) return toast.error('Completa recurso, fecha y franja');
         if (form.fecha < getTodayBogotaDate()) return toast.error('No puedes reservar fechas pasadas');
+        if (!franjaSeleccionada) return toast.error('Selecciona una franja válida');
+        if (!franjaSeleccionada.seleccionable) {
+            setHorarioInvalido(true);
+            setMensajeHorario('Esta franja ya no está disponible.');
+            return toast.error('La franja seleccionada no está disponible');
+        }
 
         if (form.fecha === getTodayBogotaDate()) {
             const ahora = getNowBogotaTimeHHMM();
-            if (form.hora_inicio < ahora) {
+            if (franjaSeleccionada.inicio < ahora) {
                 setHorarioInvalido(true);
                 setMensajeHorario('Parte de la franja ya pasó. Selecciona un horario futuro para hoy.');
                 return toast.error('No puedes reservar una hora pasada para hoy');
             }
         }
 
-        const fecha_inicio = toFechaISO(form.fecha, form.hora_inicio);
-        const fecha_fin = toFechaISO(form.fecha, form.hora_fin);
-
-        const existeSlotExacto = slotsDisponibles.some((slot) => slot.inicio === form.hora_inicio && slot.fin === form.hora_fin);
-        if (!existeSlotExacto) {
-            setHorarioInvalido(true);
-            setMensajeHorario('Este horario no está disponible.');
-            const alternativas = slotsDisponibles.slice(0, 4).map((slot) => `${slot.inicio} - ${slot.fin}`);
-            setSugerenciasHorario(alternativas);
-            return toast.error('Este horario no está disponible');
-        }
         setHorarioInvalido(false);
         setMensajeHorario('');
         setSugerenciasHorario([]);
-
-        if (validarBloqueo(form.recurso_id, fecha_inicio, fecha_fin)) {
-            return toast.error('La franja elegida está bloqueada por administración');
-        }
 
         setLoadingCreate(true);
         const result = await crearReserva({
@@ -194,27 +189,32 @@ export default function ReservarZona({ usuarioApp }) {
             recurso_id: form.recurso_id,
             residente_id: perfilResidente.id,
             apartamento_id: perfilResidente.apartamento_id,
-            fecha_inicio,
-            fecha_fin,
+            fecha_inicio: franjaSeleccionada.fecha_inicio,
+            fecha_fin: franjaSeleccionada.fecha_fin,
             tipo_reserva: form.tipo_reserva,
             subtipo: form.subtipo || null,
             motivo: form.motivo || null,
             observaciones: form.observaciones || null,
             metadata: {
                 origen: 'app_residente',
-                recurso_tipo: recursos.find((r) => r.id === form.recurso_id)?.tipo || null
+                recurso_tipo: recursos.find((r) => r.id === form.recurso_id)?.tipo || null,
+                disponibilidad_modo: disponibilidadConfig?.modo || 'slots',
+                franja_id: franjaSeleccionada.id
             }
         });
         setLoadingCreate(false);
 
-        if (!result.ok) return toast.error(result.error);
+        if (!result.ok) {
+            const alternativas = slotsDisponibles.slice(0, 4).map((slot) => `${slot.inicio} - ${slot.fin}`);
+            setSugerenciasHorario(alternativas);
+            return toast.error(result.error);
+        }
 
         toast.success('Solicitud de reserva creada');
         setForm((f) => ({
             ...f,
             fecha: '',
-            hora_inicio: '',
-            hora_fin: '',
+            franja_id: '',
             subtipo: '',
             motivo: '',
             observaciones: ''
@@ -222,11 +222,11 @@ export default function ReservarZona({ usuarioApp }) {
         cargar();
     };
 
-    const aplicarSlotSugerido = (slot) => {
+    const seleccionarFranja = (franja) => {
+        if (!franja?.seleccionable) return;
         setForm((prev) => ({
             ...prev,
-            hora_inicio: slot.inicio,
-            hora_fin: slot.fin
+            franja_id: franja.id
         }));
         setHorarioInvalido(false);
         setMensajeHorario('');
@@ -283,17 +283,7 @@ export default function ReservarZona({ usuarioApp }) {
         [reservas]
     );
 
-    const bloqueoPreview = useMemo(() => {
-        if (!form.recurso_id || !form.fecha || !form.hora_inicio || !form.hora_fin) return false;
-        if (form.hora_fin <= form.hora_inicio) return false;
-
-        return validarBloqueo(
-            form.recurso_id,
-            toFechaISO(form.fecha, form.hora_inicio),
-            toFechaISO(form.fecha, form.hora_fin)
-        );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.recurso_id, form.fecha, form.hora_inicio, form.hora_fin, bloqueos]);
+    const bloqueoPreview = franjaSeleccionada?.estado === 'bloqueada';
 
     return (
         <div className="space-y-4">
@@ -319,10 +309,14 @@ export default function ReservarZona({ usuarioApp }) {
                 bloqueoDetectado={bloqueoPreview}
                 disponibilidadLoading={loadingDisponibilidad}
                 slotsDisponibles={slotsDisponibles}
+                franjasDisponibles={franjasDisponibles}
+                franjaSeleccionadaId={form.franja_id}
+                disponibilidadConfig={disponibilidadConfig}
+                fallbackConfigAplicado={fallbackConfigAplicado}
                 horarioInvalido={horarioInvalido}
                 horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
                 sugerencias={sugerenciasHorario}
-                onSugerirHorario={aplicarSlotSugerido}
+                onSeleccionarFranja={seleccionarFranja}
                 minFecha={getTodayBogotaDate()}
             />
 
