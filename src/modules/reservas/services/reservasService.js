@@ -1,5 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 import { esEstadoReservaValido, puedeTransicionarReserva } from '../domain/reservaStateMachine';
+import { isColombiaHoliday } from '../utils/colombiaHolidays';
 
 const err = (error, fallback) => error?.message || fallback;
 
@@ -27,6 +28,68 @@ const BASE_RESERVA_SELECT = `
 `;
 
 const ESTADOS_ACTIVOS_RESERVA = ['solicitada', 'aprobada', 'en_curso'];
+const DISPONIBILIDAD_DEFAULT = Object.freeze({
+    version: 1,
+    timezone: 'America/Bogota',
+    modo: 'slots',
+    activo: true,
+    slots: {
+        hora_apertura: '06:00',
+        hora_cierre: '22:00',
+        duracion_min: 60,
+        intervalo_min: 30
+    },
+    bloques_fijos: [],
+    semanal: {
+        lun_vie: {
+            activo: true,
+            modo: 'slots',
+            slots: {
+                hora_apertura: '06:00',
+                hora_cierre: '22:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        },
+        sabado: {
+            activo: true,
+            modo: 'slots',
+            slots: {
+                hora_apertura: '06:00',
+                hora_cierre: '22:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        },
+        domingo: {
+            activo: false,
+            modo: 'slots',
+            slots: {
+                hora_apertura: '06:00',
+                hora_cierre: '22:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        }
+        },
+    festivos: {
+        activo: false,
+        usar: 'sabado',
+        especial: {
+            modo: 'slots',
+            slots: {
+                hora_apertura: '08:00',
+                hora_cierre: '16:00',
+                duracion_min: 60,
+                intervalo_min: 30
+            },
+            bloques_fijos: []
+        }
+    }
+});
 
 const addMinutes = (isoDate, minutes) => new Date(new Date(isoDate).getTime() + (minutes * 60 * 1000));
 
@@ -39,7 +102,26 @@ const formatLocalDateTime = (date) => (
     + `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
 );
 
-const formatHHMM = (date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
+const uuidLike = (v) => typeof v === 'string' && v.trim().length > 0;
+
+const toMinutes = (hhmm) => {
+    if (typeof hhmm !== 'string' || !/^\d{2}:\d{2}$/.test(hhmm)) return null;
+    const [h, m] = hhmm.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return (h * 60) + m;
+};
+
+const fromMinutesToHHMM = (min) => `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`;
+
+const buildDateTimeFromMinutes = (fecha, minutes) => `${fecha}T${fromMinutesToHHMM(minutes)}:00`;
+const getDayGroupKey = (fecha) => {
+    const day = new Date(`${fecha}T00:00:00`).getDay(); // 0=domingo
+    if (day >= 1 && day <= 5) return 'lun_vie';
+    if (day === 6) return 'sabado';
+    return 'domingo';
+};
 
 const getBogotaNowParts = () => {
     const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -58,6 +140,133 @@ const getBogotaNowParts = () => {
         date: `${byType.year}-${byType.month}-${byType.day}`,
         time: `${byType.hour}:${byType.minute}:${byType.second}`
     };
+};
+
+const normalizarConfiguracionDia = (rawConfig = {}, baseSlots = DISPONIBILIDAD_DEFAULT.slots, { duracionOverride = null } = {}) => {
+    const config = isPlainObject(rawConfig) ? rawConfig : {};
+    const slotsCfg = isPlainObject(config.slots) ? config.slots : {};
+    const modo = config.modo === 'bloques_fijos' ? 'bloques_fijos' : 'slots';
+    const activo = config.activo !== false;
+
+    const apertura = toMinutes(slotsCfg.hora_apertura ?? baseSlots.hora_apertura);
+    const cierre = toMinutes(slotsCfg.hora_cierre ?? baseSlots.hora_cierre);
+    const aperturaMin = apertura ?? toMinutes(baseSlots.hora_apertura);
+    const cierreMin = cierre ?? toMinutes(baseSlots.hora_cierre);
+    const aperturaFinal = aperturaMin;
+    const cierreFinal = cierreMin > aperturaFinal ? cierreMin : toMinutes(baseSlots.hora_cierre);
+
+    const duracionRaw = Number.isFinite(Number(duracionOverride))
+        ? Number(duracionOverride)
+        : Number(slotsCfg.duracion_min ?? baseSlots.duracion_min);
+    const intervaloRaw = Number(slotsCfg.intervalo_min ?? baseSlots.intervalo_min);
+
+    const bloquesRaw = Array.isArray(config.bloques_fijos) ? config.bloques_fijos : [];
+    const bloques_fijos = bloquesRaw
+        .map((b, idx) => {
+            if (!isPlainObject(b)) return null;
+            const inicioMin = toMinutes(b.hora_inicio);
+            const finMin = toMinutes(b.hora_fin);
+            if (inicioMin === null || finMin === null || finMin <= inicioMin) return null;
+            return {
+                id: uuidLike(b.id) ? b.id : `bloque_${idx + 1}`,
+                label: typeof b.label === 'string' && b.label.trim() ? b.label.trim() : `Bloque ${idx + 1}`,
+                hora_inicio: fromMinutesToHHMM(inicioMin),
+                hora_fin: fromMinutesToHHMM(finMin)
+            };
+        })
+        .filter(Boolean);
+
+    return {
+        activo,
+        modo: modo === 'bloques_fijos' && bloques_fijos.length === 0 ? 'slots' : modo,
+        slots: {
+            hora_apertura: fromMinutesToHHMM(aperturaFinal),
+            hora_cierre: fromMinutesToHHMM(cierreFinal),
+            duracion_min: clamp(Math.round(duracionRaw || 60), 15, 24 * 60),
+            intervalo_min: clamp(Math.round(intervaloRaw || 30), 5, 24 * 60)
+        },
+        bloques_fijos
+    };
+};
+
+const normalizarDisponibilidad = (reglas = {}, { duracionOverride = null, fecha = null } = {}) => {
+    const base = {
+        version: 1,
+        timezone: DISPONIBILIDAD_DEFAULT.timezone,
+        modo: DISPONIBILIDAD_DEFAULT.modo,
+        activo: true,
+        slots: { ...DISPONIBILIDAD_DEFAULT.slots },
+        bloques_fijos: [],
+        semanal: JSON.parse(JSON.stringify(DISPONIBILIDAD_DEFAULT.semanal)),
+        dia_grupo: fecha ? getDayGroupKey(fecha) : null,
+        es_festivo: Boolean(fecha && isColombiaHoliday(fecha)),
+        festivos: JSON.parse(JSON.stringify(DISPONIBILIDAD_DEFAULT.festivos))
+    };
+
+    const disponibilidad = isPlainObject(reglas?.disponibilidad) ? reglas.disponibilidad : {};
+    const legacy = normalizarConfiguracionDia(disponibilidad, DISPONIBILIDAD_DEFAULT.slots, { duracionOverride });
+    base.modo = legacy.modo;
+    base.activo = legacy.activo;
+    base.slots = legacy.slots;
+    base.bloques_fijos = legacy.bloques_fijos;
+
+    const semanalRaw = isPlainObject(disponibilidad.semanal) ? disponibilidad.semanal : {};
+    const groups = ['lun_vie', 'sabado', 'domingo'];
+    groups.forEach((group) => {
+        const cfg = normalizarConfiguracionDia(
+            semanalRaw[group] || {
+                activo: base.activo,
+                modo: base.modo,
+                slots: base.slots,
+                bloques_fijos: base.bloques_fijos
+            },
+            base.slots,
+            { duracionOverride }
+        );
+        base.semanal[group] = cfg;
+    });
+
+    const festivosRaw = isPlainObject(disponibilidad.festivos) ? disponibilidad.festivos : {};
+    const especialNormalizado = normalizarConfiguracionDia(
+        festivosRaw.especial || {},
+        base.slots,
+        { duracionOverride }
+    );
+    base.festivos = {
+        activo: festivosRaw.activo === true,
+        usar: ['sabado', 'domingo', 'especial'].includes(festivosRaw.usar) ? festivosRaw.usar : 'sabado',
+        especial: {
+            modo: especialNormalizado.modo,
+            slots: especialNormalizado.slots,
+            bloques_fijos: especialNormalizado.bloques_fijos
+        }
+    };
+
+    if (base.es_festivo) {
+        if (!base.festivos.activo) {
+            base.activo = false;
+        } else if (base.festivos.usar === 'sabado' || base.festivos.usar === 'domingo') {
+            const cfg = base.semanal[base.festivos.usar];
+            base.activo = cfg.activo;
+            base.modo = cfg.modo;
+            base.slots = cfg.slots;
+            base.bloques_fijos = cfg.bloques_fijos;
+        } else {
+            const cfg = base.festivos.especial;
+            base.activo = true;
+            base.modo = cfg.modo;
+            base.slots = cfg.slots;
+            base.bloques_fijos = cfg.bloques_fijos;
+        }
+    } else if (base.dia_grupo && base.semanal[base.dia_grupo]) {
+        const cfgDia = base.semanal[base.dia_grupo];
+        base.activo = cfgDia.activo;
+        base.modo = cfgDia.modo;
+        base.slots = cfgDia.slots;
+        base.bloques_fijos = cfgDia.bloques_fijos;
+    }
+
+    return base;
 };
 
 const isReservaEnPasadoBogota = (fecha_inicio, fecha_fin) => {
@@ -128,6 +337,41 @@ export const crearRecursoComun = async ({
         .single();
 
     if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo crear recurso') };
+    return { ok: true, data, error: null };
+};
+
+export const actualizarRecursoComun = async ({
+    recurso_id,
+    conjunto_id,
+    nombre,
+    tipo,
+    descripcion = null,
+    capacidad = null,
+    requiere_aprobacion = true,
+    requiere_deposito = false,
+    deposito_valor = null,
+    tiempo_buffer_min = 0,
+    reglas = {}
+}) => {
+    const { data, error } = await supabase
+        .from('recursos_comunes')
+        .update({
+            nombre,
+            tipo,
+            descripcion,
+            capacidad,
+            requiere_aprobacion,
+            requiere_deposito,
+            deposito_valor,
+            tiempo_buffer_min,
+            reglas
+        })
+        .eq('id', recurso_id)
+        .eq('conjunto_id', conjunto_id)
+        .select('id, conjunto_id, nombre, tipo, activo, capacidad, requiere_aprobacion, requiere_deposito, deposito_valor, tiempo_buffer_min, reglas')
+        .single();
+
+    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo actualizar recurso') };
     return { ok: true, data, error: null };
 };
 
@@ -466,14 +710,11 @@ export const getDisponibilidadRecurso = async ({
     conjunto_id,
     recurso_id,
     fecha,
-    inicioJornada = '06:00',
-    finJornada = '22:00',
-    duracionMin = 60,
-    intervaloMin = 30
+    duracionMin = null
 }) => {
     const { data: recurso, error: errorRecurso } = await supabase
         .from('recursos_comunes')
-        .select('id, tiempo_buffer_min')
+        .select('id, tiempo_buffer_min, reglas')
         .eq('id', recurso_id)
         .eq('conjunto_id', conjunto_id)
         .single();
@@ -483,6 +724,7 @@ export const getDisponibilidadRecurso = async ({
     }
 
     const bufferMin = Number(recurso.tiempo_buffer_min || 0);
+    const config = normalizarDisponibilidad(recurso.reglas || {}, { duracionOverride: duracionMin, fecha });
     const dayStart = `${fecha}T00:00:00`;
     const dayEnd = `${fecha}T23:59:59`;
 
@@ -507,49 +749,120 @@ export const getDisponibilidadRecurso = async ({
 
     if (errorBloqueos) return { ok: false, data: null, error: humanizeReservaError(errorBloqueos, 'No se pudo cargar bloqueos del recurso') };
 
-    const [jornadaStartH, jornadaStartM] = inicioJornada.split(':').map(Number);
-    const [jornadaEndH, jornadaEndM] = finJornada.split(':').map(Number);
-    const inicio = new Date(`${fecha}T00:00:00`);
-    inicio.setHours(jornadaStartH, jornadaStartM, 0, 0);
-    const fin = new Date(`${fecha}T00:00:00`);
-    fin.setHours(jornadaEndH, jornadaEndM, 0, 0);
+    const reservasSinBuffer = (reservas || []).map((r) => ({
+        inicio: new Date(r.fecha_inicio),
+        fin: new Date(r.fecha_fin)
+    }));
+    const franjasBuffer = reservasSinBuffer.map((r) => ({
+        inicio: addMinutes(r.inicio, -bufferMin),
+        fin: addMinutes(r.fin, bufferMin)
+    }));
+    const franjasBloqueadas = (bloqueos || []).map((b) => ({
+        inicio: new Date(b.fecha_inicio),
+        fin: new Date(b.fecha_fin)
+    }));
 
-    const franjaOcupada = [
-        ...(reservas || []).map((r) => ({
-            inicio: addMinutes(r.fecha_inicio, -bufferMin),
-            fin: addMinutes(r.fecha_fin, bufferMin)
-        })),
-        ...(bloqueos || []).map((b) => ({
-            inicio: new Date(b.fecha_inicio),
-            fin: new Date(b.fecha_fin)
-        }))
-    ];
+    const candidatos = [];
+    if (!config.activo) {
+        return {
+            ok: true,
+            data: {
+                franjas: [],
+                slots: [],
+                bufferMin,
+                config,
+                mensaje: config.es_festivo ? 'Este recurso no está disponible en días festivos.' : null,
+                fallbackAplicado: !isPlainObject(recurso.reglas?.disponibilidad)
+            },
+            error: null
+        };
+    }
 
+    if (config.modo === 'slots') {
+        const aperturaMin = toMinutes(config.slots.hora_apertura);
+        const cierreMin = toMinutes(config.slots.hora_cierre);
+        const duracion = config.slots.duracion_min;
+        const intervalo = config.slots.intervalo_min;
+
+        let cursorMin = aperturaMin;
+        while ((cursorMin + duracion) <= cierreMin) {
+            candidatos.push({
+                id: `slot_${cursorMin}_${cursorMin + duracion}`,
+                inicioMin: cursorMin,
+                finMin: cursorMin + duracion
+            });
+            cursorMin += intervalo;
+        }
+    } else {
+        config.bloques_fijos.forEach((b) => {
+            const inicioMin = toMinutes(b.hora_inicio);
+            const finMin = toMinutes(b.hora_fin);
+            if (inicioMin === null || finMin === null || finMin <= inicioMin) return;
+            candidatos.push({
+                id: b.id,
+                label: b.label,
+                inicioMin,
+                finMin
+            });
+        });
+    }
+
+    const franjas = [];
     const slots = [];
     const bogotaNow = getBogotaNowParts();
     const esHoyBogota = fecha === bogotaNow.date;
-    let cursor = new Date(inicio);
-    while (addMinutes(cursor, duracionMin) <= fin) {
-        const slotStart = new Date(cursor);
-        const slotEnd = addMinutes(cursor, duracionMin);
-        const slotStartComparable = `${fecha}T${formatHHMM(slotStart)}:00`;
-        const nowComparable = `${bogotaNow.date}T${bogotaNow.time}`;
-        const paso = esHoyBogota && slotStartComparable < nowComparable;
-        const ocupado = franjaOcupada.some((f) => overlaps(slotStart, slotEnd, f.inicio, f.fin));
+    const nowComparable = `${bogotaNow.date}T${bogotaNow.time}`;
 
-        if (!ocupado && !paso) {
+    candidatos.forEach((candidate) => {
+        const fecha_inicio = buildDateTimeFromMinutes(fecha, candidate.inicioMin);
+        const fecha_fin = buildDateTimeFromMinutes(fecha, candidate.finMin);
+        const slotStart = new Date(fecha_inicio);
+        const slotEnd = new Date(fecha_fin);
+        const slotStartComparable = `${fecha}T${fromMinutesToHHMM(candidate.inicioMin)}:00`;
+        const paso = esHoyBogota && slotStartComparable < nowComparable;
+        const bloqueada = franjasBloqueadas.some((f) => overlaps(slotStart, slotEnd, f.inicio, f.fin));
+        const ocupada = reservasSinBuffer.some((f) => overlaps(slotStart, slotEnd, f.inicio, f.fin));
+        const invalidaBuffer = !ocupada && franjasBuffer.some((f) => overlaps(slotStart, slotEnd, f.inicio, f.fin));
+
+        let estado = 'disponible';
+        if (paso) estado = 'pasada';
+        else if (bloqueada) estado = 'bloqueada';
+        else if (ocupada) estado = 'ocupada';
+        else if (invalidaBuffer) estado = 'invalida_buffer';
+
+        const franja = {
+            id: candidate.id,
+            label: candidate.label || null,
+            inicio: fromMinutesToHHMM(candidate.inicioMin),
+            fin: fromMinutesToHHMM(candidate.finMin),
+            fecha_inicio,
+            fecha_fin,
+            estado,
+            seleccionable: estado === 'disponible'
+        };
+
+        franjas.push(franja);
+        if (franja.seleccionable) {
             slots.push({
-                inicio: formatHHMM(slotStart),
-                fin: formatHHMM(slotEnd),
-                fecha_inicio: `${fecha}T${formatHHMM(slotStart)}:00`,
-                fecha_fin: `${fecha}T${formatHHMM(slotEnd)}:00`
+                inicio: franja.inicio,
+                fin: franja.fin,
+                fecha_inicio,
+                fecha_fin
             });
         }
+    });
 
-        cursor = addMinutes(cursor, intervaloMin);
-    }
-
-    return { ok: true, data: { slots, bufferMin }, error: null };
+    return {
+        ok: true,
+        data: {
+            franjas,
+            slots,
+            bufferMin,
+            config,
+            fallbackAplicado: !isPlainObject(recurso.reglas?.disponibilidad)
+        },
+        error: null
+    };
 };
 
 export const registrarDocumentoReserva = async ({
