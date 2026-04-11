@@ -155,7 +155,10 @@ const normalizarConfiguracionDia = (rawConfig = {}, baseSlots = DISPONIBILIDAD_D
     const aperturaFinal = aperturaMin;
     const cierreFinal = cierreMin > aperturaFinal ? cierreMin : toMinutes(baseSlots.hora_cierre);
 
-    const duracionRaw = Number.isFinite(Number(duracionOverride))
+    const tieneDuracionOverride = duracionOverride !== null
+        && duracionOverride !== undefined
+        && Number.isFinite(Number(duracionOverride));
+    const duracionRaw = tieneDuracionOverride
         ? Number(duracionOverride)
         : Number(slotsCfg.duracion_min ?? baseSlots.duracion_min);
     const intervaloRaw = Number(slotsCfg.intervalo_min ?? baseSlots.intervalo_min);
