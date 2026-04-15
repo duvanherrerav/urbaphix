@@ -43,6 +43,8 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [usuarioApp?.conjunto_id, filtroEstado]);
 
+    const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
+
     const actualizar = async (id, estado, detalle) => {
         const resp = await cambiarEstadoReserva({
             reserva_id: id,
@@ -53,7 +55,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         });
 
         if (!resp.ok) return toast.error(resp.error);
-        toast.success(`Reserva ${estado}`);
+        toast.success(`Reserva ${estadoLabel(estado)}`);
         cargar();
     };
 
@@ -84,9 +86,9 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                                 <button
                                     className="bg-amber-600 text-white px-3 py-1 rounded disabled:bg-amber-300 disabled:cursor-not-allowed"
                                     disabled={!evaluacionNoShow.elegible}
-                                    onClick={() => actualizar(r.id, 'no_show', 'Marcada como no_show por vigilancia')}
+                                    onClick={() => actualizar(r.id, 'no_show', 'Marcada como no asistió por vigilancia')}
                                 >
-                                    No show
+                                    Marcar como no asistió
                                 </button>
                                 {!evaluacionNoShow.elegible && (
                                     <p className="w-full text-xs text-amber-700">{evaluacionNoShow.motivo}</p>

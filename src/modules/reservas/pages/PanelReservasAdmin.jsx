@@ -26,6 +26,7 @@ const MODO_OPCIONES = [
     { value: 'slots', label: 'Franjas automáticas' },
     { value: 'bloques_fijos', label: 'Bloques fijos' }
 ];
+const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
 
 const buildDefaultDia = () => ({
     activo: true,
@@ -442,7 +443,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
             detalle: detalle || `Gestión admin: ${estado}`
         });
         if (!resp.ok) return toast.error(resp.error);
-        toast.success(`Reserva ${estado}`);
+        toast.success(`Reserva ${estadoLabel(estado)}`);
         cargar();
     };
 
@@ -840,9 +841,9 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                         <button
                                                             className="bg-amber-600 text-white px-3 py-1 rounded disabled:bg-amber-300 disabled:cursor-not-allowed"
                                                             disabled={!evaluacionNoShow.elegible}
-                                                            onClick={() => actualizarEstado(r.id, 'no_show', 'Marcada como no_show por admin')}
+                                                            onClick={() => actualizarEstado(r.id, 'no_show', 'Marcada como no asistió por admin')}
                                                         >
-                                                            No show
+                                                            Marcar como no asistió
                                                         </button>
                                                         {!evaluacionNoShow.elegible && (
                                                             <p className="w-full text-xs text-amber-700">{evaluacionNoShow.motivo}</p>

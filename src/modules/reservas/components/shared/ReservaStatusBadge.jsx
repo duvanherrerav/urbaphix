@@ -15,16 +15,20 @@ const STATUS_LABELS = {
     cancelada: 'Cancelada',
     en_curso: 'En curso',
     finalizada: 'Finalizada',
-    no_show: 'No show'
+    no_show: 'No asistió'
 };
 
 const getReservaStatusLabel = (estado) => STATUS_LABELS[estado] || estado || 'Sin estado';
 
 export default function ReservaStatusBadge({ estado, className = '' }) {
     const styles = STATUS_STYLES[estado] || 'bg-gray-100 text-gray-700 border-gray-200';
+    const isNoShow = estado === 'no_show';
 
     return (
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold border ${styles} ${className}`}>
+        <span
+            title={isNoShow ? 'El residente no realizó check-in dentro del tiempo permitido' : undefined}
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold border ${styles} ${className}`}
+        >
             {getReservaStatusLabel(estado)}
         </span>
     );
