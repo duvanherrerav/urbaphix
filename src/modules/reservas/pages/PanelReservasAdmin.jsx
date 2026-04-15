@@ -5,6 +5,7 @@ import {
     cambiarEstadoReserva,
     crearBloqueo,
     crearRecursoComun,
+    evaluarElegibilidadNoShow,
     getRecursosComunes,
     listarBloqueos,
     listarEventosReserva,
@@ -432,13 +433,13 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         cargar();
     };
 
-    const actualizarEstado = async (id, estado) => {
+    const actualizarEstado = async (id, estado, detalle = null) => {
         const resp = await cambiarEstadoReserva({
             reserva_id: id,
             estado,
             usuario_id: usuarioApp.id,
             usuario_rol: usuarioApp.rol_id,
-            detalle: `Gestión admin: ${estado}`
+            detalle: detalle || `Gestión admin: ${estado}`
         });
         if (!resp.ok) return toast.error(resp.error);
         toast.success(`Reserva ${estado}`);
@@ -818,8 +819,10 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
                                 {detalleTab === 'historial' && (
                                     <div className="space-y-2">
-                                        {recursosHistorial.map((r) => (
-                                            <div key={r.id} className="border rounded-xl p-3 space-y-2">
+                                        {recursosHistorial.map((r) => {
+                                            const evaluacionNoShow = evaluarElegibilidadNoShow(r);
+                                            return (
+                                                <div key={r.id} className="border rounded-xl p-3 space-y-2">
                                                 <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
                                                 <p className="text-sm text-gray-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
                                                 <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
@@ -827,6 +830,30 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                     <div className="flex gap-2 mt-2">
                                                         <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
                                                         <button className="bg-red-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
+                                                    </div>
+                                                )}
+                                                {r.estado === 'aprobada' && (
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        <button className="bg-blue-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'en_curso', 'Check-in por admin')}>
+                                                            Check-in
+                                                        </button>
+                                                        <button
+                                                            className="bg-amber-600 text-white px-3 py-1 rounded disabled:bg-amber-300 disabled:cursor-not-allowed"
+                                                            disabled={!evaluacionNoShow.elegible}
+                                                            onClick={() => actualizarEstado(r.id, 'no_show', 'Marcada como no_show por admin')}
+                                                        >
+                                                            No show
+                                                        </button>
+                                                        {!evaluacionNoShow.elegible && (
+                                                            <p className="w-full text-xs text-amber-700">{evaluacionNoShow.motivo}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {r.estado === 'en_curso' && (
+                                                    <div className="flex gap-2 mt-2">
+                                                        <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'finalizada', 'Check-out por admin')}>
+                                                            Check-out
+                                                        </button>
                                                     </div>
                                                 )}
                                                 <button className="text-sm underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
@@ -837,8 +864,9 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                         ))}
                                                     </ul>
                                                 )}
-                                            </div>
-                                        ))}
+                                                </div>
+                                            );
+                                        })}
                                         {recursosHistorial.length === 0 && <p className="text-sm text-gray-500">Sin historial para este recurso.</p>}
                                     </div>
                                 )}
