@@ -575,6 +575,55 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 </div>
                                             );
                                         })}
+
+                                        <div className="bg-white border rounded-lg p-3 space-y-2">
+                                            <h5 className="font-medium">Días festivos</h5>
+                                            <label className="text-sm flex items-center gap-2">
+                                                <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
+                                                Disponible en festivos
+                                            </label>
+                                            {recursoForm.festivos.activo && (
+                                                <>
+                                                    <label className="text-sm block">Aplicar horario de festivo
+                                                        <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.usar} onChange={(e) => updateFestivosConfig((f) => ({ ...f, usar: e.target.value }))}>
+                                                            <option value="sabado">Usar horario de sábado</option>
+                                                            <option value="domingo">Usar horario de domingo</option>
+                                                            <option value="especial">Usar horario especial</option>
+                                                        </select>
+                                                    </label>
+                                                    {recursoForm.festivos.usar === 'especial' && (
+                                                        <div className="space-y-2 border rounded-lg p-2">
+                                                            <label className="text-sm block">Tipo de horario especial
+                                                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.modo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, modo: e.target.value } }))}>
+                                                                    {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                                </select>
+                                                            </label>
+                                                            {recursoForm.festivos.especial.modo === 'slots' && (
+                                                                <div className="grid md:grid-cols-2 gap-2">
+                                                                    <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.duracion_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, duracion_min: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
+                                                                </div>
+                                                            )}
+                                                            {recursoForm.festivos.especial.modo === 'bloques_fijos' && (
+                                                                <div className="space-y-2">
+                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>
+                                                                    {recursoForm.festivos.especial.bloques_fijos.map((bloque, idx) => (
+                                                                        <div key={`wizard-festivos-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
+                                                                            <label className="text-xs md:col-span-2">Nombre del bloque<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.nombre} onChange={(e) => editBloque('festivos', idx, 'nombre', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque('festivos', idx, 'hora_inicio', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editBloque('festivos', idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                                 {wizardStep === 2 && (
@@ -672,6 +721,55 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 </div>
                                             );
                                         })}
+
+                                        <div className="bg-white border rounded-lg p-3 space-y-2">
+                                            <h5 className="font-medium">Días festivos</h5>
+                                            <label className="text-sm flex items-center gap-2">
+                                                <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
+                                                Disponible en festivos
+                                            </label>
+                                            {recursoForm.festivos.activo && (
+                                                <>
+                                                    <label className="text-sm block">Aplicar horario de festivo
+                                                        <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.usar} onChange={(e) => updateFestivosConfig((f) => ({ ...f, usar: e.target.value }))}>
+                                                            <option value="sabado">Usar horario de sábado</option>
+                                                            <option value="domingo">Usar horario de domingo</option>
+                                                            <option value="especial">Usar horario especial</option>
+                                                        </select>
+                                                    </label>
+                                                    {recursoForm.festivos.usar === 'especial' && (
+                                                        <div className="space-y-2 border rounded-lg p-2">
+                                                            <label className="text-sm block">Tipo de horario especial
+                                                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.modo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, modo: e.target.value } }))}>
+                                                                    {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                                </select>
+                                                            </label>
+                                                            {recursoForm.festivos.especial.modo === 'slots' && (
+                                                                <div className="grid md:grid-cols-2 gap-2">
+                                                                    <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.duracion_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, duracion_min: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
+                                                                </div>
+                                                            )}
+                                                            {recursoForm.festivos.especial.modo === 'bloques_fijos' && (
+                                                                <div className="space-y-2">
+                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>
+                                                                    {recursoForm.festivos.especial.bloques_fijos.map((bloque, idx) => (
+                                                                        <div key={`detalle-festivos-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
+                                                                            <label className="text-xs md:col-span-2">Nombre del bloque<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.nombre} onChange={(e) => editBloque('festivos', idx, 'nombre', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque('festivos', idx, 'hora_inicio', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editBloque('festivos', idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
