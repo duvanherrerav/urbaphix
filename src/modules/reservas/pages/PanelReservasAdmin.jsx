@@ -243,6 +243,9 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     const [bloqueoForm, setBloqueoForm] = useState({ recurso_id: '', fecha: '', hora_inicio: '', hora_fin: '', motivo: '' });
     const [recursoForm, setRecursoForm] = useState(buildRecursoFormDefault());
     const [recursoEditId, setRecursoEditId] = useState('');
+    const [vistaAdmin, setVistaAdmin] = useState('lista'); // lista | crear | detalle
+    const [wizardStep, setWizardStep] = useState(0); // 0 general, 1 disponibilidad, 2 deposito
+    const [detalleTab, setDetalleTab] = useState('general'); // general | disponibilidad | deposito | bloqueos | historial
 
     const cargar = async () => {
         if (!usuarioApp?.conjunto_id) return;
@@ -448,211 +451,307 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         setEventosPorReserva((prev) => ({ ...prev, [reservaId]: resp.data || [] }));
     };
 
+    const iniciarCreacion = () => {
+        setRecursoEditId('');
+        setRecursoForm(buildRecursoFormDefault());
+        setWizardStep(0);
+        setVistaAdmin('crear');
+    };
+
+    const abrirDetalleRecurso = (recursoId, tab = 'general') => {
+        setRecursoEditId(recursoId);
+        setDetalleTab(tab);
+        setVistaAdmin('detalle');
+        setBloqueoForm((s) => ({ ...s, recurso_id: recursoId }));
+    };
+
+    const salirAListado = () => {
+        setVistaAdmin('lista');
+        setWizardStep(0);
+        setDetalleTab('general');
+    };
+
+    const guardarDesdeVista = async () => {
+        await guardarRecurso();
+        await cargar();
+        if (!recursoEditId) salirAListado();
+    };
+
+    const recursosHistorial = useMemo(
+        () => reservas.filter((r) => !recursoEditId || r.recurso_id === recursoEditId),
+        [reservas, recursoEditId]
+    );
+
     return (
         <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-5 shadow space-y-3">
-                <h2 className="text-2xl font-bold">Panel reservas (admin) 🧩</h2>
-                {loading && <p className="text-sm text-gray-500">Cargando...</p>}
-                {reservas.map((r) => (
-                    <div key={r.id} className="border rounded-xl p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
-                        <p className="text-sm text-gray-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-                        <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
-                        {r.estado === 'solicitada' && (
-                            <div className="flex gap-2 mt-2">
-                                <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
-                                <button className="bg-red-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
-                            </div>
-                        )}
-                        <button className="text-sm underline" onClick={() => verBitacora(r.id)}>Ver bitácora</button>
-                        {eventosPorReserva[r.id]?.length > 0 && (
-                            <ul className="text-xs text-gray-600 list-disc pl-4">
-                                {eventosPorReserva[r.id].map((ev) => (
-                                    <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                ))}
-                {reservas.length === 0 && <p className="text-sm text-gray-500">Sin reservas registradas.</p>}
-            </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow space-y-3">
-                <h3 className="text-lg font-semibold">Configurar recurso común</h3>
-                <p className="text-sm text-slate-600">Define disponibilidad, festivos y depósito del recurso.</p>
-
-                <select className="border rounded-lg px-3 py-2 w-full" value={recursoEditId} onChange={(e) => setRecursoEditId(e.target.value)}>
-                    <option value="">Crear nuevo recurso</option>
-                    {recursos.map((r) => <option key={r.id} value={r.id}>Editar: {r.nombre} · {r.tipo}</option>)}
-                </select>
-
-                <div className="grid md:grid-cols-2 gap-3">
-                    <input className="border rounded-lg px-3 py-2" placeholder="Nombre del recurso" value={recursoForm.nombre} onChange={(e) => setRecursoForm((s) => ({ ...s, nombre: e.target.value }))} />
-                    <select className="border rounded-lg px-3 py-2" value={recursoForm.tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, tipo: e.target.value }))}>
-                        <option value="salon_social">Salón social</option>
-                        <option value="cancha">Cancha</option>
-                        <option value="bbq">BBQ</option>
-                        <option value="logistica">Logística</option>
-                        <option value="enseres">Enseres</option>
-                        <option value="gimnasio">Gimnasio</option>
-                        <option value="generica">Genérica</option>
-                    </select>
-                    <input className="border rounded-lg px-3 py-2" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
-                    <input className="border rounded-lg px-3 py-2" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
-                </div>
-
-                <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
-                    <h4 className="font-semibold">Depósito</h4>
-                    <label className="text-sm flex items-center gap-2">
-                        <input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />
-                        ¿Requiere depósito?
-                    </label>
-                    {recursoForm.requiere_deposito && (
-                        <div className="grid md:grid-cols-2 gap-3">
-                            <label className="text-sm">Valor del depósito (COP)
-                                <input type="number" min="1" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_valor} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_valor: e.target.value }))} />
-                            </label>
-                            <label className="text-sm">Tipo de depósito
-                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_tipo: e.target.value }))}>
-                                    <option value="reembolsable">Reembolsable</option>
-                                    <option value="no_reembolsable">No reembolsable</option>
-                                </select>
-                            </label>
-                            <label className="text-sm md:col-span-2">Observación (opcional)
-                                <textarea className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_observacion} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_observacion: e.target.value }))} />
-                            </label>
-                        </div>
+            <div className="bg-white rounded-2xl p-5 shadow space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-2xl font-bold">Recursos comunes</h2>
+                    {vistaAdmin === 'lista' ? (
+                        <button className="bg-indigo-700 text-white px-3 py-2 rounded" onClick={iniciarCreacion}>Crear recurso</button>
+                    ) : (
+                        <button className="border border-slate-300 px-3 py-2 rounded" onClick={salirAListado}>Volver al listado</button>
                     )}
                 </div>
+                {loading && <p className="text-sm text-gray-500">Cargando...</p>}
 
-                <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
-                    <h4 className="font-semibold">Configuración de disponibilidad</h4>
-                    <label className="text-sm text-slate-700 block">
-                        Tiempo de separación entre reservas (minutos)
-                        <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => setRecursoForm((s) => ({ ...s, tiempo_buffer_min: e.target.value }))} />
-                    </label>
-
-                    {GRUPOS_DIAS.map((dia) => {
-                        const cfg = recursoForm.disponibilidad_semanal[dia.key];
-                        return (
-                            <div key={dia.key} className="bg-white border rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between gap-2">
-                                    <h5 className="font-medium">{dia.label}</h5>
-                                    <label className="text-sm flex items-center gap-2">
-                                        <input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />
-                                        Disponible
-                                    </label>
+                {vistaAdmin === 'lista' && (
+                    <div className="space-y-2">
+                        {recursos.map((r) => (
+                            <div key={r.id} className="border rounded-xl p-3 flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="font-medium">{r.nombre}</p>
+                                    <p className="text-sm text-slate-500">{r.tipo} · Capacidad: {r.capacidad || 'N/A'}</p>
                                 </div>
-                                {cfg.activo && (
-                                    <>
-                                        <label className="text-sm block">Tipo de horario
-                                            <select className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.modo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, modo: e.target.value }))}>
-                                                {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                            </select>
-                                        </label>
-                                        {cfg.modo === 'slots' && (
-                                            <div className="grid md:grid-cols-2 gap-2">
-                                                <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
-                                                <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_cierre} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: e.target.value } }))} /></label>
-                                                <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.duracion_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, duracion_min: e.target.value } }))} /></label>
-                                                <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
-                                            </div>
-                                        )}
-                                        {cfg.modo === 'bloques_fijos' && (
-                                            <div className="space-y-2">
-                                                <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
-                                                {cfg.bloques_fijos.map((bloque, idx) => (
-                                                    <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
-                                                        <label className="text-xs md:col-span-2">Nombre del bloque<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.nombre} onChange={(e) => editBloque(dia.key, idx, 'nombre', e.target.value)} /></label>
-                                                        <label className="text-xs">Hora de inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
-                                                        <label className="text-xs">Hora de fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editBloque(dia.key, idx, 'hora_fin', e.target.value)} /></label>
-                                                        <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
+                                <button className="text-sm border rounded px-3 py-1" onClick={() => abrirDetalleRecurso(r.id)}>Editar</button>
                             </div>
-                        );
-                    })}
+                        ))}
+                        {recursos.length === 0 && <p className="text-sm text-gray-500">No hay recursos creados.</p>}
+                    </div>
+                )}
 
-                    <div className="bg-white border rounded-lg p-3 space-y-2">
-                        <h5 className="font-medium">Días festivos</h5>
-                        <label className="text-sm flex items-center gap-2">
-                            <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
-                            Disponible en festivos
-                        </label>
-                        {recursoForm.festivos.activo && (
+                {vistaAdmin !== 'lista' && (
+                    <div className="space-y-4">
+                        {vistaAdmin === 'crear' && (
                             <>
-                                <label className="text-sm block">Aplicar horario de festivo
-                                    <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.usar} onChange={(e) => updateFestivosConfig((f) => ({ ...f, usar: e.target.value }))}>
-                                        <option value="sabado">Usar horario de sábado</option>
-                                        <option value="domingo">Usar horario de domingo</option>
-                                        <option value="especial">Usar horario especial</option>
-                                    </select>
-                                </label>
-                                {recursoForm.festivos.usar === 'especial' && (
-                                    <div className="space-y-2 border rounded-lg p-2">
-                                        <label className="text-sm block">Tipo de horario especial
-                                            <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.modo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, modo: e.target.value } }))}>
-                                                {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                <div className="flex gap-2 text-sm">
+                                    {['General', 'Disponibilidad', 'Depósito'].map((label, idx) => (
+                                        <span key={label} className={`px-3 py-1 rounded-full ${wizardStep === idx ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}. {label}</span>
+                                    ))}
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-3">
+                                    {wizardStep === 0 && (
+                                        <>
+                                            <input className="border rounded-lg px-3 py-2" placeholder="Nombre del recurso" value={recursoForm.nombre} onChange={(e) => setRecursoForm((s) => ({ ...s, nombre: e.target.value }))} />
+                                            <select className="border rounded-lg px-3 py-2" value={recursoForm.tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, tipo: e.target.value }))}>
+                                                <option value="salon_social">Salón social</option><option value="cancha">Cancha</option><option value="bbq">BBQ</option><option value="logistica">Logística</option><option value="enseres">Enseres</option><option value="gimnasio">Gimnasio</option><option value="generica">Genérica</option>
                                             </select>
-                                        </label>
-                                        {recursoForm.festivos.especial.modo === 'slots' && (
-                                            <div className="grid md:grid-cols-2 gap-2">
-                                                <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: e.target.value } } }))} /></label>
-                                                <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: e.target.value } } }))} /></label>
-                                                <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.duracion_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, duracion_min: e.target.value } } }))} /></label>
-                                                <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
-                                            </div>
-                                        )}
-                                        {recursoForm.festivos.especial.modo === 'bloques_fijos' && (
-                                            <div className="space-y-2">
-                                                <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>
-                                                {recursoForm.festivos.especial.bloques_fijos.map((bloque, idx) => (
-                                                    <div key={`festivos-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
-                                                        <label className="text-xs md:col-span-2">Nombre del bloque<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.nombre} onChange={(e) => editBloque('festivos', idx, 'nombre', e.target.value)} /></label>
-                                                        <label className="text-xs">Hora de inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque('festivos', idx, 'hora_inicio', e.target.value)} /></label>
-                                                        <label className="text-xs">Hora de fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editBloque('festivos', idx, 'hora_fin', e.target.value)} /></label>
-                                                        <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
+                                            <input className="border rounded-lg px-3 py-2" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
+                                            <input className="border rounded-lg px-3 py-2" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                            <label className="text-sm md:col-span-2">Tiempo de separación entre reservas (minutos)
+                                                <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => setRecursoForm((s) => ({ ...s, tiempo_buffer_min: e.target.value }))} />
+                                            </label>
+                                        </>
+                                    )}
+                                </div>
+                                {wizardStep === 1 && (
+                                    <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
+                                        <h4 className="font-semibold">Disponibilidad</h4>
+                                        {GRUPOS_DIAS.map((dia) => {
+                                            const cfg = recursoForm.disponibilidad_semanal[dia.key];
+                                            return (
+                                                <div key={dia.key} className="bg-white border rounded-lg p-3 space-y-2">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <h5 className="font-medium">{dia.label}</h5>
+                                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />Disponible</label>
                                                     </div>
-                                                ))}
+                                                    {cfg.activo && (
+                                                        <>
+                                                            <label className="text-sm block">Tipo de horario
+                                                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.modo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, modo: e.target.value }))}>{MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
+                                                            </label>
+                                                            {cfg.modo === 'slots' ? (
+                                                                <div className="grid md:grid-cols-2 gap-2">
+                                                                    <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_cierre} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.duracion_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, duracion_min: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="space-y-2">
+                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
+                                                                    {cfg.bloques_fijos.map((bloque, idx) => (
+                                                                        <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
+                                                                            <label className="text-xs md:col-span-2">Nombre del bloque<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.nombre} onChange={(e) => editBloque(dia.key, idx, 'nombre', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editBloque(dia.key, idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {wizardStep === 2 && (
+                                    <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
+                                        <h4 className="font-semibold">Depósito</h4>
+                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
+                                        {recursoForm.requiere_deposito && (
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                                <label className="text-sm">Valor del depósito (COP)<input type="number" min="1" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_valor} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_valor: e.target.value }))} /></label>
+                                                <label className="text-sm">Tipo de depósito
+                                                    <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_tipo: e.target.value }))}>
+                                                        <option value="reembolsable">Reembolsable</option><option value="no_reembolsable">No reembolsable</option>
+                                                    </select>
+                                                </label>
+                                                <label className="text-sm md:col-span-2">Observación (opcional)<textarea className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_observacion} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_observacion: e.target.value }))} /></label>
                                             </div>
                                         )}
                                     </div>
                                 )}
+                                <div className="flex justify-between">
+                                    <button className="border rounded px-3 py-2" onClick={() => setWizardStep((s) => Math.max(0, s - 1))} disabled={wizardStep === 0}>Anterior</button>
+                                    {wizardStep < 2
+                                        ? <button className="bg-indigo-700 text-white rounded px-3 py-2" onClick={() => setWizardStep((s) => Math.min(2, s + 1))}>Siguiente</button>
+                                        : <button className="bg-indigo-700 text-white rounded px-3 py-2" onClick={guardarDesdeVista}>Crear recurso</button>}
+                                </div>
+                            </>
+                        )}
+
+                        {vistaAdmin === 'detalle' && (
+                            <>
+                                <div className="flex flex-wrap gap-2 border-b pb-2">
+                                    {[
+                                        ['general', 'General'],
+                                        ['disponibilidad', 'Disponibilidad'],
+                                        ['deposito', 'Depósito'],
+                                        ['bloqueos', 'Bloqueos'],
+                                        ['historial', 'Historial']
+                                    ].map(([key, label]) => (
+                                        <button key={key} className={`px-3 py-1 rounded ${detalleTab === key ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`} onClick={() => setDetalleTab(key)}>{label}</button>
+                                    ))}
+                                </div>
+
+                                {detalleTab === 'general' && (
+                                    <div className="grid md:grid-cols-2 gap-3">
+                                        <input className="border rounded-lg px-3 py-2" placeholder="Nombre del recurso" value={recursoForm.nombre} onChange={(e) => setRecursoForm((s) => ({ ...s, nombre: e.target.value }))} />
+                                        <select className="border rounded-lg px-3 py-2" value={recursoForm.tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, tipo: e.target.value }))}>
+                                            <option value="salon_social">Salón social</option><option value="cancha">Cancha</option><option value="bbq">BBQ</option><option value="logistica">Logística</option><option value="enseres">Enseres</option><option value="gimnasio">Gimnasio</option><option value="generica">Genérica</option>
+                                        </select>
+                                        <input className="border rounded-lg px-3 py-2" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
+                                        <input className="border rounded-lg px-3 py-2" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                        <label className="text-sm md:col-span-2">Tiempo de separación entre reservas (minutos)
+                                            <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => setRecursoForm((s) => ({ ...s, tiempo_buffer_min: e.target.value }))} />
+                                        </label>
+                                    </div>
+                                )}
+
+                                {detalleTab === 'disponibilidad' && (
+                                    <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
+                                        <h4 className="font-semibold">Disponibilidad semanal</h4>
+                                        {GRUPOS_DIAS.map((dia) => {
+                                            const cfg = recursoForm.disponibilidad_semanal[dia.key];
+                                            return (
+                                                <div key={dia.key} className="bg-white border rounded-lg p-3 space-y-2">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <h5 className="font-medium">{dia.label}</h5>
+                                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />Disponible</label>
+                                                    </div>
+                                                    {cfg.activo && (
+                                                        <>
+                                                            <label className="text-sm block">Tipo de horario
+                                                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.modo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, modo: e.target.value }))}>{MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
+                                                            </label>
+                                                            {cfg.modo === 'slots' ? (
+                                                                <div className="grid md:grid-cols-2 gap-2">
+                                                                    <label className="text-sm">Hora de apertura<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<input type="time" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.hora_cierre} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.duracion_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, duracion_min: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="space-y-2">
+                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
+                                                                    {cfg.bloques_fijos.map((bloque, idx) => (
+                                                                        <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
+                                                                            <label className="text-xs md:col-span-2">Nombre del bloque<input className="border rounded px-2 py-1 w-full mt-1" value={bloque.nombre} onChange={(e) => editBloque(dia.key, idx, 'nombre', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de fin<input type="time" className="border rounded px-2 py-1 w-full mt-1" value={bloque.hora_fin} onChange={(e) => editBloque(dia.key, idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {detalleTab === 'deposito' && (
+                                    <div className="border rounded-xl p-4 space-y-3 bg-slate-50">
+                                        <h4 className="font-semibold">Depósito</h4>
+                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
+                                        {recursoForm.requiere_deposito && (
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                                <label className="text-sm">Valor del depósito (COP)<input type="number" min="1" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_valor} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_valor: e.target.value }))} /></label>
+                                                <label className="text-sm">Tipo de depósito
+                                                    <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_tipo: e.target.value }))}>
+                                                        <option value="reembolsable">Reembolsable</option><option value="no_reembolsable">No reembolsable</option>
+                                                    </select>
+                                                </label>
+                                                <label className="text-sm md:col-span-2">Observación (opcional)<textarea className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.deposito_observacion} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_observacion: e.target.value }))} /></label>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {detalleTab === 'bloqueos' && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-slate-600">Registra cierres temporales por mantenimiento o novedades operativas.</p>
+                                        <div className="grid md:grid-cols-2 gap-3">
+                                            <select className="border rounded-lg px-3 py-2" value={bloqueoForm.recurso_id} onChange={(e) => setBloqueoForm((s) => ({ ...s, recurso_id: e.target.value }))}>
+                                                <option value="">Selecciona recurso</option>
+                                                {recursos.map((r) => <option key={r.id} value={r.id}>{r.nombre} · {r.tipo}</option>)}
+                                            </select>
+                                            <input type="date" className="border rounded-lg px-3 py-2" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
+                                            <input type="time" className="border rounded-lg px-3 py-2" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
+                                            <input type="time" className="border rounded-lg px-3 py-2" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
+                                            <input className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Motivo del cierre temporal" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
+                                        </div>
+                                        <button className="bg-slate-800 text-white px-3 py-2 rounded" onClick={crearBloqueoAdmin}>Registrar cierre temporal</button>
+                                        <div className="space-y-2">
+                                            {bloqueos.filter((b) => !recursoEditId || b.recurso_id === recursoEditId).map((b) => (
+                                                <div key={b.id} className="border rounded p-2 flex items-center justify-between">
+                                                    <p className="text-sm">{b.recursos_comunes?.nombre || b.recurso_id} · {formatDateRangeBogota(b.fecha_inicio, b.fecha_fin)} · {b.motivo}</p>
+                                                    <button className="text-xs border rounded px-2 py-1" onClick={() => borrarBloqueo(b.id)}>Eliminar</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {detalleTab === 'historial' && (
+                                    <div className="space-y-2">
+                                        {recursosHistorial.map((r) => (
+                                            <div key={r.id} className="border rounded-xl p-3 space-y-2">
+                                                <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
+                                                <p className="text-sm text-gray-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                                <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
+                                                {r.estado === 'solicitada' && (
+                                                    <div className="flex gap-2 mt-2">
+                                                        <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
+                                                        <button className="bg-red-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
+                                                    </div>
+                                                )}
+                                                <button className="text-sm underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
+                                                {eventosPorReserva[r.id]?.length > 0 && (
+                                                    <ul className="text-xs text-gray-600 list-disc pl-4">
+                                                        {eventosPorReserva[r.id].map((ev) => (
+                                                            <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {recursosHistorial.length === 0 && <p className="text-sm text-gray-500">Sin historial para este recurso.</p>}
+                                    </div>
+                                )}
+
+                                {['general', 'disponibilidad', 'deposito'].includes(detalleTab) && (
+                                    <button className="bg-indigo-700 text-white px-3 py-2 rounded" onClick={guardarDesdeVista}>Guardar cambios</button>
+                                )}
                             </>
                         )}
                     </div>
-                </div>
-
-                <button className="bg-indigo-700 text-white px-3 py-2 rounded" onClick={guardarRecurso}>{recursoEditId ? 'Guardar cambios' : 'Crear recurso'}</button>
-            </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow space-y-3">
-                <h3 className="text-lg font-semibold">Cerrar temporalmente un recurso</h3>
-                <p className="text-sm text-slate-600">Úsalo para mantenimiento, eventos internos, novedades operativas o cierres temporales.</p>
-                <div className="grid md:grid-cols-2 gap-3">
-                    <select className="border rounded-lg px-3 py-2" value={bloqueoForm.recurso_id} onChange={(e) => setBloqueoForm((s) => ({ ...s, recurso_id: e.target.value }))}>
-                        <option value="">Selecciona recurso</option>
-                        {recursos.map((r) => <option key={r.id} value={r.id}>{r.nombre} · {r.tipo}</option>)}
-                    </select>
-                    <input type="date" className="border rounded-lg px-3 py-2" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
-                    <input type="time" className="border rounded-lg px-3 py-2" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
-                    <input type="time" className="border rounded-lg px-3 py-2" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
-                    <input className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Motivo del cierre temporal" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
-                </div>
-                <button className="bg-slate-800 text-white px-3 py-2 rounded" onClick={crearBloqueoAdmin}>Registrar cierre temporal</button>
-                <div className="space-y-2">
-                    {bloqueos.map((b) => (
-                        <div key={b.id} className="border rounded p-2 flex items-center justify-between">
-                            <p className="text-sm">{b.recursos_comunes?.nombre || b.recurso_id} · {formatDateRangeBogota(b.fecha_inicio, b.fecha_fin)} · {b.motivo}</p>
-                            <button className="text-xs border rounded px-2 py-1" onClick={() => borrarBloqueo(b.id)}>Eliminar</button>
-                        </div>
-                    ))}
-                    {bloqueos.length === 0 && <p className="text-sm text-gray-500">No hay cierres temporales registrados.</p>}
-                </div>
+                )}
             </div>
         </div>
     );
