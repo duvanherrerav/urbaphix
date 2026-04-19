@@ -10,8 +10,8 @@ export const ESTADOS_RESERVA = Object.freeze([
 
 const TRANSICIONES = Object.freeze({
     solicitada: Object.freeze(['aprobada', 'rechazada', 'cancelada']),
-    aprobada: Object.freeze(['en_curso', 'cancelada']),
-    en_curso: Object.freeze(['finalizada', 'no_show']),
+    aprobada: Object.freeze(['en_curso', 'no_show', 'cancelada']),
+    en_curso: Object.freeze(['finalizada']),
     rechazada: Object.freeze([]),
     cancelada: Object.freeze([]),
     finalizada: Object.freeze([]),
@@ -23,9 +23,9 @@ const ROLES_POR_TRANSICION = Object.freeze({
     'solicitada->rechazada': Object.freeze(['admin']),
     'solicitada->cancelada': Object.freeze(['admin', 'residente']),
     'aprobada->en_curso': Object.freeze(['admin', 'vigilancia']),
+    'aprobada->no_show': Object.freeze(['admin', 'vigilancia']),
     'aprobada->cancelada': Object.freeze(['admin', 'residente']),
-    'en_curso->finalizada': Object.freeze(['admin', 'vigilancia']),
-    'en_curso->no_show': Object.freeze(['admin', 'vigilancia'])
+    'en_curso->finalizada': Object.freeze(['admin', 'vigilancia'])
 });
 
 export const esEstadoReservaValido = (estado) => ESTADOS_RESERVA.includes(estado);

@@ -5,6 +5,7 @@ import {
     cambiarEstadoReserva,
     crearBloqueo,
     crearRecursoComun,
+    evaluarElegibilidadNoShow,
     getRecursosComunes,
     listarBloqueos,
     listarEventosReserva,
@@ -25,6 +26,11 @@ const MODO_OPCIONES = [
     { value: 'slots', label: 'Franjas automáticas' },
     { value: 'bloques_fijos', label: 'Bloques fijos' }
 ];
+const POLITICAS_CONFIRMACION = [
+    { value: 'requiere_aprobacion_admin', label: 'Requiere aprobación admin' },
+    { value: 'confirmacion_automatica', label: 'Confirmación automática' }
+];
+const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
 
 const buildDefaultDia = () => ({
     activo: true,
@@ -47,6 +53,7 @@ const buildRecursoFormDefault = () => ({
     deposito_valor: '',
     deposito_tipo: 'reembolsable',
     deposito_observacion: '',
+    confirmacion_politica: 'requiere_aprobacion_admin',
     tiempo_buffer_min: 0,
     disponibilidad_semanal: {
         lun_vie: buildDefaultDia(),
@@ -116,6 +123,10 @@ const normalizarDisponibilidadDesdeRecurso = (recurso) => {
     const especialSlots = especial?.slots || {};
     const especialBloques = Array.isArray(especial?.bloques_fijos) ? especial.bloques_fijos : [];
 
+    const politicaConfirmacion = POLITICAS_CONFIRMACION.some((p) => p.value === recurso?.reglas?.confirmacion?.politica)
+        ? recurso.reglas.confirmacion.politica
+        : 'requiere_aprobacion_admin';
+
     return {
         ...form,
         nombre: recurso?.nombre || '',
@@ -128,6 +139,7 @@ const normalizarDisponibilidadDesdeRecurso = (recurso) => {
             ? recurso.reglas.deposito.tipo
             : 'reembolsable',
         deposito_observacion: recurso?.reglas?.deposito?.observacion || '',
+        confirmacion_politica: politicaConfirmacion,
         tiempo_buffer_min: Number(recurso?.tiempo_buffer_min || 0),
         festivos: {
             activo: festivos.activo === true,
@@ -391,7 +403,10 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                         tipo: recursoForm.deposito_tipo,
                         observacion: recursoForm.deposito_observacion?.trim() || null
                     }
-                    : {}
+                    : {},
+                confirmacion: {
+                    politica: recursoForm.confirmacion_politica
+                }
             }
         };
 
@@ -432,16 +447,16 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         cargar();
     };
 
-    const actualizarEstado = async (id, estado) => {
+    const actualizarEstado = async (id, estado, detalle = null) => {
         const resp = await cambiarEstadoReserva({
             reserva_id: id,
             estado,
             usuario_id: usuarioApp.id,
             usuario_rol: usuarioApp.rol_id,
-            detalle: `Gestión admin: ${estado}`
+            detalle: detalle || `Gestión admin: ${estado}`
         });
         if (!resp.ok) return toast.error(resp.error);
-        toast.success(`Reserva ${estado}`);
+        toast.success(`Reserva ${estadoLabel(estado)}`);
         cargar();
     };
 
@@ -528,6 +543,11 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                             </select>
                                             <input className="border rounded-lg px-3 py-2" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
                                             <input className="border rounded-lg px-3 py-2" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                            <label className="text-sm md:col-span-2">Política de confirmación
+                                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.confirmacion_politica} onChange={(e) => setRecursoForm((s) => ({ ...s, confirmacion_politica: e.target.value }))}>
+                                                    {POLITICAS_CONFIRMACION.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                </select>
+                                            </label>
                                             <label className="text-sm md:col-span-2">Tiempo de separación entre reservas (minutos)
                                                 <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => setRecursoForm((s) => ({ ...s, tiempo_buffer_min: e.target.value }))} />
                                             </label>
@@ -674,6 +694,11 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         </select>
                                         <input className="border rounded-lg px-3 py-2" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
                                         <input className="border rounded-lg px-3 py-2" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                        <label className="text-sm md:col-span-2">Política de confirmación
+                                            <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.confirmacion_politica} onChange={(e) => setRecursoForm((s) => ({ ...s, confirmacion_politica: e.target.value }))}>
+                                                {POLITICAS_CONFIRMACION.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                            </select>
+                                        </label>
                                         <label className="text-sm md:col-span-2">Tiempo de separación entre reservas (minutos)
                                             <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => setRecursoForm((s) => ({ ...s, tiempo_buffer_min: e.target.value }))} />
                                         </label>
@@ -818,27 +843,54 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
                                 {detalleTab === 'historial' && (
                                     <div className="space-y-2">
-                                        {recursosHistorial.map((r) => (
-                                            <div key={r.id} className="border rounded-xl p-3 space-y-2">
-                                                <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
-                                                <p className="text-sm text-gray-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-                                                <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
-                                                {r.estado === 'solicitada' && (
-                                                    <div className="flex gap-2 mt-2">
-                                                        <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
-                                                        <button className="bg-red-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
-                                                    </div>
-                                                )}
-                                                <button className="text-sm underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
-                                                {eventosPorReserva[r.id]?.length > 0 && (
-                                                    <ul className="text-xs text-gray-600 list-disc pl-4">
-                                                        {eventosPorReserva[r.id].map((ev) => (
-                                                            <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                            </div>
-                                        ))}
+                                        {recursosHistorial.map((r) => {
+                                            const evaluacionNoShow = evaluarElegibilidadNoShow(r);
+                                            return (
+                                                <div key={r.id} className="border rounded-xl p-3 space-y-2">
+                                                    <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
+                                                    <p className="text-sm text-gray-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                                    <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
+                                                    {r.estado === 'solicitada' && (
+                                                        <div className="flex gap-2 mt-2">
+                                                            <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
+                                                            <button className="bg-red-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
+                                                        </div>
+                                                    )}
+                                                    {r.estado === 'aprobada' && (
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            <button className="bg-blue-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'en_curso', 'Check-in por admin')}>
+                                                                Check-in
+                                                            </button>
+                                                            <button
+                                                                className="bg-amber-600 text-white px-3 py-1 rounded disabled:bg-amber-300 disabled:cursor-not-allowed"
+                                                                disabled={!evaluacionNoShow.elegible}
+                                                                onClick={() => actualizarEstado(r.id, 'no_show', 'Marcada como no asistió por admin')}
+                                                            >
+                                                                Marcar como no asistió
+                                                            </button>
+                                                            {!evaluacionNoShow.elegible && (
+                                                                <p className="w-full text-xs text-amber-700">{evaluacionNoShow.motivo}</p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {r.estado === 'en_curso' && (
+                                                        <div className="flex gap-2 mt-2">
+                                                            <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'finalizada', 'Check-out por admin')}>
+                                                                Check-out
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    <button className="text-sm underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
+                                                    {eventosPorReserva[r.id]?.length > 0 && (
+                                                        <ul className="text-xs text-gray-600 list-disc pl-4">
+                                                            {eventosPorReserva[r.id].map((ev) => (
+                                                                <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                         {recursosHistorial.length === 0 && <p className="text-sm text-gray-500">Sin historial para este recurso.</p>}
                                     </div>
                                 )}

@@ -28,6 +28,10 @@ const BASE_RESERVA_SELECT = `
 `;
 
 const ESTADOS_ACTIVOS_RESERVA = ['solicitada', 'aprobada', 'en_curso'];
+const POLITICAS_CONFIRMACION_VALIDAS = Object.freeze([
+    'confirmacion_automatica',
+    'requiere_aprobacion_admin'
+]);
 const DISPONIBILIDAD_DEFAULT = Object.freeze({
     version: 1,
     timezone: 'America/Bogota',
@@ -105,6 +109,9 @@ const formatLocalDateTime = (date) => (
 const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
 const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const uuidLike = (v) => typeof v === 'string' && v.trim().length > 0;
+const NAIVE_TS_REGEX = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+export const NO_SHOW_TOLERANCIA_MINUTOS = 15;
 
 const toMinutes = (hhmm) => {
     if (typeof hhmm !== 'string' || !/^\d{2}:\d{2}$/.test(hhmm)) return null;
@@ -140,6 +147,56 @@ const getBogotaNowParts = () => {
         date: `${byType.year}-${byType.month}-${byType.day}`,
         time: `${byType.hour}:${byType.minute}:${byType.second}`
     };
+};
+
+const parseBogotaNaiveToEpochMs = (value) => {
+    if (typeof value !== 'string') return null;
+    const match = value.match(NAIVE_TS_REGEX);
+    if (!match) return null;
+
+    const [, y, m, d, hh, mm, ss = '00'] = match;
+    return Date.UTC(
+        Number(y),
+        Number(m) - 1,
+        Number(d),
+        Number(hh) + 5,
+        Number(mm),
+        Number(ss)
+    );
+};
+
+export const evaluarElegibilidadNoShow = (reserva, { toleranciaMin = NO_SHOW_TOLERANCIA_MINUTOS } = {}) => {
+    if (!reserva) {
+        return { elegible: false, motivo: 'Reserva no encontrada' };
+    }
+
+    if (reserva.estado !== 'aprobada') {
+        return { elegible: false, motivo: 'Solo reservas aprobadas pueden marcarse como no show' };
+    }
+
+    if (reserva.checkin_por) {
+        return { elegible: false, motivo: 'La reserva ya tiene check-in' };
+    }
+
+    const inicioMs = parseBogotaNaiveToEpochMs(reserva.fecha_inicio);
+    if (!inicioMs) {
+        return { elegible: false, motivo: 'Fecha de inicio inválida para evaluar no show' };
+    }
+
+    const now = getBogotaNowParts();
+    const ahoraMs = parseBogotaNaiveToEpochMs(`${now.date}T${now.time}`);
+    if (!ahoraMs) {
+        return { elegible: false, motivo: 'No fue posible calcular hora actual Bogotá' };
+    }
+
+    const toleranciaMs = Number(toleranciaMin) * 60 * 1000;
+    const habilitaNoShowMs = inicioMs + toleranciaMs;
+
+    if (ahoraMs < habilitaNoShowMs) {
+        return { elegible: false, motivo: `Aún no cumple tolerancia de ${toleranciaMin} min` };
+    }
+
+    return { elegible: true, motivo: null };
 };
 
 const normalizarConfiguracionDia = (rawConfig = {}, baseSlots = DISPONIBILIDAD_DEFAULT.slots, { duracionOverride = null } = {}) => {
@@ -302,6 +359,33 @@ export const humanizeReservaError = (error, fallback = 'No se pudo completar la 
     return message;
 };
 
+const normalizarPoliticaConfirmacion = (recurso = null) => {
+    const politicaRaw = recurso?.reglas?.confirmacion?.politica;
+    if (POLITICAS_CONFIRMACION_VALIDAS.includes(politicaRaw)) {
+        return politicaRaw;
+    }
+    return 'requiere_aprobacion_admin';
+};
+
+const getPoliticaConfirmacionRecurso = async ({ conjunto_id, recurso_id }) => {
+    const { data: recurso, error } = await supabase
+        .from('recursos_comunes')
+        .select('id, conjunto_id, reglas')
+        .eq('id', recurso_id)
+        .eq('conjunto_id', conjunto_id)
+        .single();
+
+    if (error || !recurso) {
+        return {
+            ok: false,
+            politica: 'requiere_aprobacion_admin',
+            error: humanizeReservaError(error, 'No se pudo leer política de confirmación del recurso')
+        };
+    }
+
+    return { ok: true, politica: normalizarPoliticaConfirmacion(recurso), error: null };
+};
+
 export const getRecursosComunes = async (conjuntoId) => {
     const { data, error } = await supabase
         .from('recursos_comunes')
@@ -428,6 +512,18 @@ export const crearReserva = async ({
         return { ok: false, data: null, error: `Este horario no está disponible.${suffix}` };
     }
 
+    const politicaConfirmacionResp = await getPoliticaConfirmacionRecurso({
+        conjunto_id,
+        recurso_id
+    });
+    if (!politicaConfirmacionResp.ok) {
+        return { ok: false, data: null, error: politicaConfirmacionResp.error };
+    }
+
+    const politica_confirmacion = politicaConfirmacionResp.politica;
+    const confirmadaAutomaticamente = politica_confirmacion === 'confirmacion_automatica';
+    const estadoInicial = confirmadaAutomaticamente ? 'aprobada' : 'solicitada';
+
     const payload = {
         conjunto_id,
         recurso_id,
@@ -440,7 +536,7 @@ export const crearReserva = async ({
         motivo,
         observaciones,
         metadata,
-        estado: 'solicitada'
+        estado: estadoInicial
     };
 
     const { data, error } = await supabase
@@ -456,10 +552,21 @@ export const crearReserva = async ({
         conjunto_id,
         actor_id: null,
         accion: 'crear',
-        detalle: 'Reserva creada'
+        detalle: confirmadaAutomaticamente ? 'Reserva creada y confirmada automáticamente' : 'Reserva creada',
+        metadata: {
+            politica_confirmacion
+        }
     });
 
-    return { ok: true, data, error: null };
+    return {
+        ok: true,
+        data,
+        error: null,
+        meta: {
+            politica_confirmacion,
+            confirmada_automaticamente: confirmadaAutomaticamente
+        }
+    };
 };
 
 export const listarReservas = async ({
@@ -501,7 +608,7 @@ export const cambiarEstadoReserva = async ({
 
     const { data: reservaActual, error: errorReservaActual } = await supabase
         .from('reservas_zonas')
-        .select('id, estado, residente_id, conjunto_id')
+        .select('id, estado, residente_id, conjunto_id, fecha_inicio, checkin_por')
         .eq('id', reserva_id)
         .single();
 
@@ -518,6 +625,13 @@ export const cambiarEstadoReserva = async ({
 
     if (!validacion.ok) {
         return { ok: false, data: null, error: validacion.error };
+    }
+
+    if (estado === 'no_show') {
+        const evaluacionNoShow = evaluarElegibilidadNoShow(reservaActual);
+        if (!evaluacionNoShow.elegible) {
+            return { ok: false, data: null, error: evaluacionNoShow.motivo };
+        }
     }
 
     const payload = { estado };

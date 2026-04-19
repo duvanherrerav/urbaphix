@@ -224,7 +224,11 @@ export default function ReservarZona({ usuarioApp }) {
             return toast.error(result.error);
         }
 
-        toast.success('Solicitud de reserva creada');
+        if (result.meta?.confirmada_automaticamente) {
+            toast.success('Reserva confirmada');
+        } else {
+            toast.success('Solicitud enviada para aprobación');
+        }
         setForm((f) => ({
             ...f,
             fecha: '',
