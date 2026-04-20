@@ -26,6 +26,10 @@ const MODO_OPCIONES = [
     { value: 'slots', label: 'Franjas automáticas' },
     { value: 'bloques_fijos', label: 'Bloques fijos' }
 ];
+const POLITICAS_CONFIRMACION = [
+    { value: 'requiere_aprobacion_admin', label: 'Requiere aprobación admin' },
+    { value: 'confirmacion_automatica', label: 'Confirmación automática' }
+];
 const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
 
 const buildDefaultDia = () => ({
@@ -49,6 +53,7 @@ const buildRecursoFormDefault = () => ({
     deposito_valor: '',
     deposito_tipo: 'reembolsable',
     deposito_observacion: '',
+    confirmacion_politica: 'requiere_aprobacion_admin',
     tiempo_buffer_min: 0,
     disponibilidad_semanal: {
         lun_vie: buildDefaultDia(),
@@ -118,6 +123,10 @@ const normalizarDisponibilidadDesdeRecurso = (recurso) => {
     const especialSlots = especial?.slots || {};
     const especialBloques = Array.isArray(especial?.bloques_fijos) ? especial.bloques_fijos : [];
 
+    const politicaConfirmacion = POLITICAS_CONFIRMACION.some((p) => p.value === recurso?.reglas?.confirmacion?.politica)
+        ? recurso.reglas.confirmacion.politica
+        : 'requiere_aprobacion_admin';
+
     return {
         ...form,
         nombre: recurso?.nombre || '',
@@ -130,6 +139,7 @@ const normalizarDisponibilidadDesdeRecurso = (recurso) => {
             ? recurso.reglas.deposito.tipo
             : 'reembolsable',
         deposito_observacion: recurso?.reglas?.deposito?.observacion || '',
+        confirmacion_politica: politicaConfirmacion,
         tiempo_buffer_min: Number(recurso?.tiempo_buffer_min || 0),
         festivos: {
             activo: festivos.activo === true,
@@ -393,7 +403,10 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                         tipo: recursoForm.deposito_tipo,
                         observacion: recursoForm.deposito_observacion?.trim() || null
                     }
-                    : {}
+                    : {},
+                confirmacion: {
+                    politica: recursoForm.confirmacion_politica
+                }
             }
         };
 
@@ -530,6 +543,11 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                             </select>
                                             <input className="border rounded-lg px-3 py-2" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
                                             <input className="border rounded-lg px-3 py-2" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                            <label className="text-sm md:col-span-2">Política de confirmación
+                                                <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.confirmacion_politica} onChange={(e) => setRecursoForm((s) => ({ ...s, confirmacion_politica: e.target.value }))}>
+                                                    {POLITICAS_CONFIRMACION.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                </select>
+                                            </label>
                                             <label className="text-sm md:col-span-2">Tiempo de separación entre reservas (minutos)
                                                 <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => setRecursoForm((s) => ({ ...s, tiempo_buffer_min: e.target.value }))} />
                                             </label>
@@ -676,6 +694,11 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         </select>
                                         <input className="border rounded-lg px-3 py-2" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
                                         <input className="border rounded-lg px-3 py-2" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                        <label className="text-sm md:col-span-2">Política de confirmación
+                                            <select className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.confirmacion_politica} onChange={(e) => setRecursoForm((s) => ({ ...s, confirmacion_politica: e.target.value }))}>
+                                                {POLITICAS_CONFIRMACION.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                            </select>
+                                        </label>
                                         <label className="text-sm md:col-span-2">Tiempo de separación entre reservas (minutos)
                                             <input type="number" min="0" className="border rounded-lg px-3 py-2 w-full mt-1" value={recursoForm.tiempo_buffer_min} onChange={(e) => setRecursoForm((s) => ({ ...s, tiempo_buffer_min: e.target.value }))} />
                                         </label>

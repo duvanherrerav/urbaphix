@@ -28,6 +28,10 @@ const BASE_RESERVA_SELECT = `
 `;
 
 const ESTADOS_ACTIVOS_RESERVA = ['solicitada', 'aprobada', 'en_curso'];
+const POLITICAS_CONFIRMACION_VALIDAS = Object.freeze([
+    'confirmacion_automatica',
+    'requiere_aprobacion_admin'
+]);
 const DISPONIBILIDAD_DEFAULT = Object.freeze({
     version: 1,
     timezone: 'America/Bogota',
@@ -355,6 +359,33 @@ export const humanizeReservaError = (error, fallback = 'No se pudo completar la 
     return message;
 };
 
+const normalizarPoliticaConfirmacion = (recurso = null) => {
+    const politicaRaw = recurso?.reglas?.confirmacion?.politica;
+    if (POLITICAS_CONFIRMACION_VALIDAS.includes(politicaRaw)) {
+        return politicaRaw;
+    }
+    return 'requiere_aprobacion_admin';
+};
+
+const getPoliticaConfirmacionRecurso = async ({ conjunto_id, recurso_id }) => {
+    const { data: recurso, error } = await supabase
+        .from('recursos_comunes')
+        .select('id, conjunto_id, reglas')
+        .eq('id', recurso_id)
+        .eq('conjunto_id', conjunto_id)
+        .single();
+
+    if (error || !recurso) {
+        return {
+            ok: false,
+            politica: 'requiere_aprobacion_admin',
+            error: humanizeReservaError(error, 'No se pudo leer política de confirmación del recurso')
+        };
+    }
+
+    return { ok: true, politica: normalizarPoliticaConfirmacion(recurso), error: null };
+};
+
 export const getRecursosComunes = async (conjuntoId) => {
     const { data, error } = await supabase
         .from('recursos_comunes')
@@ -481,6 +512,18 @@ export const crearReserva = async ({
         return { ok: false, data: null, error: `Este horario no está disponible.${suffix}` };
     }
 
+    const politicaConfirmacionResp = await getPoliticaConfirmacionRecurso({
+        conjunto_id,
+        recurso_id
+    });
+    if (!politicaConfirmacionResp.ok) {
+        return { ok: false, data: null, error: politicaConfirmacionResp.error };
+    }
+
+    const politica_confirmacion = politicaConfirmacionResp.politica;
+    const confirmadaAutomaticamente = politica_confirmacion === 'confirmacion_automatica';
+    const estadoInicial = confirmadaAutomaticamente ? 'aprobada' : 'solicitada';
+
     const payload = {
         conjunto_id,
         recurso_id,
@@ -493,7 +536,7 @@ export const crearReserva = async ({
         motivo,
         observaciones,
         metadata,
-        estado: 'solicitada'
+        estado: estadoInicial
     };
 
     const { data, error } = await supabase
@@ -509,10 +552,21 @@ export const crearReserva = async ({
         conjunto_id,
         actor_id: null,
         accion: 'crear',
-        detalle: 'Reserva creada'
+        detalle: confirmadaAutomaticamente ? 'Reserva creada y confirmada automáticamente' : 'Reserva creada',
+        metadata: {
+            politica_confirmacion
+        }
     });
 
-    return { ok: true, data, error: null };
+    return {
+        ok: true,
+        data,
+        error: null,
+        meta: {
+            politica_confirmacion,
+            confirmada_automaticamente: confirmadaAutomaticamente
+        }
+    };
 };
 
 export const listarReservas = async ({
