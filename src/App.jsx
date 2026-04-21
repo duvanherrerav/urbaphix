@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
+import isotipo from './assets/brand/isotipo-urbaphix.svg';
+import imagotipo from './assets/brand/imagotipo-urbaphix.svg';
 
 import Login from './modules/auth/Login';
 import { pedirPermiso } from './utils/push';
@@ -34,7 +36,7 @@ function App() {
   const [modulo, setModulo] = useState('');
   const menuRef = useRef(null);
 
-  const menuBtn = "w-full text-left p-2 rounded hover:bg-gray-700";
+  const menuBtn = "w-full app-btn app-btn-ghost justify-start";
   const ROLES_VALIDOS = ['admin', 'vigilancia', 'residente'];
 
   // 🔔 permisos
@@ -174,8 +176,8 @@ function App() {
 
   if (isBootstrapping) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-gray-600 text-sm">Cargando Urbaphix...</div>
+      <div className="app-shell flex items-center justify-center">
+        <div className="app-card text-app-text-secondary text-sm">Cargando Urbaphix...</div>
       </div>
     );
   }
@@ -183,15 +185,20 @@ function App() {
   // 🔐 LOGIN
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="app-shell flex items-center justify-center p-6">
 
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+        <div className="app-card w-full max-w-md">
 
-          <h1 className="text-2xl font-bold text-center mb-2">
-            Urbaphix 🚀
+          <div className="mb-6 flex flex-col items-center gap-3">
+            <img src={isotipo} alt="Isotipo Urbaphix" className="h-12 w-12" />
+            <img src={imagotipo} alt="Urbaphix" className="h-9 w-auto" />
+          </div>
+
+          <h1 className="text-2xl font-bold text-center mb-2 text-app-text-primary">
+            Bienvenido
           </h1>
 
-          <p className="text-center text-gray-500 text-sm mb-6">
+          <p className="text-center text-app-text-secondary text-sm mb-6">
             Gestión inteligente para propiedad horizontal
           </p>
 
@@ -205,14 +212,17 @@ function App() {
 
   // 🚀 APP
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="app-shell flex">
 
       {/* 🔥 SIDEBAR */}
-      <div className="w-64 bg-gray-900 text-white p-4">
+      <div className="app-sidebar w-72 p-4">
 
-        <h1 className="text-xl font-bold mb-6">
-          Urbaphix 🚀
-        </h1>
+        <div className="mb-6 rounded-xl border border-app-border bg-app-bg p-4">
+          <img src={imagotipo} alt="Imagotipo Urbaphix" className="h-8 w-auto" />
+          <p className="mt-2 text-xs text-app-text-secondary">
+            Plataforma SaaS para propiedad horizontal
+          </p>
+        </div>
 
         <nav className="space-y-2">
 
@@ -287,45 +297,47 @@ function App() {
       <div className="flex-1">
 
         {/* HEADER */}
-        <div className="bg-white shadow px-6 py-4 flex justify-between items-center relative z-50">
+        <div className="app-header px-6 py-4 flex justify-between items-center relative z-50">
 
-          <h2 className="font-semibold text-lg capitalize">
+          <h2 className="font-semibold text-lg capitalize text-app-text-primary">
             {moduloActual}
           </h2>
 
           {/* 👤 MENU */}
-          <div className="relative z-50" ref={menuRef}>
+          <div className="relative z-50 flex items-center gap-3" ref={menuRef}>
+
+            <img src={isotipo} alt="Isotipo Urbaphix" className="h-8 w-8" />
 
             <button
               onClick={() => setOpenMenu(!openMenu)}
-              className="w-10 h-10 bg-gray-900 text-white rounded-full flex items-center justify-center font-bold"
+              className="w-10 h-10 rounded-full border border-app-border bg-app-bg text-app-text-primary flex items-center justify-center font-bold"
             >
               {usuarioApp?.nombre?.[0]?.toUpperCase() || 'U'}
             </button>
 
             {openMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border z-[70]">
+              <div className="absolute right-0 top-10 mt-2 w-56 rounded-xl border border-app-border bg-app-bg-alt shadow-app z-[70]">
 
-                <div className="px-4 py-3 border-b">
-                  <p className="text-sm font-semibold">
+                <div className="px-4 py-3 border-b border-app-border">
+                  <p className="text-sm font-semibold text-app-text-primary">
                     {usuarioApp?.nombre || 'Usuario'}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-app-text-secondary">
                     Urbaphix
                   </p>
                 </div>
 
-                <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">
+                <button className="w-full text-left px-4 py-2 hover:bg-app-bg text-sm text-app-text-secondary hover:text-app-text-primary">
                   Perfil
                 </button>
 
-                <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">
+                <button className="w-full text-left px-4 py-2 hover:bg-app-bg text-sm text-app-text-secondary hover:text-app-text-primary">
                   Configuración
                 </button>
 
                 <button
                   onClick={() => supabase.auth.signOut()}
-                  className="w-full text-left px-4 py-2 hover:bg-red-100 text-sm text-red-600"
+                  className="w-full text-left px-4 py-2 hover:bg-[#EF444426] text-sm text-state-error"
                 >
                   Cerrar sesión
                 </button>
@@ -340,18 +352,18 @@ function App() {
         {/* CONTENIDO DINÁMICO */}
         <div className="p-6 space-y-6">
           {errorPerfil && (
-            <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+            <div className="app-badge-error w-full rounded-xl px-4 py-3 text-sm">
               {errorPerfil}
             </div>
           )}
 
           {rolNoAutorizado && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-700 px-4 py-3 text-sm">
+            <div className="app-badge-warning w-full rounded-xl px-4 py-3 text-sm">
               Tu rol actual no está autorizado para este panel. Contacta al administrador del conjunto.
             </div>
           )}
 
-          <Suspense fallback={<div className="text-sm text-gray-500">Cargando módulo...</div>}>
+          <Suspense fallback={<div className="app-badge-info">Cargando módulo...</div>}>
             {/* ADMIN */}
             {usuarioApp?.rol_id === 'admin' && (
               <>

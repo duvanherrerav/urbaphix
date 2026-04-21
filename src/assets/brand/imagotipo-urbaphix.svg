@@ -1,0 +1,7 @@
+<svg width="260" height="56" viewBox="0 0 260 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0.5" y="0.5" width="55" height="55" rx="13.5" fill="#020617" stroke="#1E293B"/>
+  <path d="M14 17.5C14 16.12 15.12 15 16.5 15H39.5C40.88 15 42 16.12 42 17.5V40.5C42 41.88 40.88 43 39.5 43H16.5C15.12 43 14 41.88 14 40.5V17.5Z" fill="#1E3A8A"/>
+  <path d="M18 19H38V25L28.2 35.2C27.48 35.95 26.28 35.95 25.56 35.2L18 27.4V19Z" fill="#2563EB"/>
+  <circle cx="38" cy="38" r="5.5" fill="#38BDF8"/>
+  <text x="70" y="35" fill="#E2E8F0" font-size="24" font-family="Inter, Arial, sans-serif" font-weight="700">Urbaphix</text>
+</svg>
