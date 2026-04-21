@@ -309,9 +309,9 @@ export default function ReservarZona({ usuarioApp }) {
                 <h1 className="text-2xl font-bold">Mis reservas</h1>
                 <p className="text-sm text-blue-100">Gestiona tus solicitudes de zonas comunes de forma simple y clara.</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className="bg-white/20 px-2 py-1 rounded-full">Activas: {reservasActivas.length}</span>
-                    <span className="bg-white/20 px-2 py-1 rounded-full">Historial: {reservasHistorial.length}</span>
-                    <span className="bg-white/20 px-2 py-1 rounded-full">Recursos: {recursos.length}</span>
+                    <span className="bg-app-bg-alt/20 px-2 py-1 rounded-full">Activas: {reservasActivas.length}</span>
+                    <span className="bg-app-bg-alt/20 px-2 py-1 rounded-full">Historial: {reservasHistorial.length}</span>
+                    <span className="bg-app-bg-alt/20 px-2 py-1 rounded-full">Recursos: {recursos.length}</span>
                 </div>
             </div>
 
@@ -340,10 +340,10 @@ export default function ReservarZona({ usuarioApp }) {
                 minFecha={getTodayBogotaDate()}
             />
 
-            <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
+            <section className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-3 border border-app-border">
                 <div className="flex items-center justify-between gap-2">
                     <h3 className="text-lg font-semibold">Mis reservas activas ({reservasActivas.length})</h3>
-                    {loadingReservas && <p className="text-xs text-slate-500">Actualizando...</p>}
+                    {loadingReservas && <p className="text-xs text-app-text-secondary">Actualizando...</p>}
                 </div>
 
                 {reservasActivas.length === 0 && (
@@ -373,7 +373,7 @@ export default function ReservarZona({ usuarioApp }) {
                 </div>
             </section>
 
-            <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
+            <section className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-3 border border-app-border">
                 <h3 className="text-lg font-semibold">Historial reciente</h3>
 
                 {reservasHistorial.length === 0 && (
@@ -388,7 +388,7 @@ export default function ReservarZona({ usuarioApp }) {
                         <div key={r.id} className="border rounded-lg p-3 flex items-center justify-between gap-2">
                             <div>
                                 <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
-                                <p className="text-xs text-slate-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                <p className="text-xs text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
                             </div>
                             <ReservaStatusBadge estado={r.estado} />
                         </div>

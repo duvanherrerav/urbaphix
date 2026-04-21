@@ -132,7 +132,7 @@ export default function DashboardAdmin({ usuarioApp }) {
           👋 Hola {usuarioApp?.nombre || 'Admin'}
         </h2>
 
-        <p className="text-sm text-gray-300 mt-1">
+        <p className="text-sm text-app-text-secondary mt-1">
           Resumen general del conjunto
         </p>
 
@@ -177,15 +177,15 @@ export default function DashboardAdmin({ usuarioApp }) {
 
       {/* 🔥 NUEVOS MINI DASHBOARDS (sin saturar) */}
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
-          <h3 className="font-semibold text-slate-800 mb-3">⚙️ Salud operativa</h3>
+        <div className="bg-app-bg-alt border border-app-border p-4 rounded-2xl shadow-sm">
+          <h3 className="font-semibold text-app-text-primary mb-3">⚙️ Salud operativa</h3>
           <div className="space-y-3">
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span>Ocupación de visitas</span>
                 <span className="font-semibold">{saludOperativa.ocupacion}%</span>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-app-bg rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${saludOperativa.ocupacion}%` }} />
               </div>
             </div>
@@ -194,15 +194,15 @@ export default function DashboardAdmin({ usuarioApp }) {
                 <span>Visitas finalizadas</span>
                 <span className="font-semibold">{saludOperativa.finalizacion}%</span>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-app-bg rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-emerald-500 to-lime-400" style={{ width: `${saludOperativa.finalizacion}%` }} />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
-          <h3 className="font-semibold text-slate-800 mb-3">💼 Pulso financiero</h3>
+        <div className="bg-app-bg-alt border border-app-border p-4 rounded-2xl shadow-sm">
+          <h3 className="font-semibold text-app-text-primary mb-3">💼 Pulso financiero</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-emerald-50 p-3">
               <p className="text-emerald-700 font-medium">Recaudado</p>
@@ -228,12 +228,12 @@ export default function DashboardAdmin({ usuarioApp }) {
       {/* 🔥 GRÁFICAS PRINCIPALES */}
       <div className="grid md:grid-cols-2 gap-6">
 
-        <div className="bg-white p-4 rounded-2xl shadow">
+        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
           <h3 className="font-semibold mb-2">📊 Actividad</h3>
           <GraficaVisitas visitas={visitas} />
         </div>
 
-        <div className="bg-white p-4 rounded-2xl shadow">
+        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
           <h3 className="font-semibold mb-2">📦 Paquetes</h3>
           <PaquetesPorTorre usuarioApp={usuarioApp} />
         </div>
@@ -241,20 +241,20 @@ export default function DashboardAdmin({ usuarioApp }) {
 
 
         {/* 🔥 FINANCIERO */}
-        <div className="bg-white p-4 rounded-2xl shadow">
+        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
           <h3 className="font-semibold mb-2">💰 Flujo financiero</h3>
           <GraficaFinanciera pagos={pagos} />
         </div>
 
         {/* 🔥 CARTERA ANALÍTICA */}
-        <div className="bg-white p-4 rounded-2xl shadow">
+        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
           <h3 className="font-semibold mb-2">📊 Análisis de cartera</h3>
           <GraficaCartera pagos={pagos} />
         </div>
       </div>
 
       {/* 🔥 LISTADO */}
-      <div className="bg-white p-4 rounded-2xl shadow">
+      <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
 
         <h3 className="font-semibold mb-4">
           Últimas visitas
@@ -269,7 +269,7 @@ export default function DashboardAdmin({ usuarioApp }) {
             >
               <div>
                 <p className="font-medium">{v.nombre_visitante}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-app-text-secondary">
                   {v.documento} • {v.placa || 'Sin placa'}
                 </p>
               </div>

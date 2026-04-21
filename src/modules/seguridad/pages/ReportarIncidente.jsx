@@ -42,17 +42,17 @@ export default function ReportarIncidente({ user }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow p-6 space-y-4 max-w-2xl">
+    <div className="bg-app-bg-alt rounded-xl shadow p-6 space-y-4 max-w-2xl">
       <div>
         <h2 className="text-xl font-bold">Reportar incidente 🚨</h2>
-        <p className="text-sm text-gray-500">Registra novedades de seguridad para trazabilidad y gestión administrativa.</p>
+        <p className="text-sm text-app-text-secondary">Registra novedades de seguridad para trazabilidad y gestión administrativa.</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-gray-600">Tipo de incidente</label>
+          <label className="text-xs text-app-text-secondary">Tipo de incidente</label>
           <select
-            className="w-full border rounded-lg px-3 py-2 mt-1"
+            className="app-input mt-1"
             value={form.tipo}
             onChange={e => setForm({ ...form, tipo: e.target.value })}
           >
@@ -64,9 +64,9 @@ export default function ReportarIncidente({ user }) {
         </div>
 
         <div>
-          <label className="text-xs text-gray-600">Ubicación</label>
+          <label className="text-xs text-app-text-secondary">Ubicación</label>
           <input
-            className="w-full border rounded-lg px-3 py-2 mt-1"
+            className="app-input mt-1"
             placeholder="Ej: Torre 2 - Lobby"
             value={form.ubicacion}
             onChange={e => setForm({ ...form, ubicacion: e.target.value })}
@@ -75,7 +75,7 @@ export default function ReportarIncidente({ user }) {
       </div>
 
       <div>
-        <label className="text-xs text-gray-600">Descripción</label>
+        <label className="text-xs text-app-text-secondary">Descripción</label>
         <textarea
           className="w-full border rounded-lg px-3 py-2 mt-1 min-h-28"
           placeholder="Describe qué pasó, quién estuvo involucrado y si hubo evidencia."
@@ -85,14 +85,14 @@ export default function ReportarIncidente({ user }) {
       </div>
 
       <div>
-        <label className="text-xs text-gray-600">Nivel de prioridad</label>
+        <label className="text-xs text-app-text-secondary">Nivel de prioridad</label>
         <div className="flex gap-2 mt-2">
           {['bajo', 'medio', 'alto'].map((nivel) => (
             <button
               key={nivel}
               type="button"
               onClick={() => setForm({ ...form, nivel })}
-              className={`px-3 py-1.5 rounded-full text-sm border ${form.nivel === nivel ? 'bg-gray-900 text-white' : 'bg-white'}`}
+              className={`px-3 py-1.5 rounded-full text-sm border ${form.nivel === nivel ? 'bg-app-bg text-white' : 'bg-app-bg-alt'}`}
             >
               {etiquetasNivel[nivel]}
             </button>

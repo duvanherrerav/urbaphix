@@ -313,15 +313,15 @@ export default function CrearVisita({ usuarioApp }) {
   const quickFrecuentes = useMemo(() => visitantesSugeridos.slice(0, 5), [visitantesSugeridos]);
 
   return (
-    <div className="bg-white rounded-2xl shadow p-5 space-y-4 max-w-2xl">
+    <div className="bg-app-bg-alt rounded-2xl shadow p-5 space-y-4 max-w-2xl">
       <div>
         <h2 className="text-2xl font-bold">Solicitar visita 🚶‍♂️</h2>
-        <p className="text-sm text-gray-500">Registra tu visita y comparte el QR para ingreso en portería.</p>
+        <p className="text-sm text-app-text-secondary">Registra tu visita y comparte el QR para ingreso en portería.</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-3">
         <input
-          className="border rounded-lg px-3 py-2"
+          className="app-input"
           placeholder="Nombre visitante"
           list="sugerencias-nombre-visitante"
           value={form.nombre}
@@ -339,7 +339,7 @@ export default function CrearVisita({ usuarioApp }) {
         </datalist>
 
         <select
-          className="border rounded-lg px-3 py-2"
+          className="app-input"
           value={form.tipo_documento}
           onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}
         >
@@ -350,7 +350,7 @@ export default function CrearVisita({ usuarioApp }) {
         </select>
 
         <input
-          className="border rounded-lg px-3 py-2"
+          className="app-input"
           placeholder="Documento"
           list="sugerencias-documento-visitante"
           value={form.documento}
@@ -368,7 +368,7 @@ export default function CrearVisita({ usuarioApp }) {
 
         <input
           type="date"
-          className="border rounded-lg px-3 py-2"
+          className="app-input"
           value={form.fecha}
           min={hoyBogota()}
           onChange={(e) => setForm({ ...form, fecha: e.target.value })}
@@ -377,13 +377,13 @@ export default function CrearVisita({ usuarioApp }) {
       </div>
       {quickFrecuentes.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-600">Accesos rápidos de visitantes frecuentes</p>
+          <p className="text-xs font-medium text-app-text-secondary">Accesos rápidos de visitantes frecuentes</p>
           <div className="flex flex-wrap gap-2">
             {quickFrecuentes.map((item) => (
               <button
                 key={`quick-${item.id}`}
                 type="button"
-                className="text-xs px-3 py-1 rounded-full border bg-white hover:bg-slate-50"
+                className="text-xs px-3 py-1 rounded-full border bg-app-bg-alt hover:bg-app-bg"
                 onClick={() => reutilizarVisita(item)}
               >
                 {item.nombre_visitante} · {item.documento}
@@ -400,7 +400,7 @@ export default function CrearVisita({ usuarioApp }) {
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
         <select
-          className="border rounded-lg px-3 py-2 w-full"
+          className="app-input w-full"
           value={form.tipoVehiculo}
           onChange={(e) => setForm({ ...form, tipoVehiculo: e.target.value, placa: '' })}
         >
@@ -411,7 +411,7 @@ export default function CrearVisita({ usuarioApp }) {
 
         {form.tipoVehiculo && (
           <input
-            className="border rounded-lg px-3 py-2 w-full"
+            className="app-input w-full"
             placeholder={form.tipoVehiculo === 'carro' ? 'Placa carro (ABC123)' : 'Placa moto (ABC12 o ABC12D)'}
             value={form.placa}
             maxLength={6}
@@ -432,32 +432,32 @@ export default function CrearVisita({ usuarioApp }) {
       </button>
 
       {qrPayload && (
-        <div ref={qrWrapRef} className="border rounded-xl p-4 bg-slate-50 space-y-3">
+        <div ref={qrWrapRef} className="border rounded-xl p-4 bg-app-bg space-y-3">
           <h3 className="font-semibold">QR validable en portería 🔐</h3>
-          <p className="text-xs text-gray-500">Portería puede validar este QR escaneando o pegando el código manual.</p>
+          <p className="text-xs text-app-text-secondary">Portería puede validar este QR escaneando o pegando el código manual.</p>
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <QRCodeCanvas value={qrPayload} size={180} />
             <div className="space-y-2">
               <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirCodigoQR}>Compartir código QR</button>
-              <button className="w-full bg-slate-900 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir QR</button>
+              <button className="w-full bg-brand-primary text-app-text-primary rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir QR</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="border rounded-xl p-4 space-y-3 bg-slate-50/60">
+      <div className="border rounded-xl p-4 space-y-3 bg-app-bg/60">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Visitantes frecuentes</h3>
-          <span className="text-xs text-gray-500">{historialFiltrado.length} registros</span>
+          <span className="text-xs text-app-text-secondary">{historialFiltrado.length} registros</span>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => { setFiltroHistorial('todos'); setPaginaFrecuentes(1); }}>Todos</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-brand-primary text-app-text-primary' : 'bg-app-bg'}`} onClick={() => { setFiltroHistorial('todos'); setPaginaFrecuentes(1); }}>Todos</button>
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => { setFiltroHistorial('pendiente'); setPaginaFrecuentes(1); }}>Pendientes</button>
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'ingresado' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'}`} onClick={() => { setFiltroHistorial('ingresado'); setPaginaFrecuentes(1); }}>En curso</button>
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}`} onClick={() => { setFiltroHistorial('salido'); setPaginaFrecuentes(1); }}>Completadas</button>
         </div>
         <input
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="app-input"
           placeholder="Filtrar por nombre del visitante"
           value={busquedaFrecuentes}
           onChange={(e) => {
@@ -467,7 +467,7 @@ export default function CrearVisita({ usuarioApp }) {
         />
         <div className="space-y-2 max-h-72 overflow-auto">
           {historialPaginado.map((item) => (
-            <div key={item.id} className="border rounded-xl p-3 text-sm bg-white shadow-sm">
+            <div key={item.id} className="border rounded-xl p-3 text-sm bg-app-bg-alt shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${normalizarEstado(item.estado) === 'salido'
@@ -479,8 +479,8 @@ export default function CrearVisita({ usuarioApp }) {
                   {normalizarEstado(item.estado) === 'salido' ? 'Completada' : normalizarEstado(item.estado) === 'ingresado' ? 'En curso' : 'Pendiente'}
                 </span>
               </div>
-              <p className="text-gray-500">Fecha visita: {item.fecha_visita}</p>
-              {item.placa && <p className="text-gray-500">Placa: {item.placa}</p>}
+              <p className="text-app-text-secondary">Fecha visita: {item.fecha_visita}</p>
+              {item.placa && <p className="text-app-text-secondary">Placa: {item.placa}</p>}
               <div className="flex flex-wrap gap-2 mt-2">
                 {normalizarEstado(item.estado) === 'pendiente' && (
                   <button className="px-2 py-1 border rounded" onClick={() => setQRDesdeHistorial(item)}>Reenviar QR</button>
@@ -491,11 +491,11 @@ export default function CrearVisita({ usuarioApp }) {
               </div>
             </div>
           ))}
-          {historialBuscado.length === 0 && <p className="text-sm text-gray-500">No hay visitas para este filtro.</p>}
+          {historialBuscado.length === 0 && <p className="text-sm text-app-text-secondary">No hay visitas para este filtro.</p>}
         </div>
         {historialBuscado.length > 0 && (
           <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Página {paginaFrecuenteActual} de {totalPaginasFrecuentes}</span>
+            <span className="text-app-text-secondary">Página {paginaFrecuenteActual} de {totalPaginasFrecuentes}</span>
             <div className="flex gap-2">
               <button
                 className="px-2 py-1 border rounded disabled:opacity-40"

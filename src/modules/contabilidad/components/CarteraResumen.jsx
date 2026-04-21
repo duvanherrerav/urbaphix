@@ -100,14 +100,14 @@ export default function CarteraResumen({ usuarioApp }) {
   };
 
   return (
-    <div className="bg-white p-5 rounded-xl shadow">
+    <div className="bg-app-bg-alt p-5 rounded-xl shadow">
 
       <h3 className="text-lg font-bold mb-4">
         💰 Cartera (Morosos)
       </h3>
 
       {cartera.length === 0 && (
-        <p className="text-gray-500">
+        <p className="text-app-text-secondary">
           No hay cartera pendiente 🎉
         </p>
       )}
@@ -123,15 +123,15 @@ export default function CarteraResumen({ usuarioApp }) {
 
             {/* INFO */}
             <div>
-              <p className="font-semibold text-gray-800">
+              <p className="font-semibold text-app-text-primary">
                 🏢 Torre {c.torre} • Apto {c.apartamento}
               </p>
 
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-app-text-secondary">
                 {c.nombre}
               </p>
 
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-app-text-secondary">
                 {c.cantidadPagos} pagos pendientes
               </p>
             </div>

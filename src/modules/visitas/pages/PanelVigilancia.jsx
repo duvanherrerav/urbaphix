@@ -229,14 +229,14 @@ export default function PanelVigilancia({ usuarioApp }) {
     const sla = calcularSLA(visitas);
 
     return (
-        <div className="bg-white rounded-xl shadow p-4 space-y-4 relative">
+        <div className="bg-app-bg-alt rounded-xl shadow p-4 space-y-4 relative">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-bold">Control Visitas 👮‍♂️</h2>
                 <div className="flex gap-2 text-xs">
-                    <button className={`px-3 py-1 rounded-full ${vista === 'pendientes' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100'}`} onClick={() => { setVista('pendientes'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
-                    <button className={`px-3 py-1 rounded-full ${vista === 'ingresadas' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`} onClick={() => { setVista('ingresadas'); setPagina(1); }}>En curso ({resumen.ingresadas})</button>
-                    <button className={`px-3 py-1 rounded-full ${vista === 'hoy' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'}`} onClick={() => { setVista('hoy'); setPagina(1); }}>Hoy</button>
-                    <button className={`px-3 py-1 rounded-full ${vista === 'finalizadas' ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`} onClick={() => { setVista('finalizadas'); setPagina(1); }}>Finalizadas</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'pendientes' ? 'bg-amber-100 text-amber-700' : 'bg-app-bg'}`} onClick={() => { setVista('pendientes'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'ingresadas' ? 'bg-blue-100 text-blue-700' : 'bg-app-bg'}`} onClick={() => { setVista('ingresadas'); setPagina(1); }}>En curso ({resumen.ingresadas})</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'hoy' ? 'bg-purple-100 text-purple-700' : 'bg-app-bg'}`} onClick={() => { setVista('hoy'); setPagina(1); }}>Hoy</button>
+                    <button className={`px-3 py-1 rounded-full ${vista === 'finalizadas' ? 'bg-green-100 text-green-700' : 'bg-app-bg'}`} onClick={() => { setVista('finalizadas'); setPagina(1); }}>Finalizadas</button>
                 </div>
             </div>
 
@@ -244,7 +244,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                 <div className="rounded-lg bg-indigo-50 px-3 py-2"><b>SLA promedio:</b> {sla.promedioMinutos} min</div>
                 <div className="rounded-lg bg-red-50 px-3 py-2"><b>Demoras &gt;15m:</b> {sla.demoras}</div>
                 <div className="rounded-lg bg-orange-50 px-3 py-2"><b>Offline pendiente:</b> {offlinePendientes}</div>
-                <button className="rounded-lg border px-3 py-2 hover:bg-gray-50" onClick={async () => {
+                <button className="rounded-lg border px-3 py-2 hover:bg-app-bg" onClick={async () => {
                     const result = await syncOfflineQueue(usuarioApp);
                     const cola = getOfflineQueue();
                     setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
@@ -253,15 +253,15 @@ export default function PanelVigilancia({ usuarioApp }) {
             </div>
 
             <div className="grid md:grid-cols-5 gap-2 text-xs">
-                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Incidentes hoy:</b> {seguridad.incidentesHoy}</div>
-                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Paquetes pendientes:</b> {seguridad.paquetesPendientes}</div>
-                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Turno mañana:</b> {seguridad.porTurno.mañana}</div>
-                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Turno tarde:</b> {seguridad.porTurno.tarde}</div>
-                <div className="rounded-lg bg-slate-100 px-3 py-2"><b>Turno noche:</b> {seguridad.porTurno.noche}</div>
+                <div className="rounded-lg bg-app-bg px-3 py-2"><b>Incidentes hoy:</b> {seguridad.incidentesHoy}</div>
+                <div className="rounded-lg bg-app-bg px-3 py-2"><b>Paquetes pendientes:</b> {seguridad.paquetesPendientes}</div>
+                <div className="rounded-lg bg-app-bg px-3 py-2"><b>Turno mañana:</b> {seguridad.porTurno.mañana}</div>
+                <div className="rounded-lg bg-app-bg px-3 py-2"><b>Turno tarde:</b> {seguridad.porTurno.tarde}</div>
+                <div className="rounded-lg bg-app-bg px-3 py-2"><b>Turno noche:</b> {seguridad.porTurno.noche}</div>
             </div>
 
             <input
-                className="w-full border rounded-lg px-3 py-2 text-sm"
+                className="app-input"
                 placeholder="Buscar por nombre, documento o placa"
                 value={busqueda}
                 onChange={(e) => {
@@ -270,8 +270,8 @@ export default function PanelVigilancia({ usuarioApp }) {
                 }}
             />
 
-            {loading && <p className="text-sm text-gray-500">Cargando visitas...</p>}
-            {!loading && filtradas.length === 0 && <p className="text-sm text-gray-500">No hay visitas para esta vista.</p>}
+            {loading && <p className="text-sm text-app-text-secondary">Cargando visitas...</p>}
+            {!loading && filtradas.length === 0 && <p className="text-sm text-app-text-secondary">No hay visitas para esta vista.</p>}
 
             <div className="space-y-3">
                 {filtradasPaginadas.map((v) => (
@@ -307,7 +307,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             {filtradas.length > 0 && (
                 <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-500">Página {paginaActual} de {totalPaginas}</p>
+                    <p className="text-xs text-app-text-secondary">Página {paginaActual} de {totalPaginas}</p>
                     <div className="flex gap-2">
                         <button
                             className="px-3 py-1 border rounded text-sm disabled:opacity-40"
@@ -338,9 +338,9 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             {modalIngreso.open && modalIngreso.visita && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-4 space-y-3 max-h-[92vh] overflow-y-auto">
+                    <div className="bg-app-bg-alt rounded-xl shadow-xl w-full max-w-md p-4 space-y-3 max-h-[92vh] overflow-y-auto">
                         <h3 className="font-semibold text-lg">Validar QR para ingreso</h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-app-text-secondary">
                             Visitante: <b>{modalIngreso.visita.nombre_visitante}</b> · Doc: <b>{modalIngreso.visita.documento}</b>
                         </p>
 
@@ -356,9 +356,9 @@ export default function PanelVigilancia({ usuarioApp }) {
                             />
                         </div>
 
-                        <div className="text-xs text-gray-500">Si la cámara falla, pega el QR manualmente:</div>
+                        <div className="text-xs text-app-text-secondary">Si la cámara falla, pega el QR manualmente:</div>
                         <input
-                            className="w-full border rounded-lg px-3 py-2 text-sm"
+                            className="app-input"
                             value={modalIngreso.manualQR}
                             onChange={(e) => setModalIngreso((prev) => ({ ...prev, manualQR: e.target.value }))}
                             placeholder='{"visita_id":"..."} o código QR'

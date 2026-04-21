@@ -34,6 +34,10 @@
 }
 
 @layer components {
+  .app-input {
+    @apply w-full rounded-lg border border-app-border bg-app-bg-alt px-3 py-2 text-sm text-app-text-primary placeholder-app-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary;
+  }
+
   .app-card {
     @apply rounded-2xl border border-app-border bg-app-bg-alt p-6 shadow-app;
   }
@@ -46,8 +50,16 @@
     @apply app-btn bg-brand-primary text-app-text-primary hover:bg-brand-tertiary focus:ring-brand-primary;
   }
 
+  .btn-primary {
+    @apply app-btn-primary;
+  }
+
   .app-btn-secondary {
     @apply app-btn border border-brand-secondary bg-[#38BDF81A] text-brand-secondary hover:bg-[#38BDF833] focus:ring-brand-secondary;
+  }
+
+  .btn-secondary {
+    @apply app-btn-secondary;
   }
 
   .app-btn-ghost {

@@ -60,10 +60,10 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
     };
 
     return (
-        <div className="bg-white rounded-2xl p-5 shadow space-y-3">
+        <div className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-3">
             <div className="flex items-center justify-between gap-2">
                 <h2 className="text-2xl font-bold">Panel reservas (vigilancia) 🛡️</h2>
-                <select className="border rounded px-2 py-1 text-sm" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                <select className="app-input" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
                     <option value="operativas">Operativas</option>
                     <option value="historico">Histórico corto</option>
                 </select>
@@ -75,8 +75,8 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                 return (
                     <div key={r.id} className="border rounded-xl p-3 space-y-2">
                         <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
-                        <p className="text-sm text-gray-500">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-                        <p className="text-sm text-gray-500">Residente ID: {r.residente_id}</p>
+                        <p className="text-sm text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                        <p className="text-sm text-app-text-secondary">Residente ID: {r.residente_id}</p>
 
                         {r.estado === 'aprobada' && (
                             <div className="flex flex-wrap gap-2 mt-2">
@@ -106,7 +106,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                     </div>
                 );
             })}
-            {reservas.length === 0 && <p className="text-sm text-gray-500">No hay reservas en operación.</p>}
+            {reservas.length === 0 && <p className="text-sm text-app-text-secondary">No hay reservas en operación.</p>}
         </div>
     );
 }

@@ -194,11 +194,11 @@ export default function MisPagos({ usuarioApp }) {
       </h2>
 
       {loading && (
-        <p className="text-gray-500">Cargando pagos...</p>
+        <p className="text-app-text-secondary">Cargando pagos...</p>
       )}
 
       {!loading && pagos.length === 0 && (
-        <div className="bg-white p-4 rounded-xl shadow text-center text-gray-500">
+        <div className="bg-app-bg-alt p-4 rounded-xl shadow text-center text-app-text-secondary">
           No tienes pagos registrados
         </div>
       )}
@@ -215,7 +215,7 @@ export default function MisPagos({ usuarioApp }) {
           return (
             <div
               key={p.id}
-              className="bg-white p-4 rounded-xl shadow flex justify-between items-center"
+              className="bg-app-bg-alt p-4 rounded-xl shadow flex justify-between items-center"
             >
 
               {/* INFO */}
@@ -224,7 +224,7 @@ export default function MisPagos({ usuarioApp }) {
                   {p.concepto}
                 </p>
 
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-app-text-secondary">
                   {formatFechaBogota(p.created_at)}
                 </p>
 
@@ -284,7 +284,7 @@ export default function MisPagos({ usuarioApp }) {
 
                 {/* 🔥 INFO MANUAL */}
                 {configPago?.tipo === 'manual' && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-app-text-secondary mt-2">
                     💡 Pago manual disponible
                   </p>
                 )}

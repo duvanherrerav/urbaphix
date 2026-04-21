@@ -121,19 +121,19 @@ export default function EstadoCuenta({ usuarioApp }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow">
+    <div className="bg-app-bg-alt p-6 rounded-xl shadow">
       <h2 className="text-xl font-bold mb-2">📄 Estado de cuenta consolidado</h2>
-      <p className="text-sm text-gray-500 mb-4">Genera reporte por rango de fechas y estado de pago (sin filtro por torre o apartamento).</p>
+      <p className="text-sm text-app-text-secondary mb-4">Genera reporte por rango de fechas y estado de pago (sin filtro por torre o apartamento).</p>
 
       <div className="grid md:grid-cols-4 gap-3 mb-4">
-        <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="border rounded-lg px-3 py-2">
+        <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="app-input">
           <option value="todos">Todos</option>
           <option value="pendiente">Pendiente</option>
           <option value="pagado">Pagado</option>
         </select>
 
-        <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="border rounded-lg px-3 py-2" />
-        <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="border rounded-lg px-3 py-2" />
+        <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="app-input" />
+        <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="app-input" />
 
         <button onClick={generarEstado} className="bg-blue-600 text-white rounded-lg px-4 py-2">
           {loading ? 'Generando...' : 'Generar reporte'}
@@ -144,29 +144,29 @@ export default function EstadoCuenta({ usuarioApp }) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-red-100 p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Pendiente</p>
+              <p className="text-sm text-app-text-secondary">Pendiente</p>
               <p className="text-xl font-bold text-red-600">${estado.totalPendiente.toLocaleString('es-CO')}</p>
             </div>
 
             <div className="bg-green-100 p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Pagado</p>
+              <p className="text-sm text-app-text-secondary">Pagado</p>
               <p className="text-xl font-bold text-green-600">${estado.totalPagado.toLocaleString('es-CO')}</p>
             </div>
           </div>
-          <div className="bg-slate-50 rounded-lg p-4">
+          <div className="bg-app-bg rounded-lg p-4">
             <h3 className="font-semibold mb-2">Tipo de pago</h3>
             <div className="grid md:grid-cols-3 gap-2 text-sm">
               {Object.entries(estado.porTipo).map(([tipo, info]) => (
-                <div key={tipo} className="border bg-white rounded px-3 py-2">
+                <div key={tipo} className="border bg-app-bg-alt rounded px-3 py-2">
                   <p className="font-medium">{tipo}</p>
                   <p>{info.cantidad} registros</p>
-                  <p className="text-slate-600">${info.total.toLocaleString('es-CO')}</p>
+                  <p className="text-app-text-secondary">${info.total.toLocaleString('es-CO')}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <button onClick={generarPDF} className="bg-gray-900 text-white px-4 py-2 rounded-lg">
+          <button onClick={generarPDF} className="bg-app-bg text-white px-4 py-2 rounded-lg">
             Descargar PDF 📄
           </button>
 
@@ -181,7 +181,7 @@ export default function EstadoCuenta({ usuarioApp }) {
                   </span>
                 </div>
               ))}
-              {estado.pagos.length === 0 && <p className="text-gray-500">Sin pagos para ese filtro.</p>}
+              {estado.pagos.length === 0 && <p className="text-app-text-secondary">Sin pagos para ese filtro.</p>}
             </div>
           </div>
         </div>
