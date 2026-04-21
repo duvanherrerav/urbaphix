@@ -15,6 +15,9 @@
   --color-error: #ef4444;
   --color-warning: #f59e0b;
   --color-info: #38bdf8;
+  --surface-1: #020617;
+  --surface-2: #0b1a2b;
+  --surface-3: #10253f;
 }
 
 @layer base {
@@ -40,6 +43,15 @@
 
   .app-card {
     @apply rounded-2xl border border-app-border bg-app-bg-alt p-6 shadow-app;
+  }
+
+  .app-surface-primary {
+    background: linear-gradient(180deg, rgba(11, 26, 43, 0.72) 0%, rgba(2, 6, 23, 0.92) 100%);
+    @apply border border-app-border rounded-2xl shadow-app;
+  }
+
+  .app-surface-muted {
+    @apply rounded-xl border border-app-border bg-app-bg p-4;
   }
 
   .app-btn {
@@ -95,10 +107,20 @@
   }
 
   .app-sidebar {
-    @apply border-r border-app-border bg-app-bg-alt text-app-text-primary;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.98) 0%, rgba(11, 26, 43, 0.9) 100%);
+    @apply border-r border-app-border text-app-text-primary;
   }
 
   .app-header {
-    @apply border-b border-app-border bg-app-bg-alt;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.8) 100%);
+    @apply border-b border-app-border backdrop-blur-sm;
+  }
+
+  .app-sidebar-item {
+    @apply w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-app-text-secondary transition-all duration-200 hover:bg-[#10253f] hover:text-app-text-primary;
+  }
+
+  .app-sidebar-item-active {
+    @apply bg-[#10253f] text-app-text-primary shadow-[inset_0_0_0_1px_rgba(59,130,246,0.28),0_6px_22px_rgba(2,6,23,0.45)];
   }
 }

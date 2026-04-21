@@ -126,7 +126,7 @@ export default function DashboardAdmin({ usuarioApp }) {
     <div className="space-y-6">
 
       {/* 🔥 HEADER PRO */}
-      <div className="bg-gradient-to-r from-gray-900 to-gray-700 text-white p-6 rounded-2xl shadow-lg">
+      <div className="app-surface-primary p-6 text-app-text-primary">
 
         <h2 className="text-2xl font-bold">
           👋 Hola {usuarioApp?.nombre || 'Admin'}
@@ -153,22 +153,22 @@ export default function DashboardAdmin({ usuarioApp }) {
       {/* 🔥 CARDS MEJORADAS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
-        <div className="bg-gradient-to-br from-amber-400 to-amber-500 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="app-surface-muted p-4">
           🟡 Pendientes
           <div className="text-2xl font-bold">{stats.pendientes}</div>
         </div>
 
-        <div className="bg-gradient-to-br from-sky-500 to-blue-600 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="app-surface-muted p-4">
           🔵 Ingresados
           <div className="text-2xl font-bold">{stats.ingresados}</div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-500 to-green-600 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="app-surface-muted p-4">
           🟢 Salidos
           <div className="text-2xl font-bold">{stats.salidos}</div>
         </div>
 
-        <div className="bg-gradient-to-br from-slate-800 to-gray-900 text-white p-4 rounded-2xl shadow hover:scale-105 transition">
+        <div className="app-surface-muted p-4">
           📦 Total
           <div className="text-2xl font-bold">{stats.total}</div>
         </div>
@@ -177,7 +177,7 @@ export default function DashboardAdmin({ usuarioApp }) {
 
       {/* 🔥 NUEVOS MINI DASHBOARDS (sin saturar) */}
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-app-bg-alt border border-app-border p-4 rounded-2xl shadow-sm">
+        <div className="app-surface-primary p-4">
           <h3 className="font-semibold text-app-text-primary mb-3">⚙️ Salud operativa</h3>
           <div className="space-y-3">
             <div>
@@ -201,24 +201,24 @@ export default function DashboardAdmin({ usuarioApp }) {
           </div>
         </div>
 
-        <div className="bg-app-bg-alt border border-app-border p-4 rounded-2xl shadow-sm">
+        <div className="app-surface-primary p-4">
           <h3 className="font-semibold text-app-text-primary mb-3">💼 Pulso financiero</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-emerald-50 p-3">
-              <p className="text-emerald-700 font-medium">Recaudado</p>
-              <p className="text-lg font-bold text-emerald-800">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p>
+            <div className="rounded-xl border border-app-border bg-app-bg p-3">
+              <p className="text-state-success font-medium">Recaudado</p>
+              <p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p>
             </div>
-            <div className="rounded-xl bg-amber-50 p-3">
-              <p className="text-amber-700 font-medium">Pendiente</p>
-              <p className="text-lg font-bold text-amber-800">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
+            <div className="rounded-xl border border-app-border bg-app-bg p-3">
+              <p className="text-state-warning font-medium">Pendiente</p>
+              <p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* 🔥 ALERTA CARTERA */}
-      <div className="bg-red-50 border border-red-200 p-4 rounded-2xl shadow">
-        <h3 className="font-semibold text-red-600 mb-2">
+      <div className="app-surface-primary p-4">
+        <h3 className="font-semibold text-state-error mb-2">
           🔥 Cartera en riesgo
         </h3>
 
@@ -228,12 +228,12 @@ export default function DashboardAdmin({ usuarioApp }) {
       {/* 🔥 GRÁFICAS PRINCIPALES */}
       <div className="grid md:grid-cols-2 gap-6">
 
-        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
+        <div className="app-surface-primary p-4">
           <h3 className="font-semibold mb-2">📊 Actividad</h3>
           <GraficaVisitas visitas={visitas} />
         </div>
 
-        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
+        <div className="app-surface-primary p-4">
           <h3 className="font-semibold mb-2">📦 Paquetes</h3>
           <PaquetesPorTorre usuarioApp={usuarioApp} />
         </div>
@@ -241,20 +241,20 @@ export default function DashboardAdmin({ usuarioApp }) {
 
 
         {/* 🔥 FINANCIERO */}
-        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
+        <div className="app-surface-primary p-4">
           <h3 className="font-semibold mb-2">💰 Flujo financiero</h3>
           <GraficaFinanciera pagos={pagos} />
         </div>
 
         {/* 🔥 CARTERA ANALÍTICA */}
-        <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
+        <div className="app-surface-primary p-4">
           <h3 className="font-semibold mb-2">📊 Análisis de cartera</h3>
           <GraficaCartera pagos={pagos} />
         </div>
       </div>
 
       {/* 🔥 LISTADO */}
-      <div className="bg-app-bg-alt p-4 rounded-2xl shadow">
+      <div className="app-surface-primary p-4">
 
         <h3 className="font-semibold mb-4">
           Últimas visitas

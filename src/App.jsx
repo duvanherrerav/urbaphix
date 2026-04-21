@@ -36,7 +36,7 @@ function App() {
   const [modulo, setModulo] = useState('');
   const menuRef = useRef(null);
 
-  const menuBtn = "w-full app-btn app-btn-ghost justify-start";
+  const menuBtnClass = (target) => `app-sidebar-item ${moduloActual === target ? 'app-sidebar-item-active' : ''}`;
   const ROLES_VALIDOS = ['admin', 'vigilancia', 'residente'];
 
   // 🔔 permisos
@@ -217,7 +217,7 @@ function App() {
       {/* 🔥 SIDEBAR */}
       <div className="app-sidebar w-72 p-4">
 
-        <div className="mb-6 rounded-xl border border-app-border bg-app-bg p-4">
+        <div className="mb-6 app-surface-primary p-4">
           <img src={imagotipo} alt="Imagotipo Urbaphix" className="h-8 w-auto" />
           <p className="mt-2 text-xs text-app-text-secondary">
             Plataforma SaaS para propiedad horizontal
@@ -229,19 +229,19 @@ function App() {
           {/* ADMIN */}
           {usuarioApp?.rol_id === 'admin' && (
             <>
-              <button onClick={() => setModulo('dashboard')} className={menuBtn}>
+              <button onClick={() => setModulo('dashboard')} className={menuBtnClass('dashboard')}>
                 📊 Dashboard
               </button>
 
-              <button onClick={() => setModulo('pagos')} className={menuBtn}>
+              <button onClick={() => setModulo('pagos')} className={menuBtnClass('pagos')}>
                 💰 Pagos
               </button>
 
-              <button onClick={() => setModulo('incidentes')} className={menuBtn}>
+              <button onClick={() => setModulo('incidentes')} className={menuBtnClass('incidentes')}>
                 🚨 Incidentes
               </button>
 
-              <button onClick={() => setModulo('reservas')} className={menuBtn}>
+              <button onClick={() => setModulo('reservas')} className={menuBtnClass('reservas')}>
                 🏟️ Reservas
               </button>
             </>
@@ -250,19 +250,19 @@ function App() {
           {/* VIGILANCIA */}
           {usuarioApp?.rol_id === 'vigilancia' && (
             <>
-              <button onClick={() => setModulo('visitas')} className={menuBtn}>
+              <button onClick={() => setModulo('visitas')} className={menuBtnClass('visitas')}>
                 🚗 Control visitas
               </button>
 
-              <button onClick={() => setModulo('paquetes')} className={menuBtn}>
+              <button onClick={() => setModulo('paquetes')} className={menuBtnClass('paquetes')}>
                 📦 Paquetería
               </button>
 
-              <button onClick={() => setModulo('incidentes')} className={menuBtn}>
+              <button onClick={() => setModulo('incidentes')} className={menuBtnClass('incidentes')}>
                 🚨 Reportar incidente
               </button>
 
-              <button onClick={() => setModulo('reservas')} className={menuBtn}>
+              <button onClick={() => setModulo('reservas')} className={menuBtnClass('reservas')}>
                 🏟️ Reservas
               </button>
             </>
@@ -271,19 +271,19 @@ function App() {
           {/* RESIDENTE */}
           {usuarioApp?.rol_id === 'residente' && (
             <>
-              <button onClick={() => setModulo('visitas')} className={menuBtn}>
+              <button onClick={() => setModulo('visitas')} className={menuBtnClass('visitas')}>
                 ➕ Solicitar visita
               </button>
 
-              <button onClick={() => setModulo('paquetes')} className={menuBtn}>
+              <button onClick={() => setModulo('paquetes')} className={menuBtnClass('paquetes')}>
                 📦 Mis paquetes
               </button>
 
-              <button onClick={() => setModulo('pagos')} className={menuBtn}>
+              <button onClick={() => setModulo('pagos')} className={menuBtnClass('pagos')}>
                 💰 Mis pagos
               </button>
 
-              <button onClick={() => setModulo('reservas')} className={menuBtn}>
+              <button onClick={() => setModulo('reservas')} className={menuBtnClass('reservas')}>
                 🏟️ Reservas
               </button>
             </>
@@ -297,7 +297,7 @@ function App() {
       <div className="flex-1">
 
         {/* HEADER */}
-        <div className="app-header px-6 py-4 flex justify-between items-center relative z-50">
+        <div className="app-header px-7 py-4 flex justify-between items-center relative z-50">
 
           <h2 className="font-semibold text-lg capitalize text-app-text-primary">
             {moduloActual}

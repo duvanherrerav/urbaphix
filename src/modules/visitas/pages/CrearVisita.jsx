@@ -313,7 +313,7 @@ export default function CrearVisita({ usuarioApp }) {
   const quickFrecuentes = useMemo(() => visitantesSugeridos.slice(0, 5), [visitantesSugeridos]);
 
   return (
-    <div className="bg-app-bg-alt rounded-2xl shadow p-5 space-y-4 max-w-2xl">
+    <div className="app-surface-primary p-6 space-y-5 max-w-2xl">
       <div>
         <h2 className="text-2xl font-bold">Solicitar visita 🚶‍♂️</h2>
         <p className="text-sm text-app-text-secondary">Registra tu visita y comparte el QR para ingreso en portería.</p>
@@ -383,7 +383,7 @@ export default function CrearVisita({ usuarioApp }) {
               <button
                 key={`quick-${item.id}`}
                 type="button"
-                className="text-xs px-3 py-1 rounded-full border bg-app-bg-alt hover:bg-app-bg"
+                className="text-xs px-3 py-1 rounded-full border border-app-border bg-app-bg-alt hover:bg-[#10253f]"
                 onClick={() => reutilizarVisita(item)}
               >
                 {item.nombre_visitante} · {item.documento}
@@ -426,26 +426,26 @@ export default function CrearVisita({ usuarioApp }) {
       <button
         onClick={crearVisita}
         disabled={loading}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg w-full"
+        className="btn-primary w-full"
       >
         {loading ? 'Creando...' : 'Crear visita y generar QR'}
       </button>
 
       {qrPayload && (
-        <div ref={qrWrapRef} className="border rounded-xl p-4 bg-app-bg space-y-3">
+        <div ref={qrWrapRef} className="app-surface-muted p-4 space-y-3">
           <h3 className="font-semibold">QR validable en portería 🔐</h3>
           <p className="text-xs text-app-text-secondary">Portería puede validar este QR escaneando o pegando el código manual.</p>
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <QRCodeCanvas value={qrPayload} size={180} />
             <div className="space-y-2">
-              <button className="w-full bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm" onClick={compartirCodigoQR}>Compartir código QR</button>
-              <button className="w-full bg-brand-primary text-app-text-primary rounded-lg px-3 py-2 text-sm" onClick={compartirImagenQR}>Compartir QR</button>
+              <button className="w-full app-btn-secondary" onClick={compartirCodigoQR}>Compartir código QR</button>
+              <button className="w-full btn-primary" onClick={compartirImagenQR}>Compartir QR</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="border rounded-xl p-4 space-y-3 bg-app-bg/60">
+      <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Visitantes frecuentes</h3>
           <span className="text-xs text-app-text-secondary">{historialFiltrado.length} registros</span>
@@ -467,7 +467,7 @@ export default function CrearVisita({ usuarioApp }) {
         />
         <div className="space-y-2 max-h-72 overflow-auto">
           {historialPaginado.map((item) => (
-            <div key={item.id} className="border rounded-xl p-3 text-sm bg-app-bg-alt shadow-sm">
+            <div key={item.id} className="app-surface-primary p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${normalizarEstado(item.estado) === 'salido'

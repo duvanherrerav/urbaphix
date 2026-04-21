@@ -304,14 +304,14 @@ export default function ReservarZona({ usuarioApp }) {
     const bloqueoPreview = franjaSeleccionada?.estado === 'bloqueada';
 
     return (
-        <div className="space-y-4">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 text-white shadow">
+        <div className="space-y-5">
+            <div className="app-surface-primary p-5 text-app-text-primary">
                 <h1 className="text-2xl font-bold">Mis reservas</h1>
-                <p className="text-sm text-blue-100">Gestiona tus solicitudes de zonas comunes de forma simple y clara.</p>
+                <p className="text-sm text-app-text-secondary">Gestiona tus solicitudes de zonas comunes de forma simple y clara.</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className="bg-app-bg-alt/20 px-2 py-1 rounded-full">Activas: {reservasActivas.length}</span>
-                    <span className="bg-app-bg-alt/20 px-2 py-1 rounded-full">Historial: {reservasHistorial.length}</span>
-                    <span className="bg-app-bg-alt/20 px-2 py-1 rounded-full">Recursos: {recursos.length}</span>
+                    <span className="app-badge-info">Activas: {reservasActivas.length}</span>
+                    <span className="app-badge-info">Historial: {reservasHistorial.length}</span>
+                    <span className="app-badge-info">Recursos: {recursos.length}</span>
                 </div>
             </div>
 
@@ -340,7 +340,7 @@ export default function ReservarZona({ usuarioApp }) {
                 minFecha={getTodayBogotaDate()}
             />
 
-            <section className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-3 border border-app-border">
+            <section className="app-surface-primary p-5 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                     <h3 className="text-lg font-semibold">Mis reservas activas ({reservasActivas.length})</h3>
                     {loadingReservas && <p className="text-xs text-app-text-secondary">Actualizando...</p>}
@@ -373,7 +373,7 @@ export default function ReservarZona({ usuarioApp }) {
                 </div>
             </section>
 
-            <section className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-3 border border-app-border">
+            <section className="app-surface-primary p-5 space-y-3">
                 <h3 className="text-lg font-semibold">Historial reciente</h3>
 
                 {reservasHistorial.length === 0 && (

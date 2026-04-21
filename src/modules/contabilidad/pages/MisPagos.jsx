@@ -187,7 +187,7 @@ export default function MisPagos({ usuarioApp }) {
   };
 
   return (
-    <div>
+    <div className="space-y-4">
 
       <h2 className="text-xl font-bold mb-4">
         Mis pagos 💰
@@ -198,7 +198,7 @@ export default function MisPagos({ usuarioApp }) {
       )}
 
       {!loading && pagos.length === 0 && (
-        <div className="bg-app-bg-alt p-4 rounded-xl shadow text-center text-app-text-secondary">
+        <div className="app-surface-primary p-4 text-center text-app-text-secondary">
           No tienes pagos registrados
         </div>
       )}
@@ -209,13 +209,13 @@ export default function MisPagos({ usuarioApp }) {
 
           const estadoColor =
             p.estado === 'pendiente'
-              ? 'text-yellow-600 bg-yellow-100'
-              : 'text-green-600 bg-green-100';
+              ? 'app-badge-warning'
+              : 'app-badge-success';
 
           return (
             <div
               key={p.id}
-              className="bg-app-bg-alt p-4 rounded-xl shadow flex justify-between items-center"
+              className="app-surface-primary p-4 flex justify-between items-center"
             >
 
               {/* INFO */}
@@ -248,7 +248,7 @@ export default function MisPagos({ usuarioApp }) {
                   ${p.valor?.toLocaleString()}
                 </p>
 
-                <span className={`text-xs px-2 py-1 rounded-full ${estadoColor}`}>
+                <span className={`text-xs px-2 py-1 rounded-full border ${estadoColor}`}>
                   {p.estado}
                 </span>
 
@@ -256,7 +256,7 @@ export default function MisPagos({ usuarioApp }) {
                 {p.estado === 'pendiente' && (
                   <button
                     onClick={pagar}
-                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg"
+                    className="mt-2 btn-primary text-xs px-3 py-1"
                   >
                     Pagar
                   </button>
@@ -274,7 +274,7 @@ export default function MisPagos({ usuarioApp }) {
 
                     <button
                       onClick={() => subirComprobante(p.id)}
-                      className="mt-1 bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-lg"
+                      className="mt-1 app-btn-secondary text-xs px-3 py-1"
                     >
                       Subir comprobante
                     </button>
