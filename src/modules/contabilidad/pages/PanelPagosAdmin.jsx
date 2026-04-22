@@ -13,6 +13,7 @@ const formatFechaBogota = (value) => {
 export default function PanelPagosAdmin({ usuarioApp }) {
 
     const [pagos, setPagos] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [filtroTorre, setFiltroTorre] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
     const [busquedaApto, setBusquedaApto] = useState('');

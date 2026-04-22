@@ -52,30 +52,49 @@ export default function DashboardAdmin({ usuarioApp }) {
 
   // 🔥 VISITAS
   async function obtenerVisitas() {
+    try {
+      const hoy = new Date();
+      const hace7dias = new Date();
 
-    const hoy = new Date();
-    const hace7dias = new Date();
+      hace7dias.setDate(hoy.getDate() - 7);
 
-    hace7dias.setDate(hoy.getDate() - 7);
+      const fechaInicio = hace7dias.toISOString().split('T')[0];
 
-    const fechaInicio = hace7dias.toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('visitas')
+        .select('*')
+        .eq('conjunto_id', usuarioApp.conjunto_id)
+        .gte('fecha_visita', fechaInicio);
 
-    const { data, error } = await supabase
-      .from('visitas')
-      .select('*')
-      .eq('conjunto_id', usuarioApp.conjunto_id)
-      .gte('fecha_visita', fechaInicio);
+      if (error) {
+        setVisitas([]);
+        setStats({
+          total: 0,
+          ingresados: 0,
+          pendientes: 0,
+          salidos: 0
+        });
+        return;
+      }
 
-    if (error) return;
+      const visitasData = data || [];
+      setVisitas(visitasData);
 
-    setVisitas(data || []);
-
-    setStats({
-      total: data.length,
-      ingresados: data.filter(v => v.estado === 'ingresado').length,
-      pendientes: data.filter(v => v.estado === 'pendiente').length,
-      salidos: data.filter(v => v.estado === 'salido').length
-    });
+      setStats({
+        total: visitasData.length,
+        ingresados: visitasData.filter(v => v.estado === 'ingresado').length,
+        pendientes: visitasData.filter(v => v.estado === 'pendiente').length,
+        salidos: visitasData.filter(v => v.estado === 'salido').length
+      });
+    } catch {
+      setVisitas([]);
+      setStats({
+        total: 0,
+        ingresados: 0,
+        pendientes: 0,
+        salidos: 0
+      });
+    }
   }
 
   // 🔥 PAGOS

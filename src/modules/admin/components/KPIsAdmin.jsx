@@ -30,7 +30,7 @@ export default function KPIsAdmin({ usuarioApp, setKpis }) {
 
       ]);
 
-      const visitas = visitasRes.data || [];
+      const visitas = visitasRes.error ? [] : (visitasRes.data || []);
       const paquetes = paquetesRes.data || [];
       const apartamentos = apartamentosRes.data || [];
 
