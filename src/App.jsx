@@ -163,6 +163,9 @@ function App() {
   };
 
   const moduloActual = modulo || moduloPorRol[usuarioApp?.rol_id] || '';
+  const seleccionarModulo = (siguienteModulo) => {
+    setModulo(siguienteModulo);
+  };
   const rolNoAutorizado = Boolean(usuarioApp) && !ROLES_VALIDOS.includes(usuarioApp?.rol_id);
 
   useEffect(() => {
@@ -229,19 +232,19 @@ function App() {
           {/* ADMIN */}
           {usuarioApp?.rol_id === 'admin' && (
             <>
-              <button onClick={() => setModulo('dashboard')} className={menuBtnClass('dashboard')}>
+              <button type="button" onClick={() => seleccionarModulo('dashboard')} className={menuBtnClass('dashboard')}>
                 📊 Dashboard
               </button>
 
-              <button onClick={() => setModulo('pagos')} className={menuBtnClass('pagos')}>
+              <button type="button" onClick={() => seleccionarModulo('pagos')} className={menuBtnClass('pagos')}>
                 💰 Pagos
               </button>
 
-              <button onClick={() => setModulo('incidentes')} className={menuBtnClass('incidentes')}>
+              <button type="button" onClick={() => seleccionarModulo('incidentes')} className={menuBtnClass('incidentes')}>
                 🚨 Incidentes
               </button>
 
-              <button onClick={() => setModulo('reservas')} className={menuBtnClass('reservas')}>
+              <button type="button" onClick={() => seleccionarModulo('reservas')} className={menuBtnClass('reservas')}>
                 🏟️ Reservas
               </button>
             </>
@@ -250,19 +253,19 @@ function App() {
           {/* VIGILANCIA */}
           {usuarioApp?.rol_id === 'vigilancia' && (
             <>
-              <button onClick={() => setModulo('visitas')} className={menuBtnClass('visitas')}>
+              <button type="button" onClick={() => seleccionarModulo('visitas')} className={menuBtnClass('visitas')}>
                 🚗 Control visitas
               </button>
 
-              <button onClick={() => setModulo('paquetes')} className={menuBtnClass('paquetes')}>
+              <button type="button" onClick={() => seleccionarModulo('paquetes')} className={menuBtnClass('paquetes')}>
                 📦 Paquetería
               </button>
 
-              <button onClick={() => setModulo('incidentes')} className={menuBtnClass('incidentes')}>
+              <button type="button" onClick={() => seleccionarModulo('incidentes')} className={menuBtnClass('incidentes')}>
                 🚨 Reportar incidente
               </button>
 
-              <button onClick={() => setModulo('reservas')} className={menuBtnClass('reservas')}>
+              <button type="button" onClick={() => seleccionarModulo('reservas')} className={menuBtnClass('reservas')}>
                 🏟️ Reservas
               </button>
             </>
@@ -271,19 +274,19 @@ function App() {
           {/* RESIDENTE */}
           {usuarioApp?.rol_id === 'residente' && (
             <>
-              <button onClick={() => setModulo('visitas')} className={menuBtnClass('visitas')}>
+              <button type="button" onClick={() => seleccionarModulo('visitas')} className={menuBtnClass('visitas')}>
                 ➕ Solicitar visita
               </button>
 
-              <button onClick={() => setModulo('paquetes')} className={menuBtnClass('paquetes')}>
+              <button type="button" onClick={() => seleccionarModulo('paquetes')} className={menuBtnClass('paquetes')}>
                 📦 Mis paquetes
               </button>
 
-              <button onClick={() => setModulo('pagos')} className={menuBtnClass('pagos')}>
+              <button type="button" onClick={() => seleccionarModulo('pagos')} className={menuBtnClass('pagos')}>
                 💰 Mis pagos
               </button>
 
-              <button onClick={() => setModulo('reservas')} className={menuBtnClass('reservas')}>
+              <button type="button" onClick={() => seleccionarModulo('reservas')} className={menuBtnClass('reservas')}>
                 🏟️ Reservas
               </button>
             </>
