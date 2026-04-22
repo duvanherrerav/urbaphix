@@ -16,8 +16,8 @@ const estadoFranjaUI = {
     },
     pasada: {
         label: 'Pasada',
-        chip: 'bg-slate-100 text-slate-600 border-slate-200',
-        boton: 'border-slate-200 text-slate-400 cursor-not-allowed'
+        chip: 'bg-app-bg text-app-text-secondary border-app-border',
+        boton: 'border-app-border text-app-text-secondary cursor-not-allowed'
     },
     invalida_buffer: {
         label: 'Buffer',
@@ -52,28 +52,28 @@ export default function ReservaCreateCard({
     const noDisponibles = franjasDisponibles.filter((f) => !f.seleccionable);
 
     return (
-        <section className="bg-white rounded-2xl p-5 shadow space-y-3 border border-slate-100">
+        <section className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-3 border border-app-border">
             <div>
                 <h2 className="text-2xl font-bold">Crear reserva</h2>
-                <p className="text-sm text-slate-500">Selecciona recurso, fecha y franja horaria para enviar tu solicitud.</p>
+                <p className="text-sm text-app-text-secondary">Selecciona recurso, fecha y franja horaria para enviar tu solicitud.</p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-3">
-                <select className="border rounded-lg px-3 py-2" value={form.recurso_id} onChange={(e) => onChange('recurso_id', e.target.value)}>
+                <select className="app-input" value={form.recurso_id} onChange={(e) => onChange('recurso_id', e.target.value)}>
                     <option value="">Selecciona recurso</option>
                     {recursos.map((r) => (
                         <option key={r.id} value={r.id}>{r.nombre} · {r.tipo}</option>
                     ))}
                 </select>
 
-                <select className="border rounded-lg px-3 py-2" value={form.tipo_reserva} onChange={(e) => onChange('tipo_reserva', e.target.value)}>
+                <select className="app-input" value={form.tipo_reserva} onChange={(e) => onChange('tipo_reserva', e.target.value)}>
                     <option value="recreativa">Recreativa</option>
                     <option value="logistica">Logística</option>
                     <option value="prestamo">Préstamo</option>
                 </select>
 
-                <input type="date" min={minFecha} className="border rounded-lg px-3 py-2" value={form.fecha} onChange={(e) => onChange('fecha', e.target.value)} />
-                <div className="border rounded-lg px-3 py-2 text-xs text-slate-600 bg-slate-50">
+                <input type="date" min={minFecha} className="app-input" value={form.fecha} onChange={(e) => onChange('fecha', e.target.value)} />
+                <div className="app-input text-xs text-app-text-secondary bg-app-bg">
                     {!disponibilidadConfig && 'Selecciona recurso y fecha para ver la disponibilidad.'}
                     {disponibilidadConfig && (
                         <div className="space-y-1">
@@ -91,9 +91,9 @@ export default function ReservaCreateCard({
                         </div>
                     )}
                 </div>
-                <input className="border rounded-lg px-3 py-2" placeholder="Subtipo (opcional)" value={form.subtipo} onChange={(e) => onChange('subtipo', e.target.value)} />
-                <input className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Motivo (opcional)" value={form.motivo} onChange={(e) => onChange('motivo', e.target.value)} />
-                <textarea className="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Observaciones (opcional)" value={form.observaciones} onChange={(e) => onChange('observaciones', e.target.value)} />
+                <input className="app-input" placeholder="Subtipo (opcional)" value={form.subtipo} onChange={(e) => onChange('subtipo', e.target.value)} />
+                <input className="app-input md:col-span-2" placeholder="Motivo (opcional)" value={form.motivo} onChange={(e) => onChange('motivo', e.target.value)} />
+                <textarea className="app-input md:col-span-2" placeholder="Observaciones (opcional)" value={form.observaciones} onChange={(e) => onChange('observaciones', e.target.value)} />
             </div>
 
             {perfilMissing && (
@@ -124,15 +124,15 @@ export default function ReservaCreateCard({
             )}
 
             <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-600">Franjas disponibles</p>
-                {disponibilidadLoading && <p className="text-xs text-slate-500">Calculando disponibilidad...</p>}
+                <p className="text-xs font-semibold text-app-text-secondary">Franjas disponibles</p>
+                {disponibilidadLoading && <p className="text-xs text-app-text-secondary">Calculando disponibilidad...</p>}
                 {!disponibilidadLoading && mensajeDisponibilidad && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
                         {mensajeDisponibilidad}
                     </p>
                 )}
                 {!disponibilidadLoading && disponibles.length === 0 && (
-                    <p className="text-xs text-slate-500">No hay franjas disponibles para esta fecha.</p>
+                    <p className="text-xs text-app-text-secondary">No hay franjas disponibles para esta fecha.</p>
                 )}
                 <div className="flex flex-wrap gap-2">
                     {disponibles.map((franja) => {
@@ -153,7 +153,7 @@ export default function ReservaCreateCard({
 
             {!disponibilidadLoading && noDisponibles.length > 0 && (
                 <div className="space-y-2">
-                    <p className="text-xs font-semibold text-slate-600">No disponibles</p>
+                    <p className="text-xs font-semibold text-app-text-secondary">No disponibles</p>
                     <div className="flex flex-wrap gap-2">
                         {noDisponibles.slice(0, 24).map((franja) => {
                             const ui = estadoFranjaUI[franja.estado] || estadoFranjaUI.pasada;
@@ -173,7 +173,7 @@ export default function ReservaCreateCard({
                 </p>
             )}
 
-            <div className="text-[11px] text-slate-500">
+            <div className="text-[11px] text-app-text-secondary">
                 Total franjas libres: {slotsDisponibles.length}
             </div>
 

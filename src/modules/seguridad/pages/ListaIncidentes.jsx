@@ -130,12 +130,12 @@ export default function ListaIncidentes({ usuarioApp }) {
   };
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow space-y-4">
+    <div className="app-surface-primary p-5 space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-2">
         <h2 className="text-xl font-bold">Incidentes</h2>
         <div className="flex gap-2">
           <input
-            className="border rounded-lg px-3 py-2 text-sm"
+            className="app-input text-sm"
             placeholder="Buscar incidente..."
             value={busqueda}
             onChange={(e) => {
@@ -144,7 +144,7 @@ export default function ListaIncidentes({ usuarioApp }) {
             }}
           />
           <select
-            className="border rounded-lg px-3 py-2 text-sm"
+            className="app-input text-sm"
             value={filtroEstado}
             onChange={(e) => {
               setFiltroEstado(e.target.value);
@@ -160,28 +160,28 @@ export default function ListaIncidentes({ usuarioApp }) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-        <div className="bg-gray-100 rounded-lg px-3 py-2"><b>Total:</b> {resumen.total}</div>
-        <div className="bg-amber-50 rounded-lg px-3 py-2"><b>Nuevos:</b> {resumen.nuevos}</div>
-        <div className="bg-blue-50 rounded-lg px-3 py-2"><b>En gestión:</b> {resumen.enGestion}</div>
-        <div className="bg-green-50 rounded-lg px-3 py-2"><b>Resueltos:</b> {resumen.resueltos}</div>
-        <div className="bg-slate-100 rounded-lg px-3 py-2"><b>Cerrados:</b> {resumen.cerrados}</div>
+        <div className="app-surface-muted px-3 py-2"><b>Total:</b> {resumen.total}</div>
+        <div className="app-surface-muted px-3 py-2 text-state-warning"><b>Nuevos:</b> {resumen.nuevos}</div>
+        <div className="app-surface-muted px-3 py-2 text-state-info"><b>En gestión:</b> {resumen.enGestion}</div>
+        <div className="app-surface-muted px-3 py-2 text-state-success"><b>Resueltos:</b> {resumen.resueltos}</div>
+        <div className="app-surface-muted px-3 py-2"><b>Cerrados:</b> {resumen.cerrados}</div>
       </div>
 
       {listaPaginada.map((i) => (
-        <div key={i.id} className="border rounded-lg p-3 space-y-2">
+        <div key={i.id} className="app-surface-muted p-3 space-y-2">
           <p><b>Descripción:</b> {i.descripcion}</p>
           <p><b>Nivel:</b> {i.nivel}</p>
           <p><b>Estado:</b> <span className="capitalize">{estadosLocal[i.id]?.estado || 'Nuevo'}</span></p>
-          <p className="text-xs text-gray-500"><b>Fecha incidente:</b> {formatBogota(i.created_at, fechasLocal[i.id])}</p>
+          <p className="text-xs text-app-text-secondary"><b>Fecha incidente:</b> {formatBogota(i.created_at, fechasLocal[i.id])}</p>
 
           {usuarioApp?.rol_id === 'admin' && (
             <div className="space-y-2">
-              <p className="text-xs text-gray-500">Gestión administrativa</p>
+              <p className="text-xs text-app-text-secondary">Gestión administrativa</p>
               <div className="flex flex-wrap gap-2">
                 {ESTADOS_GESTION.map((estado) => (
                   <button
                     key={estado}
-                    className={`px-2 py-1 border rounded text-xs hover:bg-gray-50 ${estadosLocal[i.id]?.estado === estado ? 'bg-gray-900 text-white' : ''}`}
+                    className={`px-2 py-1 border rounded text-xs hover:bg-app-bg ${estadosLocal[i.id]?.estado === estado ? 'bg-app-bg text-white' : ''}`}
                     onClick={() => cambiarEstado(i, estado)}
                   >
                     {estado}
@@ -193,11 +193,11 @@ export default function ListaIncidentes({ usuarioApp }) {
         </div>
       ))}
 
-      {lista.length === 0 && <p className="text-sm text-gray-500">Sin incidentes para el filtro seleccionado.</p>}
+      {lista.length === 0 && <p className="text-sm text-app-text-secondary">Sin incidentes para el filtro seleccionado.</p>}
 
       {lista.length > 0 && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-gray-500">Página {paginaActual} de {totalPaginas}</p>
+          <p className="text-xs text-app-text-secondary">Página {paginaActual} de {totalPaginas}</p>
           <div className="flex gap-2">
             <button
               className="px-3 py-1 border rounded text-sm disabled:opacity-40"

@@ -38,13 +38,13 @@ export default function Login() {
     <div>
 
       {/* TOGGLE */}
-      <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+      <div className="mb-6 flex rounded-lg border border-app-border bg-app-bg p-1">
         <button
           onClick={() => setModo('login')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium ${
+          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
             modo === 'login'
-              ? 'bg-white shadow'
-              : 'text-gray-500'
+              ? 'bg-brand-primary text-app-text-primary'
+              : 'text-app-text-secondary hover:bg-app-bg-alt'
           }`}
         >
           Iniciar sesión
@@ -52,10 +52,10 @@ export default function Login() {
 
         <button
           onClick={() => setModo('register')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium ${
+          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
             modo === 'register'
-              ? 'bg-white shadow'
-              : 'text-gray-500'
+              ? 'bg-brand-primary text-app-text-primary'
+              : 'text-app-text-secondary hover:bg-app-bg-alt'
           }`}
         >
           Crear cuenta
@@ -66,7 +66,7 @@ export default function Login() {
       <input
         type="email"
         placeholder="Correo electrónico"
-        className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="mb-3"
         value={email}
         onChange={e => setEmail(e.target.value)}
       />
@@ -75,7 +75,7 @@ export default function Login() {
       <input
         type="password"
         placeholder="Contraseña"
-        className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="mb-4"
         value={password}
         onChange={e => setPassword(e.target.value)}
       />
@@ -83,7 +83,7 @@ export default function Login() {
       {/* BOTÓN PRINCIPAL */}
       <button
         onClick={handleSubmit}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold"
+        className="app-btn-primary w-full"
       >
         {modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
       </button>

@@ -216,20 +216,20 @@ export default function CrearCobro({ usuarioApp }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow max-w-2xl">
+    <div className="bg-app-bg-alt p-6 rounded-xl shadow max-w-2xl">
       <h2 className="text-xl font-bold mb-1">Crear cobro 💰</h2>
-      <p className="text-sm text-gray-500 mb-4">Cobro individual por apartamento escrito o masivo por tipo de apartamento.</p>
+      <p className="text-sm text-app-text-secondary mb-4">Cobro individual por apartamento escrito o masivo por tipo de apartamento.</p>
 
-      <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+      <div className="flex mb-6 bg-app-bg rounded-lg p-1">
         <button
           onClick={() => setModo('individual')}
-          className={`flex-1 py-2 rounded-lg ${modo === 'individual' ? 'bg-white shadow' : 'text-gray-500'}`}
+          className={`flex-1 py-2 rounded-lg ${modo === 'individual' ? 'bg-app-bg-alt shadow' : 'text-app-text-secondary'}`}
         >
           Individual
         </button>
         <button
           onClick={() => setModo('masivo')}
-          className={`flex-1 py-2 rounded-lg ${modo === 'masivo' ? 'bg-white shadow' : 'text-gray-500'}`}
+          className={`flex-1 py-2 rounded-lg ${modo === 'masivo' ? 'bg-app-bg-alt shadow' : 'text-app-text-secondary'}`}
         >
           Masivo
         </button>
@@ -240,7 +240,7 @@ export default function CrearCobro({ usuarioApp }) {
           <select
             value={torreSeleccionada}
             onChange={(e) => setTorreSeleccionada(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2"
+            className="app-input"
           >
             <option value="">Torre</option>
             {torres.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
@@ -250,13 +250,13 @@ export default function CrearCobro({ usuarioApp }) {
             value={apartamentoInput}
             placeholder="Escribe apartamento (ej: 301)"
             onChange={(e) => setApartamentoInput(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2"
+            className="app-input"
           />
 
           <select
             value={form.concepto}
             onChange={(e) => setForm({ ...form, concepto: e.target.value, subcategoriaMulta: '' })}
-            className="w-full border rounded-lg px-3 py-2"
+            className="app-input"
           >
             {CATEGORIAS_PH.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
@@ -265,7 +265,7 @@ export default function CrearCobro({ usuarioApp }) {
             <select
               value={form.subcategoriaMulta}
               onChange={(e) => setForm({ ...form, subcategoriaMulta: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2"
+              className="app-input"
             >
               <option value="">Subcategoría de multa</option>
               <option value="leve">Leve</option>
@@ -279,40 +279,40 @@ export default function CrearCobro({ usuarioApp }) {
             type="number"
             placeholder="Valor"
             onChange={(e) => setForm({ ...form, valor: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2"
+            className="app-input"
           />
         </div>
       )}
 
       {modo === 'masivo' && (
         <div className="space-y-3">
-          <p className="text-sm text-gray-600">Se aplicará administración masiva a todos los apartamentos según <b>tipo apartamento</b>.</p>
+          <p className="text-sm text-app-text-secondary">Se aplicará administración masiva a todos los apartamentos según <b>tipo apartamento</b>.</p>
           <div className="grid md:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-gray-500">Pequeño</label>
+              <label className="text-xs text-app-text-secondary">Pequeño</label>
               <input
                 type="number"
                 value={tarifasTipo.pequeno}
                 onChange={(e) => setTarifasTipo({ ...tarifasTipo, pequeno: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
+                className="app-input"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">Mediano</label>
+              <label className="text-xs text-app-text-secondary">Mediano</label>
               <input
                 type="number"
                 value={tarifasTipo.mediano}
                 onChange={(e) => setTarifasTipo({ ...tarifasTipo, mediano: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
+                className="app-input"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">Grande</label>
+              <label className="text-xs text-app-text-secondary">Grande</label>
               <input
                 type="number"
                 value={tarifasTipo.grande}
                 onChange={(e) => setTarifasTipo({ ...tarifasTipo, grande: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
+                className="app-input"
               />
             </div>
           </div>

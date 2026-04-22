@@ -72,11 +72,12 @@ export default function MisPagos({ usuarioApp }) {
       }
 
       // 🔥 OBTENER RESIDENTE
-      const { data: residente } = await supabase
+      const { data: residentesRows } = await supabase
         .from('residentes')
         .select('id')
         .eq('usuario_id', usuarioApp.id)
-        .maybeSingle();
+        .limit(1);
+      const residente = residentesRows?.[0] || null;
 
       if (!residente) {
         setPagos([]);
@@ -187,18 +188,18 @@ export default function MisPagos({ usuarioApp }) {
   };
 
   return (
-    <div>
+    <div className="space-y-4">
 
       <h2 className="text-xl font-bold mb-4">
         Mis pagos 💰
       </h2>
 
       {loading && (
-        <p className="text-gray-500">Cargando pagos...</p>
+        <p className="text-app-text-secondary">Cargando pagos...</p>
       )}
 
       {!loading && pagos.length === 0 && (
-        <div className="bg-white p-4 rounded-xl shadow text-center text-gray-500">
+        <div className="app-surface-primary p-4 text-center text-app-text-secondary">
           No tienes pagos registrados
         </div>
       )}
@@ -209,13 +210,13 @@ export default function MisPagos({ usuarioApp }) {
 
           const estadoColor =
             p.estado === 'pendiente'
-              ? 'text-yellow-600 bg-yellow-100'
-              : 'text-green-600 bg-green-100';
+              ? 'app-badge-warning'
+              : 'app-badge-success';
 
           return (
             <div
               key={p.id}
-              className="bg-white p-4 rounded-xl shadow flex justify-between items-center"
+              className="app-surface-primary p-4 flex justify-between items-center"
             >
 
               {/* INFO */}
@@ -224,7 +225,7 @@ export default function MisPagos({ usuarioApp }) {
                   {p.concepto}
                 </p>
 
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-app-text-secondary">
                   {formatFechaBogota(p.created_at)}
                 </p>
 
@@ -248,7 +249,7 @@ export default function MisPagos({ usuarioApp }) {
                   ${p.valor?.toLocaleString()}
                 </p>
 
-                <span className={`text-xs px-2 py-1 rounded-full ${estadoColor}`}>
+                <span className={`text-xs px-2 py-1 rounded-full border ${estadoColor}`}>
                   {p.estado}
                 </span>
 
@@ -256,7 +257,7 @@ export default function MisPagos({ usuarioApp }) {
                 {p.estado === 'pendiente' && (
                   <button
                     onClick={pagar}
-                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg"
+                    className="mt-2 btn-primary text-xs px-3 py-1"
                   >
                     Pagar
                   </button>
@@ -274,7 +275,7 @@ export default function MisPagos({ usuarioApp }) {
 
                     <button
                       onClick={() => subirComprobante(p.id)}
-                      className="mt-1 bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-lg"
+                      className="mt-1 app-btn-secondary text-xs px-3 py-1"
                     >
                       Subir comprobante
                     </button>
@@ -284,7 +285,7 @@ export default function MisPagos({ usuarioApp }) {
 
                 {/* 🔥 INFO MANUAL */}
                 {configPago?.tipo === 'manual' && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-app-text-secondary mt-2">
                     💡 Pago manual disponible
                   </p>
                 )}

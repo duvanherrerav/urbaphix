@@ -1,3 +1,127 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    --color-primary: #2563eb;
+    --color-secondary: #38bdf8;
+    --color-tertiary: #1e3a8a;
+    --color-bg: #0f172a;
+    --color-bg-alt: #020617;
+    --color-text-primary: #e2e8f0;
+    --color-text-secondary: #94a3b8;
+    --color-border: #1e293b;
+    --color-success: #22c55e;
+    --color-error: #ef4444;
+    --color-warning: #f59e0b;
+    --color-info: #38bdf8;
+    --surface-1: #020617;
+    --surface-2: #0b1a2b;
+    --surface-3: #10253f;
+}
+
+@layer base {
+    body {
+        @apply bg-app-bg text-app-text-primary antialiased;
+    }
+
+    input,
+    select,
+    textarea {
+        @apply w-full rounded-lg border border-app-border bg-app-bg-alt px-4 py-2 text-sm text-app-text-primary placeholder-app-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary;
+    }
+
+    textarea {
+        @apply min-h-28;
+    }
+}
+
+@layer components {
+    .app-input {
+        @apply w-full rounded-lg border border-app-border bg-app-bg-alt px-3 py-2 text-sm text-app-text-primary placeholder-app-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary;
+    }
+
+    .app-card {
+        @apply rounded-2xl border border-app-border bg-app-bg-alt p-6 shadow-app;
+    }
+
+    .app-surface-primary {
+        background: linear-gradient(180deg, rgba(11, 26, 43, 0.72) 0%, rgba(2, 6, 23, 0.92) 100%);
+        @apply border border-app-border rounded-2xl shadow-app;
+    }
+
+    .app-surface-muted {
+        @apply rounded-xl border border-app-border bg-app-bg p-4;
+    }
+
+    .app-btn {
+        @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-app-bg;
+    }
+
+    .app-btn-primary {
+        @apply app-btn bg-brand-primary text-app-text-primary hover:bg-brand-tertiary focus:ring-brand-primary;
+    }
+
+    .btn-primary {
+        @apply app-btn-primary;
+    }
+
+    .app-btn-secondary {
+        @apply app-btn border border-brand-secondary bg-[#38BDF81A] text-brand-secondary hover:bg-[#38BDF833] focus:ring-brand-secondary;
+    }
+
+    .btn-secondary {
+        @apply app-btn-secondary;
+    }
+
+    .app-btn-ghost {
+        @apply app-btn border border-app-border bg-transparent text-app-text-secondary hover:bg-[#1E293B] hover:text-app-text-primary focus:ring-brand-primary;
+    }
+
+    .app-btn-danger {
+        @apply app-btn border border-state-error bg-[#EF44441A] text-state-error hover:bg-[#EF444433] focus:ring-state-error;
+    }
+
+    .app-badge {
+        @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+    }
+
+    .app-badge-info {
+        @apply app-badge border-state-info bg-[#38BDF826] text-state-info;
+    }
+
+    .app-badge-success {
+        @apply app-badge border-state-success bg-[#22C55E26] text-state-success;
+    }
+
+    .app-badge-warning {
+        @apply app-badge border-state-warning bg-[#F59E0B26] text-state-warning;
+    }
+
+    .app-badge-error {
+        @apply app-badge border-state-error bg-[#EF444426] text-state-error;
+    }
+
+    .app-shell {
+        @apply min-h-screen bg-app-bg text-app-text-primary;
+    }
+
+    .app-sidebar {
+        background: linear-gradient(180deg, rgba(2, 6, 23, 0.98) 0%, rgba(11, 26, 43, 0.9) 100%);
+        @apply border-r border-app-border text-app-text-primary;
+    }
+
+    .app-header {
+        background: linear-gradient(180deg, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.8) 100%);
+        @apply border-b border-app-border backdrop-blur-sm;
+    }
+
+    .app-sidebar-item {
+        @apply w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-app-text-secondary transition-all duration-200 hover:bg-[#10253f] hover:text-app-text-primary;
+    }
+
+    .app-sidebar-item-active {
+        @apply bg-[#10253f] text-app-text-primary;
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.28), 0 6px 22px rgba(37, 99, 235, 0.18);
+    }
+}

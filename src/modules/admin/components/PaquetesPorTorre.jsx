@@ -72,7 +72,7 @@ export default function PaquetesPorTorre({ usuarioApp }) {
           return (
             <div
               key={index}
-              className="bg-white p-4 rounded-xl shadow"
+              className="bg-app-bg-alt p-4 rounded-xl shadow"
             >
 
               {/* HEADER */}
@@ -81,13 +81,13 @@ export default function PaquetesPorTorre({ usuarioApp }) {
                   🏢 {item.torre}
                 </span>
 
-                <span className="text-sm font-bold text-gray-700">
+                <span className="text-sm font-bold text-app-text-primary">
                   {item.total} paquetes
                 </span>
               </div>
 
               {/* BARRA */}
-              <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
+              <div className="w-full bg-app-bg h-3 rounded-full overflow-hidden">
 
                 <div
                   className={`h-full ${porcentaje > 70
@@ -106,7 +106,7 @@ export default function PaquetesPorTorre({ usuarioApp }) {
         })}
 
         {data.length === 0 && (
-          <p className="text-gray-500 text-sm">
+          <p className="text-app-text-secondary text-sm">
             No hay datos disponibles
           </p>
         )}

@@ -40,9 +40,9 @@ export default function DashboardResumen({ stats, kpis }) {
     <div className="space-y-4">
 
       {/* 🧠 RESUMEN */}
-      <div className="bg-gray-900 text-white p-5 rounded-xl shadow">
+      <div className="bg-app-bg text-white p-5 rounded-xl shadow">
 
-        <p className="text-sm text-gray-300 mb-1">
+        <p className="text-sm text-app-text-secondary mb-1">
           Resumen del día
         </p>
 

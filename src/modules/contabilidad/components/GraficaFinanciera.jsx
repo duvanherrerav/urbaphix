@@ -93,7 +93,7 @@ export default function GraficaFinanciera({ pagos }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow mb-6">
+    <div className="bg-app-bg-alt p-6 rounded-xl shadow mb-6">
 
       <h3 className="text-lg font-semibold mb-4">
         Flujo financiero 📊

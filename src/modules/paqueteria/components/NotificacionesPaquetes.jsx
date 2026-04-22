@@ -14,11 +14,12 @@ export default function NotificacionesPaquetes({ usuarioApp }) {
     const init = async () => {
 
       // 🔥 obtener residente
-      const { data: residente } = await supabase
+      const { data: residentesRows } = await supabase
         .from('residentes')
         .select('id')
         .eq('usuario_id', usuarioApp.id)
-        .single();
+        .limit(1);
+      const residente = residentesRows?.[0] || null;
 
       if (!residente) return;
 

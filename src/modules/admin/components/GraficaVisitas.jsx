@@ -94,13 +94,13 @@ export default function GraficaVisitas({ visitas }) {
         <h3 className="text-lg font-semibold">
           Visitas por día 📅
         </h3>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-app-text-secondary">
           Últimos días de actividad
         </p>
       </div>
 
       {/* GRÁFICA */}
-      <div className="bg-white p-4 rounded-xl shadow">
+      <div className="bg-app-bg-alt p-4 rounded-xl shadow">
         <Bar data={data} options={options} />
       </div>
 

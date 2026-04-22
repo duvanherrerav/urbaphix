@@ -43,7 +43,7 @@ export default function GraficaCartera({ pagos }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow">
+    <div className="bg-app-bg-alt p-6 rounded-xl shadow">
 
       <h3 className="text-lg font-semibold mb-4">
         Estado financiero 📊
@@ -51,7 +51,7 @@ export default function GraficaCartera({ pagos }) {
 
       <Doughnut data={data} options={options} />
 
-      <div className="mt-4 text-sm text-gray-600 space-y-1">
+      <div className="mt-4 text-sm text-app-text-secondary space-y-1">
         <p>💰 Pagado: ${totalPagado.toLocaleString()}</p>
         <p>⏳ Pendiente: ${totalPendiente.toLocaleString()}</p>
       </div>
