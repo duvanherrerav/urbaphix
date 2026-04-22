@@ -39,7 +39,6 @@ export default function MisPaquetes({ usuarioApp }) {
 
   useEffect(() => {
     if (!usuarioApp?.id) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     obtenerPaquetes(usuarioApp.id);
   }, [usuarioApp?.id]);
 
@@ -113,85 +112,67 @@ export default function MisPaquetes({ usuarioApp }) {
   );
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold">Mis paquetes 📦</h2>
-        <p className="text-sm text-gray-500">Consulta tus envíos pendientes y entregados.</p>
+    <div className="space-y-5">
+      <div className="app-surface-primary p-5">
+        <h2 className="text-2xl font-bold text-app-text-primary">Mis paquetes 📦</h2>
+        <p className="text-sm text-app-text-secondary mt-1">Seguimiento de entregas con estado, fechas y categoría de servicio.</p>
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          <div className="app-surface-muted"><span className="text-app-text-secondary">Total</span><p className="text-lg font-semibold">{resumen.total}</p></div>
+          <div className="app-surface-muted"><span className="text-app-text-secondary">Pendientes</span><p className="text-lg font-semibold text-state-warning">{resumen.pendientes}</p></div>
+          <div className="app-surface-muted"><span className="text-app-text-secondary">Entregados</span><p className="text-lg font-semibold text-state-success">{resumen.entregados}</p></div>
+          <div className="app-surface-muted"><span className="text-app-text-secondary">Servicios</span><p className="text-lg font-semibold text-brand-secondary">{resumen.servicios}</p></div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100'}`} onClick={() => { setFiltroEstado('todos'); setPagina(1); }}>Todos ({resumen.total})</button>
-        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => { setFiltroEstado('pendiente'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
-        <button type="button" className={`px-3 py-1 rounded-full text-sm ${filtroEstado === 'entregado' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'}`} onClick={() => { setFiltroEstado('entregado'); setPagina(1); }}>Entregados ({resumen.entregados})</button>
-        <span className="px-3 py-1 rounded-full text-sm bg-indigo-100 text-indigo-700">Servicios públicos ({resumen.servicios})</span>
+      <div className="app-surface-primary p-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={`app-btn text-xs ${filtroEstado === 'todos' ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => { setFiltroEstado('todos'); setPagina(1); }}>Todos ({resumen.total})</button>
+          <button type="button" className={`app-btn text-xs ${filtroEstado === 'pendiente' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => { setFiltroEstado('pendiente'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
+          <button type="button" className={`app-btn text-xs ${filtroEstado === 'entregado' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => { setFiltroEstado('entregado'); setPagina(1); }}>Entregados ({resumen.entregados})</button>
+        </div>
+
+        <input
+          className="app-input"
+          placeholder="Buscar por descripción"
+          value={busqueda}
+          onChange={(e) => {
+            setBusqueda(e.target.value);
+            setPagina(1);
+          }}
+        />
       </div>
 
-      <input
-        className="w-full border rounded-lg px-3 py-2"
-        placeholder="Buscar por descripción"
-        value={busqueda}
-        onChange={(e) => {
-          setBusqueda(e.target.value);
-          setPagina(1);
-        }}
-      />
-
-      {loading && <p className="text-sm text-gray-500">Cargando paquetes...</p>}
-
-      {!loading && paquetesFiltrados.length === 0 && (
-        <p className="text-sm text-gray-500">No hay paquetes para este filtro.</p>
-      )}
+      {loading && <p className="text-sm text-app-text-secondary">Cargando paquetes...</p>}
+      {!loading && paquetesFiltrados.length === 0 && <div className="app-surface-primary p-4 text-sm text-app-text-secondary">No hay paquetes para este filtro.</div>}
 
       <div className="space-y-3">
         {paquetesPaginados.map((p) => (
-          <div key={p.id} className="border rounded-xl p-3 bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-medium">Descripción: {p.descripcion_visible}</p>
-              <span className={`px-2 py-0.5 rounded-full text-xs ${p.categoria === 'servicio_publico'
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-blue-100 text-blue-700'
-                }`}>
-                {p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}
+          <div key={p.id} className="app-surface-primary p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-app-text-secondary">{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</p>
+                <p className="font-semibold text-app-text-primary mt-1">{p.descripcion_visible || 'Sin descripción'}</p>
+              </div>
+              <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>
+                {p.categoria === 'servicio_publico' ? 'Servicio' : 'Envío'}
               </span>
             </div>
 
-            <p>
-              <span className="font-semibold">Estado:</span>
-              <span className={`ml-1 font-medium ${p.estado === 'pendiente' ? 'text-amber-600' : 'text-emerald-600'}`}>
-                {p.estado}
-              </span>
-            </p>
-
-            <p>
-              <span className="font-semibold">Recibido:</span> {new Date(p.fecha_recibido).toLocaleDateString()}
-            </p>
-
-            {p.fecha_entrega && (
-              <p>
-                <span className="font-semibold">Entregado:</span> {new Date(p.fecha_entrega).toLocaleDateString()}
-              </p>
-            )}
+            <div className="mt-3 grid md:grid-cols-3 gap-2 text-sm">
+              <div className="app-surface-muted"><span className="text-app-text-secondary block">Estado</span><span className={`${p.estado === 'pendiente' ? 'text-state-warning' : 'text-state-success'} font-semibold capitalize`}>{p.estado}</span></div>
+              <div className="app-surface-muted"><span className="text-app-text-secondary block">Recibido</span><span>{p.fecha_recibido ? new Date(p.fecha_recibido).toLocaleDateString() : '-'}</span></div>
+              <div className="app-surface-muted"><span className="text-app-text-secondary block">Entregado</span><span>{p.fecha_entrega ? new Date(p.fecha_entrega).toLocaleDateString() : 'Pendiente'}</span></div>
+            </div>
           </div>
         ))}
       </div>
+
       {!loading && paquetesFiltrados.length > 0 && (
         <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-500">Página {paginaActual} de {totalPaginas} · {paquetesFiltrados.length} resultados</span>
+          <span className="text-app-text-secondary">Página {paginaActual} de {totalPaginas} · {paquetesFiltrados.length} resultados</span>
           <div className="flex gap-2">
-            <button
-              className="px-2 py-1 border rounded disabled:opacity-40"
-              disabled={paginaActual === 1}
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </button>
-            <button
-              className="px-2 py-1 border rounded disabled:opacity-40"
-              disabled={paginaActual === totalPaginas}
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-            >
-              Siguiente
-            </button>
+            <button className="app-btn-ghost text-xs" disabled={paginaActual === 1} onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>
+            <button className="app-btn-ghost text-xs" disabled={paginaActual === totalPaginas} onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}>Siguiente</button>
           </div>
         </div>
       )}

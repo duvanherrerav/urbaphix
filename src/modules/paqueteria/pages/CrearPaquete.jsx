@@ -6,7 +6,6 @@ import { registrarPaquete } from '../services/paquetesService';
 export default function CrearPaquete({ usuarioApp }) {
   const [torres, setTorres] = useState([]);
   const [loading, setLoading] = useState(false);
-
   const [torreSeleccionada, setTorreSeleccionada] = useState('');
   const [apartamentoManual, setApartamentoManual] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -21,11 +20,7 @@ export default function CrearPaquete({ usuarioApp }) {
         .eq('conjunto_id', usuarioApp.conjunto_id)
         .order('nombre', { ascending: true });
 
-      if (error) {
-        toast.error('No se pudieron cargar las torres');
-        return;
-      }
-
+      if (error) return toast.error('No se pudieron cargar las torres');
       setTorres(data || []);
     };
     obtenerTorres();
@@ -53,74 +48,36 @@ export default function CrearPaquete({ usuarioApp }) {
     }, usuarioApp);
     setLoading(false);
 
-    if (!result.ok) {
-      toast.error(`No se pudo registrar: ${result.error}`);
-      return;
-    }
+    if (!result.ok) return toast.error(`No se pudo registrar: ${result.error}`);
 
-    toast.success(
-      categoria === 'servicio_publico'
-        ? 'Servicio público recibido y notificado al residente'
-        : 'Paquete registrado y notificado al residente'
-    );
-    window.dispatchEvent(new CustomEvent('paqueteria:changed', {
-      detail: { action: 'created', paquete: result.paquete || null }
-    }));
+    toast.success(categoria === 'servicio_publico' ? 'Servicio público recibido y notificado al residente' : 'Paquete registrado y notificado al residente');
+    window.dispatchEvent(new CustomEvent('paqueteria:changed', { detail: { action: 'created', paquete: result.paquete || null } }));
     limpiarFormulario();
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow p-5 space-y-4">
+    <div className="app-surface-primary p-5 space-y-4">
       <div>
         <h2 className="text-2xl font-bold">Registrar recepción 📦</h2>
-        <p className="text-sm text-gray-500">
-          Registra paquetes o servicios públicos para que el residente tenga alerta al llegar.
-        </p>
+        <p className="text-sm text-app-text-secondary">Carga rápida para paquetería y servicios públicos por torre/apartamento.</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-3">
-        <select
-          className="border rounded-lg px-3 py-2"
-          value={categoria}
-          onChange={(e) => setCategoria(e.target.value)}
-        >
+        <select className="app-input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
           <option value="paquete">Paquete</option>
           <option value="servicio_publico">Servicio público</option>
         </select>
 
-        <select
-          className="border rounded-lg px-3 py-2"
-          value={torreSeleccionada}
-          onChange={(e) => setTorreSeleccionada(e.target.value)}
-        >
+        <select className="app-input" value={torreSeleccionada} onChange={(e) => setTorreSeleccionada(e.target.value)}>
           <option value="">Selecciona torre</option>
-          {torres.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.nombre}
-            </option>
-          ))}
+          {torres.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
         </select>
 
-        <input
-          className="border rounded-lg px-3 py-2"
-          placeholder="Apartamento (escrito manual)"
-          value={apartamentoManual}
-          onChange={(e) => setApartamentoManual(e.target.value)}
-        />
-
-        <input
-          className="border rounded-lg px-3 py-2"
-          placeholder={categoria === 'servicio_publico' ? 'Ej: Factura de energía abril' : 'Ej: Amazon, MercadoLibre'}
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-        />
+        <input className="app-input" placeholder="Apartamento" value={apartamentoManual} onChange={(e) => setApartamentoManual(e.target.value)} />
+        <input className="app-input" placeholder={categoria === 'servicio_publico' ? 'Ej: Factura de energía abril' : 'Ej: Amazon, MercadoLibre'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
       </div>
 
-      <button
-        onClick={crearPaquete}
-        disabled={loading}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-      >
+      <button onClick={crearPaquete} disabled={loading} className="app-btn-primary">
         {loading ? 'Guardando...' : (categoria === 'servicio_publico' ? 'Registrar servicio público' : 'Guardar paquete')}
       </button>
     </div>

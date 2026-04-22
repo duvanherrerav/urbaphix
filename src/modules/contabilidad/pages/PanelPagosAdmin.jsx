@@ -1,116 +1,131 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
 const formatFechaBogota = (value) => {
-    if (!value) return '-';
-    const raw = String(value).trim().replace(' ', 'T');
-    const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
-    const parsed = new Date(hasZone ? raw : `${raw}Z`);
-    if (Number.isNaN(parsed.getTime())) return '-';
-    return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+  if (!value) return '-';
+  const raw = String(value).trim().replace(' ', 'T');
+  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
+  const parsed = new Date(hasZone ? raw : `${raw}Z`);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
 };
 
 export default function PanelPagosAdmin({ usuarioApp }) {
+  const [pagos, setPagos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filtroTorre, setFiltroTorre] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
+  const [busquedaApto, setBusquedaApto] = useState('');
 
-    const [pagos, setPagos] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [filtroTorre, setFiltroTorre] = useState('');
-    const [filtroEstado, setFiltroEstado] = useState('');
-    const [busquedaApto, setBusquedaApto] = useState('');
+  async function cargarPagos() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('pagos')
+      .select(`
+        *,
+        tipo_pago,
+        residentes (
+          id,
+          usuario_id,
+          apartamentos (
+            numero,
+            torres!fk_apartamento_torre ( nombre )
+          ),
+          usuarios_app ( nombre )
+        )
+      `)
+      .eq('conjunto_id', usuarioApp.conjunto_id)
+      .order('created_at', { ascending: false });
 
-    // 🔥 CARGAR PAGOS (SOLUCIÓN FINAL CON JOIN)
-    async function cargarPagos() {
+    setLoading(false);
+    if (error) return;
 
-        setLoading(true);
+    const pagosFormateados = (data || []).map((p) => ({
+      ...p,
+      nombre: p.residentes?.usuarios_app?.nombre || 'Residente',
+      apartamento: p.residentes?.apartamentos?.numero || '-',
+      torre: p.residentes?.apartamentos?.torres?.nombre || '-'
+    }));
 
-        const { data, error } = await supabase
-            .from('pagos')
-            .select(`
-                *,
-                tipo_pago,
-                residentes (
-                    id,
-                    usuario_id,
-                    apartamentos (
-                        numero,
-                        torres!fk_apartamento_torre (
-                            nombre
-                        )
-                    ),
-                    usuarios_app (
-                        nombre
-                    )
-                )
-            `)
-            .eq('conjunto_id', usuarioApp.conjunto_id)
-            .order('created_at', { ascending: false });
+    setPagos(pagosFormateados);
+  }
 
-        if (error) {
-            console.log('Error cargando pagos:', error);
-            setLoading(false);
-            return;
-        }
+  useEffect(() => {
+    if (usuarioApp?.conjunto_id) cargarPagos();
+  }, [usuarioApp]);
 
-        // 🔥 FORMATEAR DATOS
-        const pagosFormateados = data.map(p => ({
-            ...p,
-            nombre: p.residentes?.usuarios_app?.nombre || 'Residente',
-            apartamento: p.residentes?.apartamentos?.numero || '-',
-            torre: p.residentes?.apartamentos?.torres?.nombre || '-'
-        }));
+  const aprobarPago = async (pago) => {
+    const { error } = await supabase.from('pagos').update({ estado: 'pagado', fecha_pago: new Date().toISOString() }).eq('id', pago.id);
+    if (error) return alert('Error al aprobar pago');
 
-        setPagos(pagosFormateados);
-        setLoading(false);
-    }
+    await supabase.from('notificaciones').insert([{ usuario_id: pago.residentes?.usuario_id, tipo: 'pago_aprobado', titulo: 'Pago aprobado', mensaje: `Tu pago de ${pago.valor} fue aprobado` }]);
+    alert('✅ Pago aprobado');
+    cargarPagos();
+  };
 
-    useEffect(() => {
-        if (usuarioApp?.conjunto_id) {
-            const timer = setTimeout(() => {
-                cargarPagos();
-            }, 0);
-            return () => clearTimeout(timer);
-        }
-    }, [usuarioApp]);
+  const torres = useMemo(() => [...new Set(pagos.map((p) => p.torre).filter(Boolean))], [pagos]);
+  const pagosFiltrados = useMemo(() => pagos.filter((p) => {
+    const cumpleTorre = filtroTorre ? p.torre === filtroTorre : true;
+    const cumpleEstado = filtroEstado ? p.estado === filtroEstado : true;
+    const cumpleApto = busquedaApto ? p.apartamento?.toString().includes(busquedaApto) : true;
+    return cumpleTorre && cumpleEstado && cumpleApto;
+  }), [pagos, filtroTorre, filtroEstado, busquedaApto]);
 
-    // 🔥 APROBAR PAGO
-    const aprobarPago = async (pago) => {
+  const resumen = useMemo(() => ({
+    total: pagosFiltrados.length,
+    pendientes: pagosFiltrados.filter((p) => p.estado === 'pendiente').length,
+    pagados: pagosFiltrados.filter((p) => p.estado === 'pagado').length,
+    cartera: pagosFiltrados.filter((p) => p.estado === 'pendiente').reduce((acc, p) => acc + Number(p.valor || 0), 0)
+  }), [pagosFiltrados]);
 
-        const { error } = await supabase
-            .from('pagos')
-            .update({
-                estado: 'pagado',
-                fecha_pago: new Date().toISOString()
-            })
-            .eq('id', pago.id);
+  return (
+    <div className="app-surface-primary p-5 space-y-4">
+      <div>
+        <h3 className="text-xl font-bold">Estado de cuenta consolidado</h3>
+        <p className="text-sm text-app-text-secondary">Seguimiento de cobros por torre, apartamento y estado.</p>
+      </div>
 
-        if (error) {
-            console.log(error);
-            alert('Error al aprobar pago');
-            return;
-        }
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        <div className="app-surface-muted"><span className="text-app-text-secondary">Registros</span><p className="text-lg font-semibold">{resumen.total}</p></div>
+        <div className="app-surface-muted"><span className="text-app-text-secondary">Pendientes</span><p className="text-lg font-semibold text-state-warning">{resumen.pendientes}</p></div>
+        <div className="app-surface-muted"><span className="text-app-text-secondary">Pagados</span><p className="text-lg font-semibold text-state-success">{resumen.pagados}</p></div>
+        <div className="app-surface-muted"><span className="text-app-text-secondary">Cartera</span><p className="text-lg font-semibold">${resumen.cartera.toLocaleString('es-CO')}</p></div>
+      </div>
 
-        // 🔔 NOTIFICACIÓN
-        await supabase.from('notificaciones').insert([{
-            usuario_id: pago.residentes?.usuario_id,
-            tipo: 'pago_aprobado',
-            titulo: 'Pago aprobado',
-            mensaje: `Tu pago de ${pago.valor} fue aprobado`
-        }]);
+      <div className="grid md:grid-cols-4 gap-2">
+        <select className="app-input" value={filtroTorre} onChange={(e) => setFiltroTorre(e.target.value)}>
+          <option value="">Todas las torres</option>
+          {torres.map((torre) => <option key={torre} value={torre}>{torre}</option>)}
+        </select>
+        <select className="app-input" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+          <option value="">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="pagado">Pagado</option>
+        </select>
+        <input className="app-input" placeholder="Apto" value={busquedaApto} onChange={(e) => setBusquedaApto(e.target.value)} />
+        <button className="app-btn-ghost" onClick={cargarPagos}>Actualizar</button>
+      </div>
 
-        alert('✅ Pago aprobado');
+      {loading && <p className="text-sm text-app-text-secondary">Cargando pagos...</p>}
+      {!loading && pagosFiltrados.length === 0 && <p className="text-sm text-app-text-secondary">Sin resultados para filtros actuales.</p>}
 
-        cargarPagos();
-    };
-    const pagosFiltrados = pagos.filter(p => {
-
-        const cumpleTorre = filtroTorre ? p.torre === filtroTorre : true;
-
-        const cumpleEstado = filtroEstado ? p.estado === filtroEstado : true;
-
-        const cumpleApto = busquedaApto
-            ? p.apartamento?.toString().includes(busquedaApto)
-            : true;
-
-        return cumpleTorre && cumpleEstado && cumpleApto;
-    });
+      <div className="space-y-2">
+        {pagosFiltrados.map((pago) => (
+          <div key={pago.id} className="app-surface-muted p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-medium">{pago.nombre} · Torre {pago.torre} · Apto {pago.apartamento}</p>
+                <p className="text-xs text-app-text-secondary">{pago.concepto} · {formatFechaBogota(pago.created_at)}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold">${Number(pago.valor || 0).toLocaleString('es-CO')}</p>
+                <span className={`app-badge ${pago.estado === 'pendiente' ? 'app-badge-warning' : 'app-badge-success'} capitalize`}>{pago.estado}</span>
+              </div>
+            </div>
+            {pago.estado === 'pendiente' && <button className="mt-2 app-btn-primary text-xs" onClick={() => aprobarPago(pago)}>Aprobar pago</button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

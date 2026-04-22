@@ -1,112 +1,96 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-    cambiarEstadoReserva,
-    evaluarElegibilidadNoShow,
-    listarReservas,
-    subscribeReservasConjunto
+  cambiarEstadoReserva,
+  evaluarElegibilidadNoShow,
+  listarReservas,
+  subscribeReservasConjunto
 } from '../services/reservasService';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota } from '../utils/dateTimeBogota';
 
 export default function PanelReservasVigilancia({ usuarioApp }) {
-    const [reservas, setReservas] = useState([]);
-    const [filtroEstado, setFiltroEstado] = useState('operativas');
+  const [reservas, setReservas] = useState([]);
+  const [filtroEstado, setFiltroEstado] = useState('operativas');
 
-    const cargar = async () => {
-        if (!usuarioApp?.conjunto_id) return;
+  const cargar = async () => {
+    if (!usuarioApp?.conjunto_id) return;
 
-        const estados = filtroEstado === 'operativas'
-            ? ['aprobada', 'en_curso']
-            : ['aprobada', 'en_curso', 'finalizada', 'no_show'];
+    const estados = filtroEstado === 'operativas'
+      ? ['aprobada', 'en_curso']
+      : ['aprobada', 'en_curso', 'finalizada', 'no_show'];
 
-        const resp = await listarReservas({
-            conjunto_id: usuarioApp.conjunto_id,
-            estados,
-            limit: 250
-        });
+    const resp = await listarReservas({ conjunto_id: usuarioApp.conjunto_id, estados, limit: 250 });
+    if (!resp.ok) return toast.error(resp.error);
+    setReservas(resp.data || []);
+  };
 
-        if (!resp.ok) return toast.error(resp.error);
-        setReservas(resp.data || []);
-    };
+  useEffect(() => { cargar(); }, [usuarioApp?.conjunto_id, filtroEstado]);
+  useEffect(() => {
+    if (!usuarioApp?.conjunto_id) return undefined;
+    return subscribeReservasConjunto(usuarioApp.conjunto_id, () => cargar());
+  }, [usuarioApp?.conjunto_id, filtroEstado]);
 
-    useEffect(() => {
-        cargar();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [usuarioApp?.conjunto_id, filtroEstado]);
+  const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
+  const resumen = useMemo(() => ({
+    operativas: reservas.filter((r) => ['aprobada', 'en_curso'].includes(r.estado)).length,
+    finalizadas: reservas.filter((r) => r.estado === 'finalizada').length,
+    noShow: reservas.filter((r) => r.estado === 'no_show').length
+  }), [reservas]);
 
-    useEffect(() => {
-        if (!usuarioApp?.conjunto_id) return undefined;
-        return subscribeReservasConjunto(usuarioApp.conjunto_id, () => {
-            cargar();
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [usuarioApp?.conjunto_id, filtroEstado]);
+  const actualizar = async (id, estado, detalle) => {
+    const resp = await cambiarEstadoReserva({ reserva_id: id, estado, usuario_id: usuarioApp.id, usuario_rol: usuarioApp.rol_id, detalle });
+    if (!resp.ok) return toast.error(resp.error);
+    toast.success(`Reserva ${estadoLabel(estado)}`);
+    cargar();
+  };
 
-    const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
+  return (
+    <div className="app-surface-primary rounded-2xl p-5 shadow space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold">Reservas operativas 🛡️</h2>
+          <p className="text-sm text-app-text-secondary">Control de check-in, check-out y no show desde vigilancia.</p>
+        </div>
+        <select className="app-input max-w-56" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+          <option value="operativas">Operativas</option>
+          <option value="historico">Histórico corto</option>
+        </select>
+      </div>
 
-    const actualizar = async (id, estado, detalle) => {
-        const resp = await cambiarEstadoReserva({
-            reserva_id: id,
-            estado,
-            usuario_id: usuarioApp.id,
-            usuario_rol: usuarioApp.rol_id,
-            detalle
-        });
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="app-surface-muted"><span className="text-app-text-secondary">Operativas</span><p className="text-lg font-semibold">{resumen.operativas}</p></div>
+        <div className="app-surface-muted"><span className="text-app-text-secondary">Finalizadas</span><p className="text-lg font-semibold text-state-success">{resumen.finalizadas}</p></div>
+        <div className="app-surface-muted"><span className="text-app-text-secondary">No show</span><p className="text-lg font-semibold text-state-warning">{resumen.noShow}</p></div>
+      </div>
 
-        if (!resp.ok) return toast.error(resp.error);
-        toast.success(`Reserva ${estadoLabel(estado)}`);
-        cargar();
-    };
-
-    return (
-        <div className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-3">
-            <div className="flex items-center justify-between gap-2">
-                <h2 className="text-2xl font-bold">Panel reservas (vigilancia) 🛡️</h2>
-                <select className="app-input" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
-                    <option value="operativas">Operativas</option>
-                    <option value="historico">Histórico corto</option>
-                </select>
+      {reservas.map((r) => {
+        const evaluacionNoShow = evaluarElegibilidadNoShow(r);
+        return (
+          <div key={r.id} className="app-surface-muted p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold">{r.recursos_comunes?.nombre || 'Recurso'}</p>
+              <ReservaStatusBadge estado={r.estado} />
+            </div>
+            <div className="grid md:grid-cols-2 gap-2 text-sm">
+              <p className="text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+              <p className="text-app-text-secondary md:text-right">Residente ID: {r.residente_id}</p>
             </div>
 
-            {reservas.map((r) => {
-                const evaluacionNoShow = evaluarElegibilidadNoShow(r);
+            {r.estado === 'aprobada' && (
+              <div className="flex flex-wrap gap-2">
+                <button className="app-btn-primary text-xs" onClick={() => actualizar(r.id, 'en_curso', 'Check-in por vigilancia')}>Check-in</button>
+                <button className="app-btn-secondary text-xs disabled:opacity-50" disabled={!evaluacionNoShow.elegible} onClick={() => actualizar(r.id, 'no_show', 'Marcada como no asistió por vigilancia')}>Marcar no asistió</button>
+                {!evaluacionNoShow.elegible && <p className="w-full text-xs text-app-text-secondary">{evaluacionNoShow.motivo}</p>}
+              </div>
+            )}
 
-                return (
-                    <div key={r.id} className="border rounded-xl p-3 space-y-2">
-                        <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
-                        <p className="text-sm text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-                        <p className="text-sm text-app-text-secondary">Residente ID: {r.residente_id}</p>
+            {r.estado === 'en_curso' && <button className="app-btn-secondary text-xs" onClick={() => actualizar(r.id, 'finalizada', 'Check-out por vigilancia')}>Check-out</button>}
+          </div>
+        );
+      })}
 
-                        {r.estado === 'aprobada' && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                <button className="bg-blue-600 text-white px-3 py-1 rounded" onClick={() => actualizar(r.id, 'en_curso', 'Check-in por vigilancia')}>
-                                    Check-in
-                                </button>
-                                <button
-                                    className="bg-amber-600 text-white px-3 py-1 rounded disabled:bg-amber-300 disabled:cursor-not-allowed"
-                                    disabled={!evaluacionNoShow.elegible}
-                                    onClick={() => actualizar(r.id, 'no_show', 'Marcada como no asistió por vigilancia')}
-                                >
-                                    Marcar como no asistió
-                                </button>
-                                {!evaluacionNoShow.elegible && (
-                                    <p className="w-full text-xs text-amber-700">{evaluacionNoShow.motivo}</p>
-                                )}
-                            </div>
-                        )}
-
-                        {r.estado === 'en_curso' && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizar(r.id, 'finalizada', 'Check-out por vigilancia')}>
-                                    Check-out
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
-            {reservas.length === 0 && <p className="text-sm text-app-text-secondary">No hay reservas en operación.</p>}
-        </div>
-    );
+      {reservas.length === 0 && <p className="text-sm text-app-text-secondary">No hay reservas en operación.</p>}
+    </div>
+  );
 }

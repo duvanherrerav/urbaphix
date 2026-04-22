@@ -142,7 +142,7 @@ export default function DashboardAdmin({ usuarioApp }) {
   }, [usuarioApp]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
 
       {/* 🔥 HEADER PRO */}
       <div className="app-surface-primary p-6 text-app-text-primary">
@@ -155,7 +155,7 @@ export default function DashboardAdmin({ usuarioApp }) {
           Resumen general del conjunto
         </p>
 
-        <div className="flex gap-6 mt-4 text-sm">
+        <div className="grid md:grid-cols-3 gap-2 mt-4 text-sm">
 
           <div>🚗 {stats.ingresados} visitas activas</div>
           <div>📦 {kpis.paquetesPendientes} paquetes</div>
@@ -170,24 +170,24 @@ export default function DashboardAdmin({ usuarioApp }) {
       <DashboardResumen stats={stats} kpis={kpis} />
 
       {/* 🔥 CARDS MEJORADAS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 
-        <div className="app-surface-muted p-4">
+        <div className="app-surface-muted p-4 min-h-24">
           🟡 Pendientes
           <div className="text-2xl font-bold">{stats.pendientes}</div>
         </div>
 
-        <div className="app-surface-muted p-4">
+        <div className="app-surface-muted p-4 min-h-24">
           🔵 Ingresados
           <div className="text-2xl font-bold">{stats.ingresados}</div>
         </div>
 
-        <div className="app-surface-muted p-4">
+        <div className="app-surface-muted p-4 min-h-24">
           🟢 Salidos
           <div className="text-2xl font-bold">{stats.salidos}</div>
         </div>
 
-        <div className="app-surface-muted p-4">
+        <div className="app-surface-muted p-4 min-h-24">
           📦 Total
           <div className="text-2xl font-bold">{stats.total}</div>
         </div>

@@ -498,7 +498,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     );
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             <div className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-2xl font-bold">Recursos comunes</h2>
