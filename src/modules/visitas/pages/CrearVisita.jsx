@@ -111,11 +111,12 @@ export default function CrearVisita({ usuarioApp }) {
   useEffect(() => {
     const init = async () => {
       const { data: authData } = await supabase.auth.getUser();
-      const { data: residente } = await supabase
+      const { data: residentesRows } = await supabase
         .from('residentes')
         .select('id')
         .eq('usuario_id', authData?.user?.id)
-        .single();
+        .limit(1);
+      const residente = residentesRows?.[0] || null;
       if (residente?.id) {
         setResidenteId(residente.id);
         cargarHistorial(residente.id);
@@ -203,11 +204,12 @@ export default function CrearVisita({ usuarioApp }) {
     }
 
     const { data: authData } = await supabase.auth.getUser();
-    const { data: residente } = await supabase
+    const { data: residentesRows } = await supabase
       .from('residentes')
       .select('id, apartamento_id')
       .eq('usuario_id', authData?.user?.id)
-      .single();
+      .limit(1);
+    const residente = residentesRows?.[0] || null;
 
     if (!residente?.id) {
       toast.error('No tienes residente asociado');

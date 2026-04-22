@@ -61,7 +61,7 @@ export default function DashboardAdmin({ usuarioApp }) {
       const fechaInicio = hace7dias.toISOString().split('T')[0];
 
       const { data, error } = await supabase
-        .from('visitas')
+        .from('registro_visitas')
         .select('*')
         .eq('conjunto_id', usuarioApp.conjunto_id)
         .gte('fecha_visita', fechaInicio);
@@ -126,7 +126,7 @@ export default function DashboardAdmin({ usuarioApp }) {
         {
           event: '*',
           schema: 'public',
-          table: 'visitas'
+          table: 'registro_visitas'
         },
         () => {
           obtenerVisitas();

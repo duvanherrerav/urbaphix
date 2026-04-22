@@ -14,11 +14,12 @@ export default function MisPaquetes({ usuarioApp }) {
     if (!usuarioId) return;
     setLoading(true);
 
-    const { data: residente } = await supabase
+    const { data: residentesRows } = await supabase
       .from('residentes')
       .select('*')
       .eq('usuario_id', usuarioId)
-      .single();
+      .limit(1);
+    const residente = residentesRows?.[0] || null;
 
     if (!residente) {
       setPaquetes([]);
@@ -47,11 +48,12 @@ export default function MisPaquetes({ usuarioApp }) {
 
     let channel = null;
     const init = async () => {
-      const { data: residente } = await supabase
+      const { data: residentesRows } = await supabase
         .from('residentes')
         .select('id')
         .eq('usuario_id', usuarioApp.id)
-        .single();
+        .limit(1);
+      const residente = residentesRows?.[0] || null;
       if (!residente?.id) return;
 
       channel = supabase

@@ -27,11 +27,12 @@ export default function NotificacionesVisitas({ usuarioApp }) {
           if (usuarioApp.rol_id !== 'residente') return;
 
           // 🔥 2. BUSCAR RESIDENTE DEL USUARIO
-          const { data: residente } = await supabase
+          const { data: residentesRows } = await supabase
             .from('residentes')
             .select('*')
             .eq('usuario_id', usuarioApp.id)
-            .single();
+            .limit(1);
+          const residente = residentesRows?.[0] || null;
 
           if (!residente) return;
 

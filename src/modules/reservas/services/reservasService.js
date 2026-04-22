@@ -472,10 +472,11 @@ export const getPerfilResidente = async (usuarioId) => {
         .from('residentes')
         .select('id, apartamento_id, conjunto_id')
         .eq('usuario_id', usuarioId)
-        .single();
+        .limit(1);
+    const perfil = data?.[0] || null;
 
-    if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se encontró perfil de residente') };
-    return { ok: true, data, error: null };
+    if (error || !perfil) return { ok: false, data: null, error: humanizeReservaError(error, 'No se encontró perfil de residente') };
+    return { ok: true, data: perfil, error: null };
 };
 
 export const crearReserva = async ({

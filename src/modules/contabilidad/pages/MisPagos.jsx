@@ -72,11 +72,12 @@ export default function MisPagos({ usuarioApp }) {
       }
 
       // 🔥 OBTENER RESIDENTE
-      const { data: residente } = await supabase
+      const { data: residentesRows } = await supabase
         .from('residentes')
         .select('id')
         .eq('usuario_id', usuarioApp.id)
-        .maybeSingle();
+        .limit(1);
+      const residente = residentesRows?.[0] || null;
 
       if (!residente) {
         setPagos([]);

@@ -15,7 +15,7 @@ export default function KPIsAdmin({ usuarioApp, setKpis }) {
       const [visitasRes, paquetesRes, apartamentosRes] = await Promise.all([
 
         supabase
-          .from('visitas')
+          .from('registro_visitas')
           .select('fecha_visita')
           .eq('conjunto_id', conjuntoId),
 
