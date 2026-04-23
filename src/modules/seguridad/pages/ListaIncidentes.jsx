@@ -5,34 +5,12 @@ import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechas
 
 const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
 const formatBogota = (value, localEpoch) => {
-  if (localEpoch) {
-    return new Date(localEpoch).toLocaleString('es-CO', {
-      timeZone: 'America/Bogota',
-      dateStyle: 'short',
-      timeStyle: 'short'
-    });
-  }
+  if (localEpoch) return new Date(localEpoch).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short' });
   if (!value) return '-';
-  const raw = String(value).trim().replace(' ', 'T');
-  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
-  const baseDate = new Date(hasZone ? raw : `${raw}Z`);
-  if (Number.isNaN(baseDate.getTime())) return '-';
-
-  const bogotaMs = baseDate.getTime() - (5 * 60 * 60 * 1000);
-  const bogotaDate = new Date(bogotaMs);
-  const d = String(bogotaDate.getUTCDate()).padStart(2, '0');
-  const m = String(bogotaDate.getUTCMonth() + 1).padStart(2, '0');
-  const y = String(bogotaDate.getUTCFullYear()).slice(0);
-  const h24 = bogotaDate.getUTCHours();
-  const mm = String(bogotaDate.getUTCMinutes()).padStart(2, '0');
-  const ampm = h24 >= 12 ? 'p. m.' : 'a. m.';
-  const h12 = h24 % 12 || 12;
-
-  return `${d}/${m}/${y}, ${h12}:${mm} ${ampm}`;
+  return new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 };
 
 export default function ListaIncidentes({ usuarioApp }) {
-
   const [incidentes, setIncidentes] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
@@ -45,16 +23,8 @@ export default function ListaIncidentes({ usuarioApp }) {
     const cargar = async () => {
       if (!usuarioApp?.conjunto_id) return;
 
-      const { data, error } = await supabase
-        .from('incidentes')
-        .select('*')
-        .eq('conjunto_id', usuarioApp.conjunto_id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        toast.error('No se pudieron cargar incidentes');
-        return;
-      }
+      const { data, error } = await supabase.from('incidentes').select('*').eq('conjunto_id', usuarioApp.conjunto_id).order('created_at', { ascending: false });
+      if (error) return toast.error('No se pudieron cargar incidentes');
 
       setIncidentes(data || []);
       setEstadosLocal(obtenerEstadosIncidentesLocal());
@@ -62,52 +32,30 @@ export default function ListaIncidentes({ usuarioApp }) {
     };
 
     cargar();
-
     const channel = supabase
       .channel(`incidentes-admin-${usuarioApp?.conjunto_id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'incidentes', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` },
-        () => cargar()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidentes', filter: `conjunto_id=eq.${usuarioApp?.conjunto_id}` }, () => cargar())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [usuarioApp?.conjunto_id]);
 
   const cambiarEstado = async (incidente, estado) => {
-    const { ok, error } = await actualizarEstadoIncidente({
-      incidenteId: incidente.id,
-      estado,
-      usuarioId: usuarioApp?.id
-    });
-
-    if (!ok) {
-      toast.error(error);
-      return;
-    }
-
-    const nuevosEstados = obtenerEstadosIncidentesLocal();
-    setEstadosLocal(nuevosEstados);
+    const { ok, error } = await actualizarEstadoIncidente({ incidenteId: incidente.id, estado, usuarioId: usuarioApp?.id });
+    if (!ok) return toast.error(error);
+    setEstadosLocal(obtenerEstadosIncidentesLocal());
     toast.success(`Incidente actualizado a ${estado}`);
   };
 
   const lista = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
-
     const filtered = incidentes.filter((i) => {
       const estadoActual = estadosLocal[i.id]?.estado || 'nuevo';
       const matchEstado = filtroEstado === 'todos' ? true : estadoActual === filtroEstado;
-      const matchBusqueda = !term
-        || i.descripcion?.toLowerCase().includes(term)
-        || i.nivel?.toLowerCase().includes(term)
-        || estadoActual.toLowerCase().includes(term);
+      const matchBusqueda = !term || i.descripcion?.toLowerCase().includes(term) || i.nivel?.toLowerCase().includes(term) || estadoActual.toLowerCase().includes(term);
       return matchEstado && matchBusqueda;
     });
 
-    // Priorizamos lo no cerrado al inicio
     return filtered.sort((a, b) => {
       const ea = estadosLocal[a.id]?.estado || 'nuevo';
       const eb = estadosLocal[b.id]?.estado || 'nuevo';
@@ -123,69 +71,52 @@ export default function ListaIncidentes({ usuarioApp }) {
 
   const resumen = {
     total: lista.length,
-    nuevos: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'nuevo').length,
+    alto: lista.filter((i) => i.nivel === 'alto').length,
     enGestion: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'en_gestion').length,
-    resueltos: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'resuelto').length,
     cerrados: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'cerrado').length
   };
 
   return (
     <div className="app-surface-primary p-5 space-y-4">
-      <div className="flex flex-wrap justify-between items-center gap-2">
-        <h2 className="text-xl font-bold">Incidentes</h2>
-        <div className="flex gap-2">
-          <input
-            className="app-input text-sm"
-            placeholder="Buscar incidente..."
-            value={busqueda}
-            onChange={(e) => {
-              setBusqueda(e.target.value);
-              setPagina(1);
-            }}
-          />
-          <select
-            className="app-input text-sm"
-            value={filtroEstado}
-            onChange={(e) => {
-              setFiltroEstado(e.target.value);
-              setPagina(1);
-            }}
-          >
-            <option value="todos">Todos</option>
-            {['nuevo', ...ESTADOS_GESTION].map((e) => (
-              <option key={e} value={e}>{e}</option>
-            ))}
-          </select>
+      <div className="grid lg:grid-cols-[1fr_auto] gap-3 items-start">
+        <div>
+          <h2 className="text-2xl font-bold">Incidentes</h2>
+          <p className="text-sm text-app-text-secondary mt-1">Gestión administrativa con prioridad, estado y trazabilidad temporal.</p>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">Total</p><p className="font-semibold text-lg">{resumen.total}</p></div>
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">Nivel alto</p><p className="font-semibold text-lg text-state-error">{resumen.alto}</p></div>
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">En gestión</p><p className="font-semibold text-lg text-state-info">{resumen.enGestion}</p></div>
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">Cerrados</p><p className="font-semibold text-lg">{resumen.cerrados}</p></div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-        <div className="app-surface-muted px-3 py-2"><b>Total:</b> {resumen.total}</div>
-        <div className="app-surface-muted px-3 py-2 text-state-warning"><b>Nuevos:</b> {resumen.nuevos}</div>
-        <div className="app-surface-muted px-3 py-2 text-state-info"><b>En gestión:</b> {resumen.enGestion}</div>
-        <div className="app-surface-muted px-3 py-2 text-state-success"><b>Resueltos:</b> {resumen.resueltos}</div>
-        <div className="app-surface-muted px-3 py-2"><b>Cerrados:</b> {resumen.cerrados}</div>
+      <div className="grid md:grid-cols-[1fr_220px] gap-2">
+        <input className="app-input text-sm" placeholder="Buscar por descripción, nivel o estado..." value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }} />
+        <select className="app-input text-sm" value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1); }}>
+          <option value="todos">Todos</option>
+          {['nuevo', ...ESTADOS_GESTION].map((e) => <option key={e} value={e}>{e}</option>)}
+        </select>
       </div>
 
       {listaPaginada.map((i) => (
-        <div key={i.id} className="app-surface-muted p-3 space-y-2">
-          <p><b>Descripción:</b> {i.descripcion}</p>
-          <p><b>Nivel:</b> {i.nivel}</p>
-          <p><b>Estado:</b> <span className="capitalize">{estadosLocal[i.id]?.estado || 'Nuevo'}</span></p>
-          <p className="text-xs text-app-text-secondary"><b>Fecha incidente:</b> {formatBogota(i.created_at, fechasLocal[i.id])}</p>
+        <div key={i.id} className="app-surface-muted p-4 space-y-3 border-l-2 border-l-brand-primary/40">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="font-medium leading-relaxed flex-1">{i.descripcion}</p>
+            <span className={`app-badge ${i.nivel === 'alto' ? 'app-badge-error' : i.nivel === 'medio' ? 'app-badge-warning' : 'app-badge-info'} capitalize`}>{i.nivel}</span>
+          </div>
+          <div className="grid md:grid-cols-3 gap-2 text-sm">
+            <p><span className="text-app-text-secondary">Estado:</span> <span className="capitalize font-semibold">{estadosLocal[i.id]?.estado || 'Nuevo'}</span></p>
+            <p className="text-app-text-secondary">Reporte: {formatBogota(i.created_at, fechasLocal[i.id])}</p>
+            <p className="text-app-text-secondary md:text-right">ID: {i.id.slice(0, 8)}...</p>
+          </div>
 
           {usuarioApp?.rol_id === 'admin' && (
-            <div className="space-y-2">
-              <p className="text-xs text-app-text-secondary">Gestión administrativa</p>
+            <div className="app-surface-primary p-3">
+              <p className="text-xs text-app-text-secondary mb-2">Acciones administrativas</p>
               <div className="flex flex-wrap gap-2">
                 {ESTADOS_GESTION.map((estado) => (
-                  <button
-                    key={estado}
-                    className={`px-2 py-1 border rounded text-xs hover:bg-app-bg ${estadosLocal[i.id]?.estado === estado ? 'bg-app-bg text-white' : ''}`}
-                    onClick={() => cambiarEstado(i, estado)}
-                  >
-                    {estado}
-                  </button>
+                  <button key={estado} className={`app-btn text-xs ${estadosLocal[i.id]?.estado === estado ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => cambiarEstado(i, estado)}>{estado}</button>
                 ))}
               </div>
             </div>
@@ -194,25 +125,12 @@ export default function ListaIncidentes({ usuarioApp }) {
       ))}
 
       {lista.length === 0 && <p className="text-sm text-app-text-secondary">Sin incidentes para el filtro seleccionado.</p>}
-
       {lista.length > 0 && (
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-app-text-secondary">Página {paginaActual} de {totalPaginas}</p>
           <div className="flex gap-2">
-            <button
-              className="px-3 py-1 border rounded text-sm disabled:opacity-40"
-              disabled={paginaActual === 1}
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </button>
-            <button
-              className="px-3 py-1 border rounded text-sm disabled:opacity-40"
-              disabled={paginaActual === totalPaginas}
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-            >
-              Siguiente
-            </button>
+            <button className="app-btn-ghost text-xs" disabled={paginaActual === 1} onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>
+            <button className="app-btn-ghost text-xs" disabled={paginaActual === totalPaginas} onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}>Siguiente</button>
           </div>
         </div>
       )}

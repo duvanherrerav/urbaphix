@@ -395,9 +395,9 @@ export default function CrearVisita({ usuarioApp }) {
         </div>
       )}
       <div className="grid md:grid-cols-3 gap-2">
-        <div>{touched.nombre && erroresFormulario.nombre && <p className="text-xs text-red-600">{erroresFormulario.nombre}</p>}</div>
-        <div>{touched.documento && erroresFormulario.documento && <p className="text-xs text-red-600">{erroresFormulario.documento}</p>}</div>
-        <div>{touched.fecha && erroresFormulario.fecha && <p className="text-xs text-red-600">{erroresFormulario.fecha}</p>}</div>
+        <div>{touched.nombre && erroresFormulario.nombre && <p className="text-xs text-state-error">{erroresFormulario.nombre}</p>}</div>
+        <div>{touched.documento && erroresFormulario.documento && <p className="text-xs text-state-error">{erroresFormulario.documento}</p>}</div>
+        <div>{touched.fecha && erroresFormulario.fecha && <p className="text-xs text-state-error">{erroresFormulario.fecha}</p>}</div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-3 items-start">
@@ -421,14 +421,14 @@ export default function CrearVisita({ usuarioApp }) {
           />
         )}
         {form.tipoVehiculo && form.placa && !validacionPlaca.ok && (
-          <p className="text-xs text-red-600">{validacionPlaca.mensaje}</p>
+          <p className="text-xs text-state-error">{validacionPlaca.mensaje}</p>
         )}
       </div>
 
       <button
         onClick={crearVisita}
         disabled={loading}
-        className="btn-primary w-full"
+        className="btn-primary w-full py-3 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.25)]"
       >
         {loading ? 'Creando...' : 'Crear visita y generar QR'}
       </button>
@@ -447,16 +447,16 @@ export default function CrearVisita({ usuarioApp }) {
         </div>
       )}
 
-      <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60">
+      <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Visitantes frecuentes</h3>
           <span className="text-xs text-app-text-secondary">{historialFiltrado.length} registros</span>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-brand-primary text-app-text-primary' : 'bg-app-bg'}`} onClick={() => { setFiltroHistorial('todos'); setPaginaFrecuentes(1); }}>Todos</button>
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-700'}`} onClick={() => { setFiltroHistorial('pendiente'); setPaginaFrecuentes(1); }}>Pendientes</button>
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'ingresado' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'}`} onClick={() => { setFiltroHistorial('ingresado'); setPaginaFrecuentes(1); }}>En curso</button>
-          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'}`} onClick={() => { setFiltroHistorial('salido'); setPaginaFrecuentes(1); }}>Completadas</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-[#F59E0B1F] text-state-warning'}`} onClick={() => { setFiltroHistorial('pendiente'); setPaginaFrecuentes(1); }}>Pendientes</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'ingresado' ? 'bg-blue-600 text-white' : 'bg-[#38BDF826] text-state-info'}`} onClick={() => { setFiltroHistorial('ingresado'); setPaginaFrecuentes(1); }}>En curso</button>
+          <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-[#22C55E26] text-state-success'}`} onClick={() => { setFiltroHistorial('salido'); setPaginaFrecuentes(1); }}>Completadas</button>
         </div>
         <input
           className="app-input"
@@ -467,16 +467,16 @@ export default function CrearVisita({ usuarioApp }) {
             setPaginaFrecuentes(1);
           }}
         />
-        <div className="space-y-2 max-h-72 overflow-auto">
+        <div className="space-y-2 max-h-72 overflow-auto pr-1">
           {historialPaginado.map((item) => (
             <div key={item.id} className="app-surface-primary p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${normalizarEstado(item.estado) === 'salido'
-                  ? 'bg-green-100 text-green-700'
+                  ? 'bg-[#22C55E26] text-state-success'
                   : normalizarEstado(item.estado) === 'ingresado'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-amber-100 text-amber-700'
+                    ? 'bg-[#38BDF826] text-state-info'
+                    : 'bg-[#F59E0B1F] text-state-warning'
                   }`}>
                   {normalizarEstado(item.estado) === 'salido' ? 'Completada' : normalizarEstado(item.estado) === 'ingresado' ? 'En curso' : 'Pendiente'}
                 </span>
@@ -485,10 +485,10 @@ export default function CrearVisita({ usuarioApp }) {
               {item.placa && <p className="text-app-text-secondary">Placa: {item.placa}</p>}
               <div className="flex flex-wrap gap-2 mt-2">
                 {normalizarEstado(item.estado) === 'pendiente' && (
-                  <button className="px-2 py-1 border rounded" onClick={() => setQRDesdeHistorial(item)}>Reenviar QR</button>
+                  <button className="app-btn-ghost text-xs" onClick={() => setQRDesdeHistorial(item)}>Reenviar QR</button>
                 )}
                 {normalizarEstado(item.estado) === 'salido' && (
-                  <button className="px-2 py-1 border rounded" onClick={() => reutilizarVisita(item)}>Crear nueva visita con estos datos</button>
+                  <button className="app-btn-ghost text-xs" onClick={() => reutilizarVisita(item)}>Crear nueva visita con estos datos</button>
                 )}
               </div>
             </div>
@@ -500,14 +500,14 @@ export default function CrearVisita({ usuarioApp }) {
             <span className="text-app-text-secondary">Página {paginaFrecuenteActual} de {totalPaginasFrecuentes}</span>
             <div className="flex gap-2">
               <button
-                className="px-2 py-1 border rounded disabled:opacity-40"
+                className="app-btn-ghost text-xs disabled:opacity-40"
                 disabled={paginaFrecuenteActual === 1}
                 onClick={() => setPaginaFrecuentes((p) => Math.max(1, p - 1))}
               >
                 Anterior
               </button>
               <button
-                className="px-2 py-1 border rounded disabled:opacity-40"
+                className="app-btn-ghost text-xs disabled:opacity-40"
                 disabled={paginaFrecuenteActual === totalPaginasFrecuentes}
                 onClick={() => setPaginaFrecuentes((p) => Math.min(totalPaginasFrecuentes, p + 1))}
               >
