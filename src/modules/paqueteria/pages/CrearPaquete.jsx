@@ -56,7 +56,7 @@ export default function CrearPaquete({ usuarioApp }) {
   };
 
   return (
-    <div className="app-surface-primary p-5 space-y-4">
+    <div className="app-surface-primary p-5 space-y-5">
       <div>
         <h2 className="text-2xl font-bold">Registrar recepción 📦</h2>
         <p className="text-sm text-app-text-secondary">Carga rápida para paquetería y servicios públicos por torre/apartamento.</p>

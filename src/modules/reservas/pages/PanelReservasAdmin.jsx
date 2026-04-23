@@ -499,13 +499,13 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
     return (
         <div className="space-y-5">
-            <div className="bg-app-bg-alt rounded-2xl p-5 shadow space-y-4">
+            <div className="app-surface-primary rounded-2xl p-5 shadow space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-2xl font-bold">Recursos comunes</h2>
                     {vistaAdmin === 'lista' ? (
-                        <button className="bg-indigo-700 text-white px-3 py-2 rounded" onClick={iniciarCreacion}>Crear recurso</button>
+                        <button className="app-btn-primary text-xs" onClick={iniciarCreacion}>Crear recurso</button>
                     ) : (
-                        <button className="border border-app-border px-3 py-2 rounded" onClick={salirAListado}>Volver al listado</button>
+                        <button className="app-btn-ghost text-xs" onClick={salirAListado}>Volver al listado</button>
                     )}
                 </div>
                 {loading && <p className="text-sm text-app-text-secondary">Cargando...</p>}
@@ -513,12 +513,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                 {vistaAdmin === 'lista' && (
                     <div className="space-y-2">
                         {recursos.map((r) => (
-                            <div key={r.id} className="border rounded-xl p-3 flex items-center justify-between gap-3">
+                            <div key={r.id} className="app-surface-muted p-3 flex items-center justify-between gap-3">
                                 <div>
                                     <p className="font-medium">{r.nombre}</p>
                                     <p className="text-sm text-app-text-secondary">{r.tipo} · Capacidad: {r.capacidad || 'N/A'}</p>
                                 </div>
-                                <button className="text-sm border rounded px-3 py-1" onClick={() => abrirDetalleRecurso(r.id)}>Editar</button>
+                                <button className="app-btn-ghost text-xs" onClick={() => abrirDetalleRecurso(r.id)}>Editar</button>
                             </div>
                         ))}
                         {recursos.length === 0 && <p className="text-sm text-app-text-secondary">No hay recursos creados.</p>}
@@ -531,7 +531,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                             <>
                                 <div className="flex gap-2 text-sm">
                                     {['General', 'Disponibilidad', 'Depósito'].map((label, idx) => (
-                                        <span key={label} className={`px-3 py-1 rounded-full ${wizardStep === idx ? 'bg-indigo-100 text-indigo-700' : 'bg-app-bg text-app-text-secondary'}`}>{idx + 1}. {label}</span>
+                                        <span key={label} className={`px-3 py-1 rounded-full ${wizardStep === idx ? 'bg-[#38BDF826] text-state-info border-state-info/40' : 'bg-app-bg text-app-text-secondary border-app-border'}`}>{idx + 1}. {label}</span>
                                     ))}
                                 </div>
                                 <div className="grid md:grid-cols-2 gap-3">
@@ -555,12 +555,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                     )}
                                 </div>
                                 {wizardStep === 1 && (
-                                    <div className="border rounded-xl p-4 space-y-3 bg-app-bg">
+                                    <div className="app-surface-muted p-4 space-y-3 bg-app-bg/70">
                                         <h4 className="font-semibold">Disponibilidad</h4>
                                         {GRUPOS_DIAS.map((dia) => {
                                             const cfg = recursoForm.disponibilidad_semanal[dia.key];
                                             return (
-                                                <div key={dia.key} className="bg-app-bg-alt border rounded-lg p-3 space-y-2">
+                                                <div key={dia.key} className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <h5 className="font-medium">{dia.label}</h5>
                                                         <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />Disponible</label>
@@ -579,13 +579,13 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-2">
-                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
+                                                                    <button type="button" className="app-btn-ghost text-xs" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
                                                                     {cfg.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque(dia.key, idx, 'nombre', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque(dia.key, idx, 'hora_fin', e.target.value)} /></label>
-                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
+                                                                            <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -596,7 +596,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                             );
                                         })}
 
-                                        <div className="bg-app-bg-alt border rounded-lg p-3 space-y-2">
+                                        <div className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
                                             <h5 className="font-medium">Días festivos</h5>
                                             <label className="text-sm flex items-center gap-2">
                                                 <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
@@ -612,7 +612,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                         </select>
                                                     </label>
                                                     {recursoForm.festivos.usar === 'especial' && (
-                                                        <div className="space-y-2 border rounded-lg p-2">
+                                                        <div className="space-y-2 rounded-lg border border-brand-primary/30 bg-app-bg/60 p-3">
                                                             <label className="text-sm block">Tipo de horario especial
                                                                 <select className="app-input mt-1" value={recursoForm.festivos.especial.modo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, modo: e.target.value } }))}>
                                                                     {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -628,13 +628,13 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                             )}
                                                             {recursoForm.festivos.especial.modo === 'bloques_fijos' && (
                                                                 <div className="space-y-2">
-                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>
+                                                                    <button type="button" className="app-btn-ghost text-xs" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>
                                                                     {recursoForm.festivos.especial.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`wizard-festivos-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque('festivos', idx, 'nombre', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque('festivos', idx, 'hora_inicio', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque('festivos', idx, 'hora_fin', e.target.value)} /></label>
-                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
+                                                                            <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -647,7 +647,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                     </div>
                                 )}
                                 {wizardStep === 2 && (
-                                    <div className="border rounded-xl p-4 space-y-3 bg-app-bg">
+                                    <div className="app-surface-muted p-4 space-y-3 bg-app-bg/70">
                                         <h4 className="font-semibold">Depósito</h4>
                                         <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
                                         {recursoForm.requiere_deposito && (
@@ -664,10 +664,10 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                     </div>
                                 )}
                                 <div className="flex justify-between">
-                                    <button className="border rounded px-3 py-2" onClick={() => setWizardStep((s) => Math.max(0, s - 1))} disabled={wizardStep === 0}>Anterior</button>
+                                    <button className="app-btn-ghost text-xs" onClick={() => setWizardStep((s) => Math.max(0, s - 1))} disabled={wizardStep === 0}>Anterior</button>
                                     {wizardStep < 2
-                                        ? <button className="bg-indigo-700 text-white rounded px-3 py-2" onClick={() => setWizardStep((s) => Math.min(2, s + 1))}>Siguiente</button>
-                                        : <button className="bg-indigo-700 text-white rounded px-3 py-2" onClick={guardarDesdeVista}>Crear recurso</button>}
+                                        ? <button className="app-btn-primary text-xs" onClick={() => setWizardStep((s) => Math.min(2, s + 1))}>Siguiente</button>
+                                        : <button className="app-btn-primary text-xs" onClick={guardarDesdeVista}>Crear recurso</button>}
                                 </div>
                             </>
                         )}
@@ -682,7 +682,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         ['bloqueos', 'Bloqueos'],
                                         ['historial', 'Historial']
                                     ].map(([key, label]) => (
-                                        <button key={key} className={`px-3 py-1 rounded ${detalleTab === key ? 'bg-indigo-100 text-indigo-700' : 'bg-app-bg text-app-text-secondary'}`} onClick={() => setDetalleTab(key)}>{label}</button>
+                                        <button key={key} className={`px-3 py-1 rounded border ${detalleTab === key ? 'bg-[#38BDF826] text-state-info border-state-info/40' : 'bg-app-bg text-app-text-secondary border-app-border'}`} onClick={() => setDetalleTab(key)}>{label}</button>
                                     ))}
                                 </div>
 
@@ -706,12 +706,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 )}
 
                                 {detalleTab === 'disponibilidad' && (
-                                    <div className="border rounded-xl p-4 space-y-3 bg-app-bg">
+                                    <div className="app-surface-muted p-4 space-y-3 bg-app-bg/70">
                                         <h4 className="font-semibold">Disponibilidad semanal</h4>
                                         {GRUPOS_DIAS.map((dia) => {
                                             const cfg = recursoForm.disponibilidad_semanal[dia.key];
                                             return (
-                                                <div key={dia.key} className="bg-app-bg-alt border rounded-lg p-3 space-y-2">
+                                                <div key={dia.key} className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <h5 className="font-medium">{dia.label}</h5>
                                                         <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />Disponible</label>
@@ -730,13 +730,13 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-2">
-                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
+                                                                    <button type="button" className="app-btn-ghost text-xs" onClick={() => addBloque(dia.key)}>Agregar bloque</button>
                                                                     {cfg.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque(dia.key, idx, 'nombre', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque(dia.key, idx, 'hora_fin', e.target.value)} /></label>
-                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
+                                                                            <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -747,7 +747,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                             );
                                         })}
 
-                                        <div className="bg-app-bg-alt border rounded-lg p-3 space-y-2">
+                                        <div className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
                                             <h5 className="font-medium">Días festivos</h5>
                                             <label className="text-sm flex items-center gap-2">
                                                 <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
@@ -763,7 +763,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                         </select>
                                                     </label>
                                                     {recursoForm.festivos.usar === 'especial' && (
-                                                        <div className="space-y-2 border rounded-lg p-2">
+                                                        <div className="space-y-2 rounded-lg border border-brand-primary/30 bg-app-bg/60 p-3">
                                                             <label className="text-sm block">Tipo de horario especial
                                                                 <select className="app-input mt-1" value={recursoForm.festivos.especial.modo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, modo: e.target.value } }))}>
                                                                     {MODO_OPCIONES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -779,13 +779,13 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                             )}
                                                             {recursoForm.festivos.especial.modo === 'bloques_fijos' && (
                                                                 <div className="space-y-2">
-                                                                    <button type="button" className="text-xs border rounded px-2 py-1" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>
+                                                                    <button type="button" className="app-btn-ghost text-xs" onClick={() => addBloque('festivos')}>Agregar bloque festivo</button>
                                                                     {recursoForm.festivos.especial.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`detalle-festivos-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque('festivos', idx, 'nombre', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque('festivos', idx, 'hora_inicio', e.target.value)} /></label>
                                                                             <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque('festivos', idx, 'hora_fin', e.target.value)} /></label>
-                                                                            <button type="button" className="text-xs border rounded px-2 py-1 h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
+                                                                            <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -799,7 +799,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 )}
 
                                 {detalleTab === 'deposito' && (
-                                    <div className="border rounded-xl p-4 space-y-3 bg-app-bg">
+                                    <div className="app-surface-muted p-4 space-y-3 bg-app-bg/70">
                                         <h4 className="font-semibold">Depósito</h4>
                                         <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
                                         {recursoForm.requiere_deposito && (
@@ -832,9 +832,9 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         <button className="btn-primary px-3 py-2 rounded" onClick={crearBloqueoAdmin}>Registrar cierre temporal</button>
                                         <div className="space-y-2">
                                             {bloqueos.filter((b) => !recursoEditId || b.recurso_id === recursoEditId).map((b) => (
-                                                <div key={b.id} className="border rounded p-2 flex items-center justify-between">
+                                                <div key={b.id} className="app-surface-muted p-2 flex items-center justify-between">
                                                     <p className="text-sm">{b.recursos_comunes?.nombre || b.recurso_id} · {formatDateRangeBogota(b.fecha_inicio, b.fecha_fin)} · {b.motivo}</p>
-                                                    <button className="text-xs border rounded px-2 py-1" onClick={() => borrarBloqueo(b.id)}>Eliminar</button>
+                                                    <button className="app-btn-ghost text-xs" onClick={() => borrarBloqueo(b.id)}>Eliminar</button>
                                                 </div>
                                             ))}
                                         </div>
@@ -846,23 +846,23 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         {recursosHistorial.map((r) => {
                                             const evaluacionNoShow = evaluarElegibilidadNoShow(r);
                                             return (
-                                                <div key={r.id} className="border rounded-xl p-3 space-y-2">
+                                                <div key={r.id} className="app-surface-muted p-3 space-y-2">
                                                 <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
                                                 <p className="text-sm text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
                                                 <p className="text-sm text-app-text-secondary">Residente ID: {r.residente_id}</p>
                                                 {r.estado === 'solicitada' && (
                                                     <div className="flex gap-2 mt-2">
-                                                        <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
-                                                        <button className="bg-red-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
+                                                        <button className="app-btn-secondary text-xs" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
+                                                        <button className="app-btn-danger text-xs" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
                                                     </div>
                                                 )}
                                                 {r.estado === 'aprobada' && (
                                                     <div className="flex flex-wrap gap-2 mt-2">
-                                                        <button className="bg-blue-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'en_curso', 'Check-in por admin')}>
+                                                        <button className="app-btn-primary text-xs" onClick={() => actualizarEstado(r.id, 'en_curso', 'Check-in por admin')}>
                                                             Check-in
                                                         </button>
                                                         <button
-                                                            className="bg-amber-600 text-white px-3 py-1 rounded disabled:bg-amber-300 disabled:cursor-not-allowed"
+                                                            className="app-btn-secondary text-xs disabled:opacity-50"
                                                             disabled={!evaluacionNoShow.elegible}
                                                             onClick={() => actualizarEstado(r.id, 'no_show', 'Marcada como no asistió por admin')}
                                                         >
@@ -875,12 +875,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 )}
                                                 {r.estado === 'en_curso' && (
                                                     <div className="flex gap-2 mt-2">
-                                                        <button className="bg-emerald-600 text-white px-3 py-1 rounded" onClick={() => actualizarEstado(r.id, 'finalizada', 'Check-out por admin')}>
+                                                        <button className="app-btn-secondary text-xs" onClick={() => actualizarEstado(r.id, 'finalizada', 'Check-out por admin')}>
                                                             Check-out
                                                         </button>
                                                     </div>
                                                 )}
-                                                <button className="text-sm underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
+                                                <button className="text-xs text-brand-secondary underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
                                                 {eventosPorReserva[r.id]?.length > 0 && (
                                                     <ul className="text-xs text-app-text-secondary list-disc pl-4">
                                                         {eventosPorReserva[r.id].map((ev) => (
@@ -896,7 +896,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 )}
 
                                 {['general', 'disponibilidad', 'deposito'].includes(detalleTab) && (
-                                    <button className="bg-indigo-700 text-white px-3 py-2 rounded" onClick={guardarDesdeVista}>Guardar cambios</button>
+                                    <button className="app-btn-primary text-xs" onClick={guardarDesdeVista}>Guardar cambios</button>
                                 )}
                             </>
                         )}

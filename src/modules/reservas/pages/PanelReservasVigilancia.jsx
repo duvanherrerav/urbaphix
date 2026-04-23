@@ -46,7 +46,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
   };
 
   return (
-    <div className="app-surface-primary rounded-2xl p-5 shadow space-y-4">
+    <div className="app-surface-primary rounded-2xl p-5 shadow space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold">Reservas operativas 🛡️</h2>
@@ -67,7 +67,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
       {reservas.map((r) => {
         const evaluacionNoShow = evaluarElegibilidadNoShow(r);
         return (
-          <div key={r.id} className="app-surface-muted p-4 space-y-3">
+          <div key={r.id} className="app-surface-muted p-4 border border-app-border/70 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold">{r.recursos_comunes?.nombre || 'Recurso'}</p>
               <ReservaStatusBadge estado={r.estado} />

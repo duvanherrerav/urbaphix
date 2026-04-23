@@ -69,35 +69,56 @@ export default function ListaIncidentes({ usuarioApp }) {
   const paginaActual = Math.min(pagina, totalPaginas);
   const listaPaginada = lista.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
+  const resumen = {
+    total: lista.length,
+    alto: lista.filter((i) => i.nivel === 'alto').length,
+    enGestion: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'en_gestion').length,
+    cerrados: lista.filter((i) => (estadosLocal[i.id]?.estado || 'nuevo') === 'cerrado').length
+  };
+
   return (
     <div className="app-surface-primary p-5 space-y-4">
-      <div className="flex flex-wrap justify-between items-center gap-2">
-        <h2 className="text-2xl font-bold">Incidentes</h2>
-        <div className="flex gap-2">
-          <input className="app-input text-sm" placeholder="Buscar incidente..." value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }} />
-          <select className="app-input text-sm" value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1); }}>
-            <option value="todos">Todos</option>
-            {['nuevo', ...ESTADOS_GESTION].map((e) => <option key={e} value={e}>{e}</option>)}
-          </select>
+      <div className="grid lg:grid-cols-[1fr_auto] gap-3 items-start">
+        <div>
+          <h2 className="text-2xl font-bold">Incidentes</h2>
+          <p className="text-sm text-app-text-secondary mt-1">Gestión administrativa con prioridad, estado y trazabilidad temporal.</p>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">Total</p><p className="font-semibold text-lg">{resumen.total}</p></div>
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">Nivel alto</p><p className="font-semibold text-lg text-state-error">{resumen.alto}</p></div>
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">En gestión</p><p className="font-semibold text-lg text-state-info">{resumen.enGestion}</p></div>
+          <div className="app-surface-muted p-2"><p className="text-app-text-secondary">Cerrados</p><p className="font-semibold text-lg">{resumen.cerrados}</p></div>
         </div>
       </div>
 
+      <div className="grid md:grid-cols-[1fr_220px] gap-2">
+        <input className="app-input text-sm" placeholder="Buscar por descripción, nivel o estado..." value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }} />
+        <select className="app-input text-sm" value={filtroEstado} onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1); }}>
+          <option value="todos">Todos</option>
+          {['nuevo', ...ESTADOS_GESTION].map((e) => <option key={e} value={e}>{e}</option>)}
+        </select>
+      </div>
+
       {listaPaginada.map((i) => (
-        <div key={i.id} className="app-surface-muted p-4 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <p className="font-medium">{i.descripcion}</p>
+        <div key={i.id} className="app-surface-muted p-4 space-y-3 border-l-2 border-l-brand-primary/40">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="font-medium leading-relaxed flex-1">{i.descripcion}</p>
             <span className={`app-badge ${i.nivel === 'alto' ? 'app-badge-error' : i.nivel === 'medio' ? 'app-badge-warning' : 'app-badge-info'} capitalize`}>{i.nivel}</span>
           </div>
-          <div className="grid md:grid-cols-2 gap-2 text-sm">
+          <div className="grid md:grid-cols-3 gap-2 text-sm">
             <p><span className="text-app-text-secondary">Estado:</span> <span className="capitalize font-semibold">{estadosLocal[i.id]?.estado || 'Nuevo'}</span></p>
-            <p className="text-app-text-secondary md:text-right">{formatBogota(i.created_at, fechasLocal[i.id])}</p>
+            <p className="text-app-text-secondary">Reporte: {formatBogota(i.created_at, fechasLocal[i.id])}</p>
+            <p className="text-app-text-secondary md:text-right">ID: {i.id.slice(0, 8)}...</p>
           </div>
 
           {usuarioApp?.rol_id === 'admin' && (
-            <div className="flex flex-wrap gap-2">
-              {ESTADOS_GESTION.map((estado) => (
-                <button key={estado} className={`app-btn text-xs ${estadosLocal[i.id]?.estado === estado ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => cambiarEstado(i, estado)}>{estado}</button>
-              ))}
+            <div className="app-surface-primary p-3">
+              <p className="text-xs text-app-text-secondary mb-2">Acciones administrativas</p>
+              <div className="flex flex-wrap gap-2">
+                {ESTADOS_GESTION.map((estado) => (
+                  <button key={estado} className={`app-btn text-xs ${estadosLocal[i.id]?.estado === estado ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => cambiarEstado(i, estado)}>{estado}</button>
+                ))}
+              </div>
             </div>
           )}
         </div>

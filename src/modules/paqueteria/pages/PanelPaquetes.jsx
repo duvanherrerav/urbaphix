@@ -53,13 +53,13 @@ export default function PanelPaquetes({ usuarioApp }) {
   };
 
   return (
-    <div className="app-surface-primary rounded-2xl p-5 space-y-4">
+    <div className="app-surface-primary rounded-2xl p-5 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold">Panel de paquetería 📬</h2>
           <p className="text-sm text-app-text-secondary">Operación por estado, búsqueda y confirmación de entrega.</p>
         </div>
-        <div className="app-surface-muted text-sm">
+        <div className="app-surface-muted text-sm border border-brand-primary/20">
           <p><b>Pendientes:</b> {entregables.length}</p>
           <p><b>Servicios públicos:</b> {serviciosPendientes}</p>
         </div>
@@ -81,7 +81,7 @@ export default function PanelPaquetes({ usuarioApp }) {
 
       <div className="space-y-3">
         {paquetes.map((p) => (
-          <div key={p.id} className="app-surface-muted p-4">
+          <div key={p.id} className="app-surface-muted p-4 border border-app-border/70">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-medium">{p.descripcion_visible || 'Sin descripción'}</p>
               <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>

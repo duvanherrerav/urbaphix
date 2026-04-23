@@ -50,7 +50,6 @@ export default function DashboardAdmin({ usuarioApp }) {
     return { ocupacion, finalizacion };
   }, [stats]);
 
-  // 🔥 VISITAS
   async function obtenerVisitas() {
     try {
       const hoy = new Date();
@@ -68,12 +67,7 @@ export default function DashboardAdmin({ usuarioApp }) {
 
       if (error) {
         setVisitas([]);
-        setStats({
-          total: 0,
-          ingresados: 0,
-          pendientes: 0,
-          salidos: 0
-        });
+        setStats({ total: 0, ingresados: 0, pendientes: 0, salidos: 0 });
         return;
       }
 
@@ -88,18 +82,11 @@ export default function DashboardAdmin({ usuarioApp }) {
       });
     } catch {
       setVisitas([]);
-      setStats({
-        total: 0,
-        ingresados: 0,
-        pendientes: 0,
-        salidos: 0
-      });
+      setStats({ total: 0, ingresados: 0, pendientes: 0, salidos: 0 });
     }
   }
 
-  // 🔥 PAGOS
   async function obtenerPagos() {
-
     const { data, error } = await supabase
       .from('pagos')
       .select('valor, estado, created_at')
@@ -111,7 +98,6 @@ export default function DashboardAdmin({ usuarioApp }) {
   }
 
   useEffect(() => {
-
     if (!usuarioApp?.conjunto_id) return;
 
     const timer = setTimeout(() => {
@@ -121,17 +107,9 @@ export default function DashboardAdmin({ usuarioApp }) {
 
     const channel = supabase
       .channel('admin-visitas')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'registro_visitas'
-        },
-        () => {
-          obtenerVisitas();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas' }, () => {
+        obtenerVisitas();
+      })
       .subscribe();
 
     return () => {
@@ -142,80 +120,42 @@ export default function DashboardAdmin({ usuarioApp }) {
   }, [usuarioApp]);
 
   return (
-    <div className="space-y-7">
-
-      {/* 🔥 HEADER PRO */}
+    <div className="space-y-6">
       <div className="app-surface-primary p-6 text-app-text-primary">
-
-        <h2 className="text-2xl font-bold">
-          👋 Hola {usuarioApp?.nombre || 'Admin'}
-        </h2>
-
-        <p className="text-sm text-app-text-secondary mt-1">
-          Resumen general del conjunto
-        </p>
-
-        <div className="grid md:grid-cols-3 gap-2 mt-4 text-sm">
-
-          <div>🚗 {stats.ingresados} visitas activas</div>
-          <div>📦 {kpis.paquetesPendientes} paquetes</div>
-          <div>💰 {resumenFinanciero.pendientesCantidad} pagos pendientes</div>
-
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold">👋 Hola {usuarioApp?.nombre || 'Admin'}</h2>
+            <p className="text-sm text-app-text-secondary mt-1">Resumen del día del conjunto con foco operativo y financiero.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs min-w-[280px]">
+            <div className="app-surface-muted p-3"><p className="text-app-text-secondary">Activas</p><p className="text-lg font-semibold">{stats.ingresados}</p></div>
+            <div className="app-surface-muted p-3"><p className="text-app-text-secondary">Paquetes</p><p className="text-lg font-semibold">{kpis.paquetesPendientes}</p></div>
+            <div className="app-surface-muted p-3"><p className="text-app-text-secondary">Pendientes</p><p className="text-lg font-semibold">{resumenFinanciero.pendientesCantidad}</p></div>
+          </div>
         </div>
-
       </div>
 
-      {/* 🔥 KPIs */}
       <KPIsAdmin usuarioApp={usuarioApp} setKpis={setKpis} />
       <DashboardResumen stats={stats} kpis={kpis} />
 
-      {/* 🔥 CARDS MEJORADAS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-
-        <div className="app-surface-muted p-4 min-h-24">
-          🟡 Pendientes
-          <div className="text-2xl font-bold">{stats.pendientes}</div>
-        </div>
-
-        <div className="app-surface-muted p-4 min-h-24">
-          🔵 Ingresados
-          <div className="text-2xl font-bold">{stats.ingresados}</div>
-        </div>
-
-        <div className="app-surface-muted p-4 min-h-24">
-          🟢 Salidos
-          <div className="text-2xl font-bold">{stats.salidos}</div>
-        </div>
-
-        <div className="app-surface-muted p-4 min-h-24">
-          📦 Total
-          <div className="text-2xl font-bold">{stats.total}</div>
-        </div>
-
+        <div className="app-surface-muted p-4 min-h-24"><p className="text-xs text-app-text-secondary">Pendientes</p><div className="text-2xl font-bold text-state-warning">{stats.pendientes}</div></div>
+        <div className="app-surface-muted p-4 min-h-24"><p className="text-xs text-app-text-secondary">Ingresados</p><div className="text-2xl font-bold text-state-info">{stats.ingresados}</div></div>
+        <div className="app-surface-muted p-4 min-h-24"><p className="text-xs text-app-text-secondary">Salidos</p><div className="text-2xl font-bold text-state-success">{stats.salidos}</div></div>
+        <div className="app-surface-muted p-4 min-h-24"><p className="text-xs text-app-text-secondary">Total</p><div className="text-2xl font-bold">{stats.total}</div></div>
       </div>
 
-      {/* 🔥 NUEVOS MINI DASHBOARDS (sin saturar) */}
       <div className="grid md:grid-cols-2 gap-4">
         <div className="app-surface-primary p-4">
           <h3 className="font-semibold text-app-text-primary mb-3">⚙️ Salud operativa</h3>
           <div className="space-y-3">
             <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Ocupación de visitas</span>
-                <span className="font-semibold">{saludOperativa.ocupacion}%</span>
-              </div>
-              <div className="h-2 bg-app-bg rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${saludOperativa.ocupacion}%` }} />
-              </div>
+              <div className="flex justify-between text-sm mb-1"><span className="text-app-text-secondary">Ocupación de visitas</span><span className="font-semibold">{saludOperativa.ocupacion}%</span></div>
+              <div className="h-2 bg-app-bg rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${saludOperativa.ocupacion}%` }} /></div>
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span>Visitas finalizadas</span>
-                <span className="font-semibold">{saludOperativa.finalizacion}%</span>
-              </div>
-              <div className="h-2 bg-app-bg rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-emerald-500 to-lime-400" style={{ width: `${saludOperativa.finalizacion}%` }} />
-              </div>
+              <div className="flex justify-between text-sm mb-1"><span className="text-app-text-secondary">Visitas finalizadas</span><span className="font-semibold">{saludOperativa.finalizacion}%</span></div>
+              <div className="h-2 bg-app-bg rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-lime-400" style={{ width: `${saludOperativa.finalizacion}%` }} /></div>
             </div>
           </div>
         </div>
@@ -223,93 +163,41 @@ export default function DashboardAdmin({ usuarioApp }) {
         <div className="app-surface-primary p-4">
           <h3 className="font-semibold text-app-text-primary mb-3">💼 Pulso financiero</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl border border-app-border bg-app-bg p-3">
-              <p className="text-state-success font-medium">Recaudado</p>
-              <p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p>
-            </div>
-            <div className="rounded-xl border border-app-border bg-app-bg p-3">
-              <p className="text-state-warning font-medium">Pendiente</p>
-              <p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
-            </div>
+            <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-success font-medium">Recaudado</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p></div>
+            <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-warning font-medium">Pendiente</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p></div>
           </div>
         </div>
       </div>
 
-      {/* 🔥 ALERTA CARTERA */}
       <div className="app-surface-primary p-4">
-        <h3 className="font-semibold text-state-error mb-2">
-          🔥 Cartera en riesgo
-        </h3>
-
+        <h3 className="font-semibold text-state-error mb-2">🔥 Cartera en riesgo</h3>
         <CarteraResumen usuarioApp={usuarioApp} />
       </div>
 
-      {/* 🔥 GRÁFICAS PRINCIPALES */}
       <div className="grid md:grid-cols-2 gap-6">
-
-        <div className="app-surface-primary p-4">
-          <h3 className="font-semibold mb-2">📊 Actividad</h3>
-          <GraficaVisitas visitas={visitas} />
-        </div>
-
-        <div className="app-surface-primary p-4">
-          <h3 className="font-semibold mb-2">📦 Paquetes</h3>
-          <PaquetesPorTorre usuarioApp={usuarioApp} />
-        </div>
-
-
-
-        {/* 🔥 FINANCIERO */}
-        <div className="app-surface-primary p-4">
-          <h3 className="font-semibold mb-2">💰 Flujo financiero</h3>
-          <GraficaFinanciera pagos={pagos} />
-        </div>
-
-        {/* 🔥 CARTERA ANALÍTICA */}
-        <div className="app-surface-primary p-4">
-          <h3 className="font-semibold mb-2">📊 Análisis de cartera</h3>
-          <GraficaCartera pagos={pagos} />
-        </div>
+        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">📊 Actividad</h3><GraficaVisitas visitas={visitas} /></div>
+        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">📦 Paquetes</h3><PaquetesPorTorre usuarioApp={usuarioApp} /></div>
+        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">💰 Flujo financiero</h3><GraficaFinanciera pagos={pagos} /></div>
+        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">📊 Análisis de cartera</h3><GraficaCartera pagos={pagos} /></div>
       </div>
 
-      {/* 🔥 LISTADO */}
-      <div className="app-surface-primary p-4">
-
-        <h3 className="font-semibold mb-4">
-          Últimas visitas
-        </h3>
-
-        <div className="space-y-3">
-
+      <div className="app-surface-primary p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Últimas visitas</h3>
+          <span className="text-xs text-app-text-secondary">{visitas.slice(0, 5).length} registros recientes</span>
+        </div>
+        <div className="space-y-2">
           {visitas.slice(0, 5).map(v => (
-            <div
-              key={v.id}
-              className="border rounded-lg p-3 flex justify-between items-center"
-            >
+            <div key={v.id} className="app-surface-muted p-3 flex justify-between items-center">
               <div>
-                <p className="font-medium">{v.nombre_visitante}</p>
-                <p className="text-sm text-app-text-secondary">
-                  {v.documento} • {v.placa || 'Sin placa'}
-                </p>
+                <p className="font-medium">{v.nombre_visitante || 'Visitante'}</p>
+                <p className="text-sm text-app-text-secondary">{v.documento || '-'} • {v.placa || 'Sin placa'}</p>
               </div>
-
-              <span className={
-                v.estado === 'pendiente'
-                  ? 'text-yellow-500 font-semibold'
-                  : v.estado === 'ingresado'
-                    ? 'text-blue-500 font-semibold'
-                    : 'text-green-500 font-semibold'
-              }>
-                {v.estado}
-              </span>
-
+              <span className={v.estado === 'pendiente' ? 'app-badge app-badge-warning' : v.estado === 'ingresado' ? 'app-badge app-badge-info' : 'app-badge app-badge-success'}>{v.estado}</span>
             </div>
           ))}
-
         </div>
-
       </div>
-
     </div>
   );
 }

@@ -376,8 +376,10 @@ function App() {
 
                 {moduloActual === 'pagos' && (
                   <>
-                    <CrearCobro usuarioApp={usuarioApp} />
-                    <PanelPagosAdmin usuarioApp={usuarioApp} />
+                    <div className="grid xl:grid-cols-2 gap-4">
+                      <CrearCobro usuarioApp={usuarioApp} />
+                      <PanelPagosAdmin usuarioApp={usuarioApp} />
+                    </div>
                     <EstadoCuenta usuarioApp={usuarioApp} />
                   </>
                 )}
@@ -402,10 +404,10 @@ function App() {
                 )}
 
                 {moduloActual === 'paquetes' && (
-                  <>
+                  <div className="grid xl:grid-cols-[420px_1fr] gap-4 items-start">
                     <CrearPaquete usuarioApp={usuarioApp} />
                     <PanelPaquetes usuarioApp={usuarioApp} />
-                  </>
+                  </div>
                 )}
 
                 {moduloActual === 'incidentes' && (

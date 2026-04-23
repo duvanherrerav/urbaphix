@@ -80,9 +80,12 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
   return (
     <div className="app-surface-primary p-5 space-y-4">
-      <div>
-        <h3 className="text-xl font-bold">Estado de cuenta consolidado</h3>
-        <p className="text-sm text-app-text-secondary">Seguimiento de cobros por torre, apartamento y estado.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xl font-bold">Estado de cuenta consolidado</h3>
+          <p className="text-sm text-app-text-secondary">Balance de cobros, filtros operativos y acciones administrativas.</p>
+        </div>
+        <button className="app-btn-ghost text-xs" onClick={cargarPagos}>Actualizar panel</button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
@@ -92,7 +95,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         <div className="app-surface-muted"><span className="text-app-text-secondary">Cartera</span><p className="text-lg font-semibold">${resumen.cartera.toLocaleString('es-CO')}</p></div>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-2">
+      <div className="app-surface-muted p-3 grid lg:grid-cols-4 gap-2">
         <select className="app-input" value={filtroTorre} onChange={(e) => setFiltroTorre(e.target.value)}>
           <option value="">Todas las torres</option>
           {torres.map((torre) => <option key={torre} value={torre}>{torre}</option>)}
@@ -102,8 +105,8 @@ export default function PanelPagosAdmin({ usuarioApp }) {
           <option value="pendiente">Pendiente</option>
           <option value="pagado">Pagado</option>
         </select>
-        <input className="app-input" placeholder="Apto" value={busquedaApto} onChange={(e) => setBusquedaApto(e.target.value)} />
-        <button className="app-btn-ghost" onClick={cargarPagos}>Actualizar</button>
+        <input className="app-input" placeholder="Buscar apto" value={busquedaApto} onChange={(e) => setBusquedaApto(e.target.value)} />
+        <div className="text-xs text-app-text-secondary flex items-center">Aplicando filtros en tiempo real</div>
       </div>
 
       {loading && <p className="text-sm text-app-text-secondary">Cargando pagos...</p>}
@@ -112,17 +115,22 @@ export default function PanelPagosAdmin({ usuarioApp }) {
       <div className="space-y-2">
         {pagosFiltrados.map((pago) => (
           <div key={pago.id} className="app-surface-muted p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="grid md:grid-cols-[1fr_auto] gap-2 items-start">
               <div>
-                <p className="font-medium">{pago.nombre} · Torre {pago.torre} · Apto {pago.apartamento}</p>
-                <p className="text-xs text-app-text-secondary">{pago.concepto} · {formatFechaBogota(pago.created_at)}</p>
+                <p className="font-medium">{pago.nombre}</p>
+                <p className="text-xs text-app-text-secondary">Torre {pago.torre} · Apto {pago.apartamento} · {pago.concepto}</p>
+                <p className="text-xs text-app-text-secondary">Creado: {formatFechaBogota(pago.created_at)}</p>
               </div>
-              <div className="text-right">
-                <p className="font-semibold">${Number(pago.valor || 0).toLocaleString('es-CO')}</p>
+              <div className="text-right space-y-1">
+                <p className="font-semibold text-lg">${Number(pago.valor || 0).toLocaleString('es-CO')}</p>
                 <span className={`app-badge ${pago.estado === 'pendiente' ? 'app-badge-warning' : 'app-badge-success'} capitalize`}>{pago.estado}</span>
               </div>
             </div>
-            {pago.estado === 'pendiente' && <button className="mt-2 app-btn-primary text-xs" onClick={() => aprobarPago(pago)}>Aprobar pago</button>}
+            {pago.estado === 'pendiente' && (
+              <div className="mt-3 flex justify-end">
+                <button className="app-btn-secondary text-xs" onClick={() => aprobarPago(pago)}>Aprobar pago</button>
+              </div>
+            )}
           </div>
         ))}
       </div>

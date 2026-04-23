@@ -428,7 +428,7 @@ export default function CrearVisita({ usuarioApp }) {
       <button
         onClick={crearVisita}
         disabled={loading}
-        className="btn-primary w-full"
+        className="btn-primary w-full py-3 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.25)]"
       >
         {loading ? 'Creando...' : 'Crear visita y generar QR'}
       </button>
@@ -447,7 +447,7 @@ export default function CrearVisita({ usuarioApp }) {
         </div>
       )}
 
-      <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60">
+      <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Visitantes frecuentes</h3>
           <span className="text-xs text-app-text-secondary">{historialFiltrado.length} registros</span>
@@ -467,7 +467,7 @@ export default function CrearVisita({ usuarioApp }) {
             setPaginaFrecuentes(1);
           }}
         />
-        <div className="space-y-2 max-h-72 overflow-auto">
+        <div className="space-y-2 max-h-72 overflow-auto pr-1">
           {historialPaginado.map((item) => (
             <div key={item.id} className="app-surface-primary p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">

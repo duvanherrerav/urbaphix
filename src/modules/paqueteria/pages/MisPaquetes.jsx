@@ -112,7 +112,7 @@ export default function MisPaquetes({ usuarioApp }) {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="app-surface-primary p-5">
         <h2 className="text-2xl font-bold text-app-text-primary">Mis paquetes 📦</h2>
         <p className="text-sm text-app-text-secondary mt-1">Seguimiento de entregas con estado, fechas y categoría de servicio.</p>
@@ -147,7 +147,7 @@ export default function MisPaquetes({ usuarioApp }) {
 
       <div className="space-y-3">
         {paquetesPaginados.map((p) => (
-          <div key={p.id} className="app-surface-primary p-4">
+          <div key={p.id} className="app-surface-primary p-4 relative overflow-hidden">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-app-text-secondary">{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</p>
@@ -159,6 +159,7 @@ export default function MisPaquetes({ usuarioApp }) {
             </div>
 
             <div className="mt-3 grid md:grid-cols-3 gap-2 text-sm">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-primary/40 to-transparent" />
               <div className="app-surface-muted"><span className="text-app-text-secondary block">Estado</span><span className={`${p.estado === 'pendiente' ? 'text-state-warning' : 'text-state-success'} font-semibold capitalize`}>{p.estado}</span></div>
               <div className="app-surface-muted"><span className="text-app-text-secondary block">Recibido</span><span>{p.fecha_recibido ? new Date(p.fecha_recibido).toLocaleDateString() : '-'}</span></div>
               <div className="app-surface-muted"><span className="text-app-text-secondary block">Entregado</span><span>{p.fecha_entrega ? new Date(p.fecha_entrega).toLocaleDateString() : 'Pendiente'}</span></div>
@@ -168,7 +169,7 @@ export default function MisPaquetes({ usuarioApp }) {
       </div>
 
       {!loading && paquetesFiltrados.length > 0 && (
-        <div className="flex items-center justify-between text-xs">
+        <div className="app-surface-muted p-3 flex items-center justify-between text-xs">
           <span className="text-app-text-secondary">Página {paginaActual} de {totalPaginas} · {paquetesFiltrados.length} resultados</span>
           <div className="flex gap-2">
             <button className="app-btn-ghost text-xs" disabled={paginaActual === 1} onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>

@@ -304,7 +304,7 @@ export default function ReservarZona({ usuarioApp }) {
     const bloqueoPreview = franjaSeleccionada?.estado === 'bloqueada';
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-6">
             <div className="app-surface-primary p-5 text-app-text-primary">
                 <h1 className="text-2xl font-bold">Mis reservas</h1>
                 <p className="text-sm text-app-text-secondary">Gestiona tus solicitudes de zonas comunes de forma simple y clara.</p>
@@ -340,7 +340,7 @@ export default function ReservarZona({ usuarioApp }) {
                 minFecha={getTodayBogotaDate()}
             />
 
-            <section className="app-surface-primary p-5 space-y-3">
+            <section className="app-surface-primary p-5 space-y-3 border border-brand-primary/20">
                 <div className="flex items-center justify-between gap-2">
                     <h3 className="text-lg font-semibold">Mis reservas activas ({reservasActivas.length})</h3>
                     {loadingReservas && <p className="text-xs text-app-text-secondary">Actualizando...</p>}
@@ -373,7 +373,7 @@ export default function ReservarZona({ usuarioApp }) {
                 </div>
             </section>
 
-            <section className="app-surface-primary p-5 space-y-3">
+            <section className="app-surface-primary p-5 space-y-3 border border-brand-primary/20">
                 <h3 className="text-lg font-semibold">Historial reciente</h3>
 
                 {reservasHistorial.length === 0 && (
@@ -385,7 +385,7 @@ export default function ReservarZona({ usuarioApp }) {
 
                 <div className="space-y-2">
                     {reservasHistorial.map((r) => (
-                        <div key={r.id} className="border rounded-lg p-3 flex items-center justify-between gap-2">
+                        <div key={r.id} className="app-surface-muted p-3 flex items-center justify-between gap-2">
                             <div>
                                 <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
                                 <p className="text-xs text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>

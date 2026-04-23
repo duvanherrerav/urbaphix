@@ -97,7 +97,7 @@ export default function MisPagos({ usuarioApp }) {
   }), [pagos]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="app-surface-primary p-5">
         <h2 className="text-2xl font-bold">Mis pagos 💰</h2>
         <p className="text-sm text-app-text-secondary mt-1">Estado de cobros, valor por pagar y acciones por comprobante.</p>
@@ -121,7 +121,7 @@ export default function MisPagos({ usuarioApp }) {
                 {p.comprobante_url && <a href={p.comprobante_url} target="_blank" rel="noreferrer" className="text-xs text-brand-secondary">Ver comprobante 📄</a>}
               </div>
 
-              <div className="lg:w-80 space-y-2">
+              <div className="lg:w-80 space-y-3">
                 <div className="app-surface-muted flex items-center justify-between">
                   <span className="text-xs text-app-text-secondary">Valor</span>
                   <span className="font-bold text-lg">${Number(p.valor || 0).toLocaleString('es-CO')}</span>
@@ -131,12 +131,12 @@ export default function MisPagos({ usuarioApp }) {
                   {p.estado === 'pendiente' && <button onClick={pagar} className="app-btn-primary text-xs">Pagar</button>}
                 </div>
                 {p.estado === 'pendiente' && (
-                  <div className="app-surface-muted space-y-2">
+                  <div className="app-surface-muted space-y-2 border border-brand-primary/20">
                     <input type="file" onChange={(e) => setArchivo(e.target.files[0])} className="text-xs" />
                     <button onClick={() => subirComprobante(p.id)} className="app-btn-secondary text-xs w-full">Subir comprobante</button>
                   </div>
                 )}
-                {configPago?.tipo === 'manual' && <p className="text-xs text-app-text-secondary">💡 Pago manual habilitado para este conjunto.</p>}
+                {configPago?.tipo === 'manual' && <p className="text-xs text-app-text-secondary app-surface-muted">💡 Pago manual habilitado para este conjunto.</p>}
               </div>
             </div>
           </div>
