@@ -302,6 +302,14 @@ export default function ReservarZona({ usuarioApp }) {
     );
 
     const bloqueoPreview = franjaSeleccionada?.estado === 'bloqueada';
+    const estadoPostReserva = (reserva) => {
+        if (reserva?.estado === 'finalizada') return 'Finalizada';
+        if (reserva?.estado === 'no_show') return 'No asistió';
+        if (reserva?.estado === 'cancelada') return 'Cancelada';
+        if (reserva?.estado === 'en_curso') return 'En curso';
+        if (reserva?.estado === 'aprobada') return 'Aprobada';
+        return 'Pendiente de gestión';
+    };
 
     return (
         <div className="space-y-6">
@@ -357,18 +365,24 @@ export default function ReservarZona({ usuarioApp }) {
 
                 <div className="space-y-3">
                     {reservasActivas.map((r) => (
-                        <ReservaCard
-                            key={r.id}
-                            reserva={r}
-                            canCancel={['solicitada', 'aprobada'].includes(r.estado)}
-                            onCancel={cancelar}
-                            onAttach={adjuntarSoporte}
-                            uploading={subiendoSoporteId === r.id}
-                            timelineEnabled={TIMELINE_ENABLED}
-                            onToggleTimeline={(reservaId) => setTimelineOpenId((prev) => prev === reservaId ? null : reservaId)}
-                            timelineOpen={timelineOpenId === r.id}
-                            timelineItems={timelineByReserva[r.id] || []}
-                        />
+                        <div key={r.id} className="space-y-2">
+                            <ReservaCard
+                                reserva={r}
+                                canCancel={['solicitada', 'aprobada'].includes(r.estado)}
+                                onCancel={cancelar}
+                                onAttach={adjuntarSoporte}
+                                uploading={subiendoSoporteId === r.id}
+                                timelineEnabled={TIMELINE_ENABLED}
+                                onToggleTimeline={(reservaId) => setTimelineOpenId((prev) => prev === reservaId ? null : reservaId)}
+                                timelineOpen={timelineOpenId === r.id}
+                                timelineItems={timelineByReserva[r.id] || []}
+                            />
+                            <div className="app-surface-muted p-2 grid md:grid-cols-3 gap-2 text-xs">
+                                <p><span className="text-app-text-secondary">Post-reserva:</span> {estadoPostReserva(r)}</p>
+                                <p><span className="text-app-text-secondary">Depósito:</span> {r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
+                                <p><span className="text-app-text-secondary">Causal:</span> {r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
+                            </div>
+                        </div>
                     ))}
                 </div>
             </section>
@@ -386,9 +400,10 @@ export default function ReservarZona({ usuarioApp }) {
                 <div className="space-y-2">
                     {reservasHistorial.map((r) => (
                         <div key={r.id} className="app-surface-muted p-3 flex items-center justify-between gap-2">
-                            <div>
+                            <div className="space-y-1">
                                 <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
                                 <p className="text-xs text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                <p className="text-xs text-app-text-secondary">Post-reserva: {estadoPostReserva(r)} · Depósito: {r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente 7B'} · Causal: {r.causal_economica || r.metadata?.causal_economica || 'Sin causal'}</p>
                             </div>
                             <ReservaStatusBadge estado={r.estado} />
                         </div>
