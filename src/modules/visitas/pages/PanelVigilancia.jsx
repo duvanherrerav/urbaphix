@@ -14,6 +14,12 @@ const normalizeEstado = (estado) => {
     return value;
 };
 const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
+const minutesDiff = (value) => {
+    if (!value) return 0;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 0;
+    return Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 60000));
+};
 
 const parseQRCode = (text) => {
     try {
@@ -226,6 +232,11 @@ export default function PanelVigilancia({ usuarioApp }) {
         ingresadas: visitas.filter((v) => v.estado_normalizado === 'ingresado').length,
         finalizadas: visitas.filter((v) => v.estado_normalizado === 'salido').length
     };
+    const alertas = useMemo(() => {
+        const pendientesCriticos = visitas.filter((v) => v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30).length;
+        const enCursoProlongados = visitas.filter((v) => v.estado_normalizado === 'ingresado' && !v.hora_salida && minutesDiff(v.hora_ingreso || v.created_at) >= 180).length;
+        return { pendientesCriticos, enCursoProlongados };
+    }, [visitas]);
     const sla = calcularSLA(visitas);
 
     return (
@@ -252,6 +263,17 @@ export default function PanelVigilancia({ usuarioApp }) {
                 }}>Sincronizar contingencia</button>
             </div>
 
+            <div className="grid md:grid-cols-2 gap-2 text-sm">
+                <div className="app-surface-muted p-3 border border-state-warning/30">
+                    <p className="font-semibold text-state-warning">⚠️ Pendientes críticos (&gt;30 min): {alertas.pendientesCriticos}</p>
+                    <p className="text-xs text-app-text-secondary mt-1">Priorizar validación QR para reducir espera en portería.</p>
+                </div>
+                <div className="app-surface-muted p-3 border border-state-info/30">
+                    <p className="font-semibold text-state-info">🕒 En curso prolongadas (&gt;180 min): {alertas.enCursoProlongados}</p>
+                    <p className="text-xs text-app-text-secondary mt-1">Verificar salidas pendientes y registrar cierre operativo.</p>
+                </div>
+            </div>
+
             <div className="grid md:grid-cols-5 gap-2 text-xs app-surface-muted p-3">
                 <div className="rounded-lg border border-app-border bg-app-bg px-3 py-2"><b>Incidentes hoy:</b> {seguridad.incidentesHoy}</div>
                 <div className="rounded-lg border border-app-border bg-app-bg px-3 py-2"><b>Paquetes pendientes:</b> {seguridad.paquetesPendientes}</div>
@@ -275,16 +297,18 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             <div className="space-y-3">
                 {filtradasPaginadas.map((v) => (
-                    <div key={v.id} className="app-surface-muted p-4 border border-app-border/70">
+                    <div key={v.id} className={`app-surface-muted p-4 border ${v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 ? 'border-state-warning/60' : 'border-app-border/70'}`}>
                         <div className="flex flex-col md:flex-row md:justify-between gap-2">
                             <div className="space-y-1 text-sm">
                                 <p><b>Visitante:</b> {v.nombre_visitante}</p>
                                 <p><b>Documento:</b> {v.documento}</p>
                                 <p><b>Fecha visita:</b> {v.fecha_visita}</p>
                                 <p><b>Placa:</b> {v.placa || 'No registra'}</p>
+                                <p className="text-xs text-app-text-secondary"><b>Creado:</b> {toDateOnly() === v.fecha_visita ? 'Hoy' : v.fecha_visita} · Espera: {minutesDiff(v.created_at)} min</p>
                             </div>
                             <div className="space-y-1 text-sm md:text-right">
                                 <p><b>Estado:</b> <span className={v.estado_normalizado === 'pendiente' ? 'text-amber-600 font-semibold' : v.estado_normalizado === 'ingresado' ? 'text-blue-600 font-semibold' : 'text-green-600 font-semibold'}>{v.estado}</span></p>
+                                {v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 && <p className="text-state-warning font-semibold">⚠️ Atención inmediata</p>}
                                 {v.hora_ingreso && <p className="text-state-info">⏱ Ingreso: {v.hora_ingreso}</p>}
                                 {v.hora_salida && <p className="text-state-success">✅ Salida: {v.hora_salida}</p>}
                             </div>
