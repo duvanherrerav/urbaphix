@@ -9,6 +9,12 @@ const formatFechaBogota = (value) => {
   if (Number.isNaN(parsed.getTime())) return '-';
   return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
 };
+const getEstadoProcesoPago = (pago) => {
+  if (pago?.estado === 'pagado') return { key: 'pagado', label: 'Aprobado', badge: 'app-badge-success' };
+  if (pago?.estado === 'rechazado') return { key: 'rechazado', label: 'Rechazado', badge: 'app-badge-error' };
+  if (pago?.comprobante_url) return { key: 'en_revision', label: 'En revisión', badge: 'app-badge-info' };
+  return { key: 'pendiente', label: 'Pendiente de pago', badge: 'app-badge-warning' };
+};
 
 export default function MisPagos({ usuarioApp }) {
   const [pagos, setPagos] = useState([]);
@@ -163,6 +169,34 @@ export default function MisPagos({ usuarioApp }) {
       <div className="space-y-3">
         {pagos.map((p) => (
           <div key={p.id} className="app-surface-primary p-4">
+            {(() => {
+              const estadoProceso = getEstadoProcesoPago(p);
+              const timeline = [
+                { key: 'pendiente', label: 'Generado' },
+                { key: 'en_revision', label: 'Comprobante enviado' },
+                { key: 'pagado', label: 'Aprobado' }
+              ];
+              const statusOrder = { pendiente: 0, en_revision: 1, pagado: 2, rechazado: 1 };
+              return (
+                <>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className={`app-badge ${estadoProceso.badge}`}>{estadoProceso.label}</span>
+                    {p.estado === 'rechazado' && <span className="text-xs text-state-error">Actualiza comprobante para revalidación</span>}
+                  </div>
+                  <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
+                    {timeline.map((step, idx) => {
+                      const current = statusOrder[estadoProceso.key] ?? 0;
+                      const isActive = idx <= current;
+                      return (
+                        <div key={step.key} className={`rounded-lg px-2 py-1 text-center ${isActive ? 'bg-brand-primary/20 text-app-text-primary' : 'bg-app-bg text-app-text-secondary'}`}>
+                          {step.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
               <div className="space-y-1">
                 <p className="font-semibold text-app-text-primary">{p.concepto}</p>
@@ -176,13 +210,18 @@ export default function MisPagos({ usuarioApp }) {
                   <span className="font-bold text-lg">${Number(p.valor || 0).toLocaleString('es-CO')}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`app-badge ${p.estado === 'pendiente' ? 'app-badge-warning' : 'app-badge-success'} capitalize`}>{p.estado}</span>
+                  <span className={`app-badge ${getEstadoProcesoPago(p).badge}`}>{getEstadoProcesoPago(p).label}</span>
                   {p.estado === 'pendiente' && <button onClick={pagar} className="app-btn-primary text-xs">Pagar</button>}
                 </div>
-                {p.estado === 'pendiente' && (
-                  <div className="app-surface-muted space-y-2 border border-brand-primary/20">
+                {(p.estado === 'pendiente' || p.estado === 'rechazado') && (
+                  <div className="app-surface-muted space-y-2 border border-brand-primary/20 p-2">
+                    <p className="text-xs text-app-text-secondary">
+                      Comprobante: {p.comprobante_url ? 'enviado, pendiente revisión' : 'pendiente por adjuntar'}
+                    </p>
                     <input type="file" onChange={(e) => setArchivo(e.target.files[0])} className="text-xs" />
-                    <button onClick={() => subirComprobante(p.id)} className="app-btn-secondary text-xs w-full">Subir comprobante</button>
+                    <button onClick={() => subirComprobante(p.id)} className="app-btn-secondary text-xs w-full">
+                      {p.comprobante_url ? 'Reemplazar comprobante' : 'Subir comprobante'}
+                    </button>
                   </div>
                 )}
                 {configPago?.tipo === 'manual' && <p className="text-xs text-app-text-secondary app-surface-muted">💡 Pago manual habilitado para este conjunto.</p>}
