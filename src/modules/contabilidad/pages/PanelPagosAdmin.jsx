@@ -220,8 +220,10 @@ export default function PanelPagosAdmin({ usuarioApp }) {
             <h4 className={`font-semibold ${bandejaSeleccionada.titleClass}`}>Bandeja: {bandejaSeleccionada.label}</h4>
             <span className="text-xs text-app-text-secondary">{pagosBandejaActiva.length} registros</span>
           </div>
-          {pagosBandejaActiva.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos para esta bandeja.</p>}
-          {pagosBandejaActiva.map(renderTarjetaPago)}
+          <div className="max-h-[55vh] overflow-y-auto pr-1 space-y-2">
+            {pagosBandejaActiva.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos para esta bandeja.</p>}
+            {pagosBandejaActiva.map(renderTarjetaPago)}
+          </div>
         </div>
       </div>
     </div>
