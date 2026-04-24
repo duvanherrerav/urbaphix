@@ -128,7 +128,7 @@ export default function ListaIncidentes({ usuarioApp }) {
             <p className="text-app-text-secondary">Reporte: {formatBogota(i.created_at, fechasLocal[i.id])}</p>
             <p className="text-app-text-secondary md:text-right">ID: {typeof i.id === 'string' && i.id ? `${i.id.slice(0, 8)}...` : '-'}</p>
           </div>
-          <div className="grid md:grid-cols-2 gap-2 text-xs">
+          <div className="grid md:grid-cols-3 gap-2 text-xs">
             <div className="app-surface-primary p-2">
               <p className="text-app-text-secondary">Evidencia</p>
               <p className="text-app-text-secondary mt-1">{i.evidencia_url ? 'Adjunta' : 'Sin evidencia adjunta'}</p>
@@ -137,6 +137,10 @@ export default function ListaIncidentes({ usuarioApp }) {
             <div className="app-surface-primary p-2">
               <p className="text-app-text-secondary">Resolución</p>
               <p className="text-app-text-secondary mt-1">{i.resolucion || 'Pendiente por documentar'}</p>
+            </div>
+            <div className="app-surface-primary p-2">
+              <p className="text-app-text-secondary">Impacto económico</p>
+              <p className="text-app-text-secondary mt-1">{i.impacto_economico || 'Sin estimación económica'}</p>
             </div>
           </div>
 

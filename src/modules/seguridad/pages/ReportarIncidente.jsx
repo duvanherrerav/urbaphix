@@ -3,7 +3,15 @@ import { crearIncidente } from '../services/seguridadService';
 import toast from 'react-hot-toast';
 
 export default function ReportarIncidente({ user }) {
-  const [form, setForm] = useState({ descripcion: '', nivel: 'bajo', tipo: 'seguridad', ubicacion: '' });
+  const [form, setForm] = useState({
+    descripcion: '',
+    nivel: 'bajo',
+    tipo: 'seguridad',
+    ubicacion: '',
+    evidenciaRef: '',
+    resolucionRef: '',
+    impactoEconomicoRef: ''
+  });
   const [loading, setLoading] = useState(false);
 
   const etiquetasNivel = { bajo: '🟢 Bajo', medio: '🟠 Medio', alto: '🔴 Alto' };
@@ -22,7 +30,15 @@ export default function ReportarIncidente({ user }) {
     if (error) return toast.error(error);
 
     toast.success('Incidente reportado');
-    setForm({ descripcion: '', nivel: 'bajo', tipo: 'seguridad', ubicacion: '' });
+    setForm({
+      descripcion: '',
+      nivel: 'bajo',
+      tipo: 'seguridad',
+      ubicacion: '',
+      evidenciaRef: '',
+      resolucionRef: '',
+      impactoEconomicoRef: ''
+    });
   };
 
   return (
@@ -58,6 +74,22 @@ export default function ReportarIncidente({ user }) {
       <div>
         <label className="text-xs text-app-text-secondary">Descripción</label>
         <textarea className="app-input mt-1 min-h-36" placeholder="Describe qué pasó, quién estuvo involucrado y si hubo evidencia." value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} />
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs text-app-text-secondary">Evidencia (placeholder UI)</label>
+          <textarea className="app-input mt-1 min-h-24" placeholder="Ej: cámara lobby 18:20, foto, testigo..." value={form.evidenciaRef} onChange={e => setForm({ ...form, evidenciaRef: e.target.value })} />
+        </div>
+        <div>
+          <label className="text-xs text-app-text-secondary">Resolución (placeholder UI)</label>
+          <textarea className="app-input mt-1 min-h-24" placeholder="Ej: escalar comité, llamado, cierre..." value={form.resolucionRef} onChange={e => setForm({ ...form, resolucionRef: e.target.value })} />
+        </div>
+        <div>
+          <label className="text-xs text-app-text-secondary">Impacto económico (placeholder UI)</label>
+          <input className="app-input mt-1" placeholder="Ej: 250000 COP (estimado)" value={form.impactoEconomicoRef} onChange={e => setForm({ ...form, impactoEconomicoRef: e.target.value })} />
+          <p className="text-[11px] text-app-text-secondary mt-1">Referencia visual para futura lógica administrativa.</p>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
