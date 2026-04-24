@@ -56,13 +56,13 @@ export default function CrearPaquete({ usuarioApp }) {
   };
 
   return (
-    <div className="app-surface-primary p-5 space-y-5">
-      <div>
+    <div className="app-surface-primary p-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">Registrar recepción 📦</h2>
-        <p className="text-sm text-app-text-secondary">Carga rápida para paquetería y servicios públicos por torre/apartamento.</p>
+        <p className="text-xs text-app-text-secondary">Carga rápida por torre/apartamento.</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-3">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-2">
         <select className="app-input" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
           <option value="paquete">Paquete</option>
           <option value="servicio_publico">Servicio público</option>
@@ -77,9 +77,11 @@ export default function CrearPaquete({ usuarioApp }) {
         <input className="app-input" placeholder={categoria === 'servicio_publico' ? 'Ej: Factura de energía abril' : 'Ej: Amazon, MercadoLibre'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
       </div>
 
-      <button onClick={crearPaquete} disabled={loading} className="app-btn-primary">
-        {loading ? 'Guardando...' : (categoria === 'servicio_publico' ? 'Registrar servicio público' : 'Guardar paquete')}
-      </button>
+      <div className="flex justify-end">
+        <button onClick={crearPaquete} disabled={loading} className="app-btn-primary">
+          {loading ? 'Guardando...' : (categoria === 'servicio_publico' ? 'Registrar servicio público' : 'Guardar paquete')}
+        </button>
+      </div>
     </div>
   );
 }
