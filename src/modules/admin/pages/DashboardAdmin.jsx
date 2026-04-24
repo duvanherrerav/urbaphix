@@ -236,22 +236,22 @@ export default function DashboardAdmin({ usuarioApp }) {
         <CarteraResumen usuarioApp={usuarioApp} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-12 gap-4">
-        <div className="app-surface-primary p-4 xl:col-span-7 flex flex-col">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Visitas por día</h3>
           <p className="text-sm text-app-text-secondary mb-3">Comportamiento diario de ingresos y salidas.</p>
-          <div className="h-[240px] md:h-[260px]">
+          <div className="h-[320px] relative">
             <GraficaVisitas visitas={visitas} />
           </div>
         </div>
-        <div className="app-surface-primary p-4 xl:col-span-5 flex flex-col">
+        <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📦 Paquetes</h3>
           <p className="text-sm text-app-text-secondary mb-3">Distribución operativa por torre.</p>
-          <div className="h-[240px] md:h-[260px]">
+          <div className="h-[320px] relative">
             <PaquetesPorTorre usuarioApp={usuarioApp} />
           </div>
         </div>
-        <div className="app-surface-primary p-4 xl:col-span-7 flex flex-col">
+        <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">💰 Flujo financiero</h3>
           <p className="text-sm text-app-text-secondary mb-2">Comparativo visual de recaudo y valores pendientes.</p>
           <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
@@ -264,20 +264,20 @@ export default function DashboardAdmin({ usuarioApp }) {
               <p className="text-base font-bold text-state-warning">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
             </div>
           </div>
-          <div className="h-[220px] md:h-[240px]">
+          <div className="h-[300px] relative">
             <GraficaFinanciera pagos={pagos} />
           </div>
         </div>
-        <div className="app-surface-primary p-4 xl:col-span-5 flex flex-col">
+        <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Análisis de cartera</h3>
           <p className="text-sm text-app-text-secondary mb-3">Estado financiero consolidado del conjunto.</p>
-          <div className="h-[180px] md:h-[200px] max-w-[320px] w-full mx-auto">
+          <div className="h-[300px] max-w-[360px] w-full mx-auto relative">
             <GraficaCartera pagos={pagos} />
           </div>
         </div>
       </div>
 
-      <div className="app-surface-primary p-6 mt-1">
+      <div className="app-surface-primary p-6 mt-3">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-app-text-primary text-lg font-bold">Últimas visitas</h3>
           <span className="text-sm text-app-text-secondary">{visitas.slice(0, 5).length} registros recientes</span>
