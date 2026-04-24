@@ -15,6 +15,10 @@ export default function MisPagos({ usuarioApp }) {
   const [loading, setLoading] = useState(true);
   const [configPago, setConfigPago] = useState(null);
   const [archivo, setArchivo] = useState(null);
+  const [residenteId, setResidenteId] = useState(null);
+
+  const ordenarPagosDesc = (rows = []) =>
+    [...rows].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
   async function obtenerConfigPago() {
     const { data } = await supabase
@@ -39,9 +43,12 @@ export default function MisPagos({ usuarioApp }) {
       const residente = residentesRows?.[0] || null;
 
       if (!residente) {
+        setResidenteId(null);
         setPagos([]);
         return;
       }
+
+      setResidenteId(residente.id);
 
       const { data } = await supabase
         .from('pagos')
@@ -49,7 +56,7 @@ export default function MisPagos({ usuarioApp }) {
         .eq('residente_id', residente.id)
         .order('created_at', { ascending: false });
 
-      setPagos(data || []);
+      setPagos(ordenarPagosDesc(data || []));
     } finally {
       setLoading(false);
     }
@@ -60,6 +67,48 @@ export default function MisPagos({ usuarioApp }) {
     obtenerConfigPago();
     cargar();
   }, [usuarioApp]);
+
+  useEffect(() => {
+    if (!residenteId) return;
+
+    const channel = supabase
+      .channel(`mis-pagos-${residenteId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pagos',
+          filter: `residente_id=eq.${residenteId}`
+        },
+        (payload) => {
+          setPagos((prev) => {
+            if (payload.eventType === 'DELETE') {
+              return prev.filter((p) => p.id !== payload.old?.id);
+            }
+
+            const incoming = payload.new;
+            if (!incoming?.id) return prev;
+
+            const existingIndex = prev.findIndex((p) => p.id === incoming.id);
+            const next = [...prev];
+
+            if (existingIndex >= 0) {
+              next[existingIndex] = { ...next[existingIndex], ...incoming };
+            } else {
+              next.push(incoming);
+            }
+
+            return ordenarPagosDesc(next);
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [residenteId]);
 
   const pagar = () => {
     if (!configPago) return alert('No hay configuración de pagos');
