@@ -11,7 +11,7 @@ const formatFechaBogota = (value) => {
 };
 
 export default function PanelPagosAdmin({ usuarioApp }) {
-  const PREVIEW_LIMIT = 4;
+  const PREVIEW_LIMIT = 3;
   const MODAL_PAGE_SIZE = 8;
   const CAUSALES_ECONOMICAS = ['no asistió', 'daño', 'tiempo excedido', 'depósito retenido'];
   const ESTADOS_BANDEJA = [
@@ -105,7 +105,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     rechazado: pagosFiltrados.filter((p) => p.estado === 'rechazado')
   }), [pagosFiltrados]);
 
-  const renderTarjetaPago = (pago) => {
+  const renderTarjetaPago = (pago, expandida = false) => {
     const tieneComprobante = Boolean(String(pago.comprobante_url || '').trim());
     const estadoLegible = pago.estado === 'pagado' ? 'aprobado' : pago.estado;
 
@@ -130,28 +130,30 @@ export default function PanelPagosAdmin({ usuarioApp }) {
       </div>
       {pago.estado === 'pendiente' && (
         <div className="mt-3 space-y-2">
-          <div className="app-surface-primary p-2 border border-brand-primary/20">
-            <p className="text-xs text-app-text-secondary mb-1">Causal económica (preparación UI)</p>
-            <div className="flex flex-wrap gap-1">
-              {CAUSALES_ECONOMICAS.map((causal) => (
-                <button
-                  key={causal}
-                  type="button"
-                  onClick={() => setCausalDraft((prev) => ({ ...prev, [pago.id]: causal }))}
-                  className={`app-btn text-[11px] ${causalDraft[pago.id] === causal ? 'app-btn-secondary' : 'app-btn-ghost'}`}
-                >
-                  {causal}
-                </button>
-              ))}
+          {expandida && (
+            <div className="app-surface-primary p-2 border border-brand-primary/20">
+              <p className="text-xs text-app-text-secondary mb-1">Causal económica (preparación UI)</p>
+              <div className="flex flex-wrap gap-1">
+                {CAUSALES_ECONOMICAS.map((causal) => (
+                  <button
+                    key={causal}
+                    type="button"
+                    onClick={() => setCausalDraft((prev) => ({ ...prev, [pago.id]: causal }))}
+                    className={`app-btn text-[11px] ${causalDraft[pago.id] === causal ? 'app-btn-secondary' : 'app-btn-ghost'}`}
+                  >
+                    {causal}
+                  </button>
+                ))}
+              </div>
+              <input
+                className="app-input mt-2 text-xs"
+                placeholder="Impacto económico estimado (placeholder)"
+                value={impactoDraft[pago.id] || ''}
+                onChange={(e) => setImpactoDraft((prev) => ({ ...prev, [pago.id]: e.target.value }))}
+              />
+              <p className="text-[11px] text-app-text-secondary mt-1">Referencia visual, aún sin persistencia backend.</p>
             </div>
-            <input
-              className="app-input mt-2 text-xs"
-              placeholder="Impacto económico estimado (placeholder)"
-              value={impactoDraft[pago.id] || ''}
-              onChange={(e) => setImpactoDraft((prev) => ({ ...prev, [pago.id]: e.target.value }))}
-            />
-            <p className="text-[11px] text-app-text-secondary mt-1">Referencia visual, aún sin persistencia backend.</p>
-          </div>
+          )}
           <div className="flex justify-end">
               <div className="space-y-1 text-right">
                 {!tieneComprobante && (
@@ -249,7 +251,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
           </div>
           {pagosBandejaActiva.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos para esta bandeja.</p>}
           <div className="space-y-2">
-            {pagosBandejaPreview.map(renderTarjetaPago)}
+            {pagosBandejaPreview.map((pago) => renderTarjetaPago(pago, false))}
           </div>
           {pagosBandejaActiva.length > PREVIEW_LIMIT && (
             <button
@@ -294,7 +296,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
             <div className="space-y-2 max-h-[68vh] overflow-y-auto pr-1 app-scrollbar">
               {pagosPanelPaginados.length === 0 && <p className="text-xs text-app-text-secondary">Sin resultados en esta búsqueda.</p>}
-              {pagosPanelPaginados.map(renderTarjetaPago)}
+              {pagosPanelPaginados.map((pago) => renderTarjetaPago(pago, true))}
             </div>
 
             {pagosPanelFiltrados.length > MODAL_PAGE_SIZE && (
