@@ -73,7 +73,7 @@ export default function DashboardAdmin({ usuarioApp }) {
 
       const { data, error } = await supabase
         .from('registro_visitas')
-        .select('*')
+        .select('*, visitante:visitantes(placa)')
         .eq('conjunto_id', usuarioApp.conjunto_id)
         .gte('fecha_visita', fechaInicio);
 
@@ -162,6 +162,8 @@ export default function DashboardAdmin({ usuarioApp }) {
     const posiblesPlacas = [
       visita?.placa,
       visita?.vehiculo_placa,
+      visita?.visitante?.placa,
+      visita?.visitantes?.placa,
       visita?.vehiculo?.placa,
       visita?.vehiculos?.placa,
       visita?.vehiculo_visitante?.placa
