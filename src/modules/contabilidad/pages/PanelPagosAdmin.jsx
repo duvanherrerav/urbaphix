@@ -292,7 +292,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
               </div>
             </div>
 
-            <div className="space-y-2 max-h-[68vh] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[68vh] overflow-y-auto pr-1 app-scrollbar">
               {pagosPanelPaginados.length === 0 && <p className="text-xs text-app-text-secondary">Sin resultados en esta búsqueda.</p>}
               {pagosPanelPaginados.map(renderTarjetaPago)}
             </div>

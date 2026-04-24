@@ -30,8 +30,31 @@ export default function CrearCobro({ usuarioApp }) {
     mediano: '80000',
     grande: '96000'
   });
+  const [ultimosCobros, setUltimosCobros] = useState([]);
+  const [loadingCobros, setLoadingCobros] = useState(false);
+
+  const formatearMiles = (value) => {
+    const limpio = String(value || '').replace(/\D/g, '');
+    if (!limpio) return '';
+    return Number(limpio).toLocaleString('es-CO');
+  };
+
+  const normalizarInputMoneda = (value) => String(value || '').replace(/\D/g, '');
 
   const notificarError = (codigo, detalle) => toast.error(`${codigo}: ${detalle}`);
+
+  const cargarUltimosCobros = async () => {
+    if (!usuarioApp?.conjunto_id) return;
+    setLoadingCobros(true);
+    const { data } = await supabase
+      .from('pagos')
+      .select('id, concepto, valor, estado, created_at')
+      .eq('conjunto_id', usuarioApp.conjunto_id)
+      .order('created_at', { ascending: false })
+      .limit(4);
+    setUltimosCobros(data || []);
+    setLoadingCobros(false);
+  };
 
   useEffect(() => {
     const cargarTorres = async () => {
@@ -43,6 +66,7 @@ export default function CrearCobro({ usuarioApp }) {
       setTorres(data || []);
     };
     cargarTorres();
+    cargarUltimosCobros();
   }, [usuarioApp]);
 
   const limpiar = () => {
@@ -131,6 +155,7 @@ export default function CrearCobro({ usuarioApp }) {
 
     toast.success('💰 Cobro individual creado');
     limpiar();
+    cargarUltimosCobros();
     setLoading(false);
   };
 
@@ -210,6 +235,7 @@ export default function CrearCobro({ usuarioApp }) {
       notificarError('COBRO-009', 'No se logró generar cobros');
     } else {
       toast.success(`💰 Cobros masivos generados: ${exitosos}. Omitidos: ${omitidos}`);
+      cargarUltimosCobros();
     }
 
     setLoading(false);
@@ -275,12 +301,18 @@ export default function CrearCobro({ usuarioApp }) {
           )}
 
           <input
-            value={form.valor}
-            type="number"
-            placeholder="Valor"
-            onChange={(e) => setForm({ ...form, valor: e.target.value })}
+            value={formatearMiles(form.valor)}
+            type="text"
+            inputMode="numeric"
+            placeholder="Valor (ej: 100.000)"
+            onChange={(e) => setForm({ ...form, valor: normalizarInputMoneda(e.target.value) })}
             className="app-input"
           />
+          {form.valor && (
+            <p className="text-xs text-app-text-secondary">
+              Valor a cobrar: ${formatearMiles(form.valor)}
+            </p>
+          )}
         </div>
       )}
 
@@ -326,6 +358,28 @@ export default function CrearCobro({ usuarioApp }) {
       >
         {loading ? 'Procesando...' : modo === 'masivo' ? 'Generar cobro masivo' : 'Crear cobro'}
       </button>
+
+      <div className="mt-4 app-surface-muted p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Últimos cobros creados</h3>
+          <span className="text-[11px] text-app-text-secondary">Top 4</span>
+        </div>
+        {loadingCobros && <p className="text-xs text-app-text-secondary">Cargando...</p>}
+        {!loadingCobros && ultimosCobros.length === 0 && (
+          <p className="text-xs text-app-text-secondary">Aún no hay cobros registrados.</p>
+        )}
+        {!loadingCobros && ultimosCobros.map((cobro) => (
+          <div key={cobro.id} className="bg-app-bg-alt border border-app-border rounded-lg px-3 py-2 text-xs flex items-center justify-between gap-2">
+            <div>
+              <p className="font-medium">{cobro.concepto || '-'}</p>
+              <p className="text-app-text-secondary">
+                {new Date(cobro.created_at).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })} · {cobro.estado || '-'}
+              </p>
+            </div>
+            <p className="font-semibold">${Number(cobro.valor || 0).toLocaleString('es-CO')}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

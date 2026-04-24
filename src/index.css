@@ -123,4 +123,29 @@
   .app-sidebar-item-active {
     @apply bg-[#10253f] text-app-text-primary shadow-[inset_0_0_0_1px_rgba(59,130,246,0.28),0_6px_22px_rgba(2,6,23,0.45)];
   }
+
+  .app-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(56, 189, 248, 0.45) rgba(2, 6, 23, 0.4);
+  }
+
+  .app-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-track {
+    background: rgba(2, 6, 23, 0.45);
+    border-radius: 9999px;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.55) 0%, rgba(37, 99, 235, 0.55) 100%);
+    border-radius: 9999px;
+    border: 2px solid rgba(2, 6, 23, 0.45);
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.75) 0%, rgba(37, 99, 235, 0.75) 100%);
+  }
 }
