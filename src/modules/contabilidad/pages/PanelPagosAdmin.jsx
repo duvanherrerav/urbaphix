@@ -58,7 +58,11 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     const { error } = await supabase.from('pagos').update({ estado: 'pagado', fecha_pago: new Date().toISOString() }).eq('id', pago.id);
     if (error) return alert('Error al aprobar pago');
 
-    await supabase.from('notificaciones').insert([{ usuario_id: pago.residentes?.usuario_id, tipo: 'pago_aprobado', titulo: 'Pago aprobado', mensaje: `Tu pago de ${pago.valor} fue aprobado` }]);
+    const usuarioId = pago?.residentes?.usuario_id;
+    if (usuarioId) {
+      await supabase.from('notificaciones').insert([{ usuario_id: usuarioId, tipo: 'pago_aprobado', titulo: 'Pago aprobado', mensaje: `Tu pago de ${pago.valor} fue aprobado` }]);
+    }
+
     alert('✅ Pago aprobado');
     cargarPagos();
   };
