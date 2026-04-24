@@ -222,10 +222,8 @@ export default function DashboardAdmin({ usuarioApp }) {
       .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
       .find((valor) => valor.length > 0);
 
-    if (!torre && !apto) return null;
-    if (torre && apto) return `${torre} • Apto ${apto}`;
-    if (torre) return torre;
-    return `Apto ${apto}`;
+    if (torre && apto) return `Torre y Apto: ${torre}${apto}`;
+    return 'Ubicación no disponible';
   };
 
   return (
@@ -369,7 +367,7 @@ export default function DashboardAdmin({ usuarioApp }) {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  {torreApto ? <span className="text-[11px] px-2 py-1 rounded-lg bg-app-bg border border-app-border text-app-text-secondary">{torreApto}</span> : null}
+                  <span className="text-[11px] px-2 py-1 rounded-lg bg-app-bg border border-app-border text-app-text-secondary">{torreApto}</span>
                   <span className={v.estado === 'pendiente' ? 'app-badge app-badge-warning' : v.estado === 'ingresado' ? 'app-badge app-badge-info' : 'app-badge app-badge-success'}>{v.estado}</span>
                 </div>
               </div>
