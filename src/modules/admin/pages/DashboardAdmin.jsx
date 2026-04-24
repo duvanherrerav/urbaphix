@@ -73,7 +73,7 @@ export default function DashboardAdmin({ usuarioApp }) {
 
       const { data, error } = await supabase
         .from('registro_visitas')
-        .select('*')
+        .select('*, visitante:visitantes(nombre, documento, placa), apartamento:apartamentos(numero, torre:torres(nombre))')
         .eq('conjunto_id', usuarioApp.conjunto_id)
         .gte('fecha_visita', fechaInicio);
 
@@ -157,6 +157,74 @@ export default function DashboardAdmin({ usuarioApp }) {
     };
 
   }, [usuarioApp]);
+
+  const obtenerPlacaVisita = (visita) => {
+    const posiblesPlacas = [
+      visita?.placa,
+      visita?.vehiculo_placa,
+      visita?.visitante?.placa,
+      visita?.visitantes?.placa,
+      visita?.vehiculo?.placa,
+      visita?.vehiculos?.placa,
+      visita?.vehiculo_visitante?.placa
+    ];
+
+    const placaValida = posiblesPlacas
+      .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
+      .find((valor) => valor.length > 0);
+
+    return placaValida || 'Sin placa';
+  };
+
+  const obtenerNombreVisita = (visita) => {
+    const posiblesNombres = [
+      visita?.nombre_visitante,
+      visita?.visitante?.nombre,
+      visita?.visitantes?.nombre
+    ];
+
+    const nombreValido = posiblesNombres
+      .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
+      .find((valor) => valor.length > 0);
+
+    return nombreValido || 'Visitante';
+  };
+
+  const obtenerDocumentoVisita = (visita) => {
+    const posiblesDocumentos = [
+      visita?.documento,
+      visita?.visitante?.documento,
+      visita?.visitantes?.documento
+    ];
+
+    const documentoValido = posiblesDocumentos
+      .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
+      .find((valor) => valor.length > 0);
+
+    return documentoValido || 'Sin documento';
+  };
+
+  const obtenerTorreAptoVisita = (visita) => {
+    const torre = [
+      visita?.torre,
+      visita?.apartamento?.torre?.nombre,
+      visita?.apartamentos?.torre?.nombre
+    ]
+      .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
+      .find((valor) => valor.length > 0);
+
+    const apto = [
+      visita?.apartamento,
+      visita?.apartamento_numero,
+      visita?.apartamento?.numero,
+      visita?.apartamentos?.numero
+    ]
+      .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
+      .find((valor) => valor.length > 0);
+
+    if (torre && apto) return `Torre y Apto: ${torre}${apto}`;
+    return 'Ubicación no disponible';
+  };
 
   return (
     <div className="space-y-5">
@@ -283,18 +351,28 @@ export default function DashboardAdmin({ usuarioApp }) {
           <span className="text-sm text-app-text-secondary">{visitas.slice(0, 5).length} registros recientes</span>
         </div>
         <div className="space-y-2">
-          {visitas.slice(0, 5).map(v => (
-            <div key={v.id} className="app-surface-muted p-3 flex justify-between items-center">
-              <div>
-                <p className="font-medium">{v.nombre_visitante || 'Visitante'}</p>
-                <p className="text-sm text-app-text-secondary">{v.documento || '-'} • {v.placa || 'Sin placa'}</p>
-                <p className="text-xs text-app-text-secondary">
-                  Fecha: {v.fecha_visita || '-'} · Ingreso: {v.hora_ingreso || 'Pendiente'} · Salida: {v.hora_salida || 'Pendiente'}
-                </p>
+          {visitas.slice(0, 5).map(v => {
+            const torreApto = obtenerTorreAptoVisita(v);
+
+            return (
+              <div key={v.id} className="app-surface-muted p-3 flex justify-between items-center">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{obtenerNombreVisita(v)}</p>
+                    <span className="text-xs text-app-text-secondary">• {obtenerDocumentoVisita(v)}</span>
+                  </div>
+                  <p className="text-sm text-app-text-secondary">Placa: {obtenerPlacaVisita(v)}</p>
+                  <p className="text-xs text-app-text-secondary">
+                    Fecha: {v.fecha_visita || '-'} · Ingreso: {v.hora_ingreso || 'Pendiente'} · Salida: {v.hora_salida || 'Pendiente'}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <span className="text-[11px] px-2 py-1 rounded-lg bg-app-bg border border-app-border text-app-text-secondary">{torreApto}</span>
+                  <span className={v.estado === 'pendiente' ? 'app-badge app-badge-warning' : v.estado === 'ingresado' ? 'app-badge app-badge-info' : 'app-badge app-badge-success'}>{v.estado}</span>
+                </div>
               </div>
-              <span className={v.estado === 'pendiente' ? 'app-badge app-badge-warning' : v.estado === 'ingresado' ? 'app-badge app-badge-info' : 'app-badge app-badge-success'}>{v.estado}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
