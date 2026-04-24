@@ -61,11 +61,24 @@ export default function GraficaVisitas({ visitas }) {
   // 🔥 OPCIONES PRO
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
+    layout: {
+      padding: { top: 4, right: 8, bottom: 2, left: 4 }
+    },
     plugins: {
       legend: {
-        display: false
+        position: 'bottom',
+        labels: {
+          color: '#E5E7EB',
+          boxWidth: 12,
+          padding: 14,
+          font: { size: 12, weight: '600' }
+        }
       },
       tooltip: {
+        backgroundColor: '#0F172A',
+        titleColor: '#F8FAFC',
+        bodyColor: '#E2E8F0',
         callbacks: {
           label: (context) => ` ${context.raw} visitas`
         }
@@ -75,35 +88,31 @@ export default function GraficaVisitas({ visitas }) {
       x: {
         grid: {
           display: false
+        },
+        ticks: {
+          color: '#E5E7EB',
+          font: { size: 11, weight: '600' }
         }
       },
       y: {
         beginAtZero: true,
         ticks: {
-          stepSize: 1
+          stepSize: 1,
+          color: '#E5E7EB',
+          font: { size: 11, weight: '600' }
+        },
+        grid: {
+          color: 'rgba(148, 163, 184, 0.18)'
         }
       }
     }
   };
 
   return (
-    <div>
-
-      {/* HEADER */}
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold">
-          Visitas por día 📅
-        </h3>
-        <p className="text-sm text-app-text-secondary">
-          Últimos días de actividad
-        </p>
-      </div>
-
-      {/* GRÁFICA */}
-      <div className="bg-app-bg-alt p-4 rounded-xl shadow">
+    <div className="h-full w-full rounded-xl bg-app-bg-alt p-3">
+      <div className="h-full w-full">
         <Bar data={data} options={options} />
       </div>
-
     </div>
   );
 } 

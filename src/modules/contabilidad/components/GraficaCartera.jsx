@@ -34,28 +34,47 @@ export default function GraficaCartera({ pagos }) {
   };
 
   const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '72%',
+    radius: '82%',
     plugins: {
       legend: {
-        position: 'bottom'
+        position: 'bottom',
+        align: 'center',
+        labels: {
+          color: '#E5E7EB',
+          boxWidth: 12,
+          padding: 14,
+          font: { size: 12, weight: '600' }
+        }
+      },
+      tooltip: {
+        backgroundColor: '#0F172A',
+        titleColor: '#F8FAFC',
+        bodyColor: '#E2E8F0'
       }
     },
-    cutout: '68%'
+    layout: {
+      padding: { top: 4, right: 6, bottom: 0, left: 6 }
+    }
   };
 
   return (
-    <div className="bg-app-bg-alt p-6 rounded-xl shadow">
-
-      <h3 className="text-lg font-semibold mb-4">
-        Estado financiero 📊
-      </h3>
-
-      <Doughnut data={data} options={options} />
-
-      <div className="mt-4 text-sm text-app-text-secondary space-y-1">
-        <p>💰 Pagado: ${totalPagado.toLocaleString()}</p>
-        <p>⏳ Pendiente: ${totalPendiente.toLocaleString()}</p>
+    <div className="h-full w-full rounded-xl bg-app-bg-alt p-3 flex flex-col overflow-hidden">
+      <div className="h-[240px] max-w-[320px] w-full mx-auto">
+        <Doughnut data={data} options={options} />
       </div>
-
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg border border-app-border bg-app-bg p-2">
+          <p className="font-semibold text-app-text-primary">Pagado</p>
+          <p className="text-sm font-bold text-state-success">${totalPagado.toLocaleString('es-CO')}</p>
+        </div>
+        <div className="rounded-lg border border-app-border bg-app-bg p-2">
+          <p className="font-semibold text-app-text-primary">Pendiente</p>
+          <p className="text-sm font-bold text-state-warning">${totalPendiente.toLocaleString('es-CO')}</p>
+        </div>
+      </div>
     </div>
   );
 }

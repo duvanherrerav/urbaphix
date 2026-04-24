@@ -159,7 +159,7 @@ export default function DashboardAdmin({ usuarioApp }) {
   }, [usuarioApp]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="app-surface-primary p-6 text-app-text-primary">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -236,17 +236,51 @@ export default function DashboardAdmin({ usuarioApp }) {
         <CarteraResumen usuarioApp={usuarioApp} />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">📊 Actividad</h3><GraficaVisitas visitas={visitas} /></div>
-        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">📦 Paquetes</h3><PaquetesPorTorre usuarioApp={usuarioApp} /></div>
-        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">💰 Flujo financiero</h3><GraficaFinanciera pagos={pagos} /></div>
-        <div className="app-surface-primary p-4"><h3 className="font-semibold mb-2">📊 Análisis de cartera</h3><GraficaCartera pagos={pagos} /></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="app-surface-primary p-4 flex flex-col">
+          <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Visitas por día</h3>
+          <p className="text-sm text-app-text-secondary mb-3">Comportamiento diario de ingresos y salidas.</p>
+          <div className="h-[320px]">
+            <GraficaVisitas visitas={visitas} />
+          </div>
+        </div>
+        <div className="app-surface-primary p-4 flex flex-col">
+          <h3 className="text-app-text-primary text-lg font-bold mb-1">📦 Paquetes</h3>
+          <p className="text-sm text-app-text-secondary mb-3">Distribución operativa por torre.</p>
+          <div className="h-[240px] md:h-[260px]">
+            <PaquetesPorTorre usuarioApp={usuarioApp} />
+          </div>
+        </div>
+        <div className="app-surface-primary p-4 flex flex-col">
+          <h3 className="text-app-text-primary text-lg font-bold mb-1">💰 Flujo financiero</h3>
+          <p className="text-sm text-app-text-secondary mb-2">Comparativo visual de recaudo y valores pendientes.</p>
+          <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+            <div className="rounded-lg border border-app-border bg-app-bg p-2">
+              <p className="font-semibold text-app-text-primary">Recaudado</p>
+              <p className="text-base font-bold text-state-success">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="rounded-lg border border-app-border bg-app-bg p-2">
+              <p className="font-semibold text-app-text-primary">Pendiente</p>
+              <p className="text-base font-bold text-state-warning">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
+            </div>
+          </div>
+          <div className="h-[300px]">
+            <GraficaFinanciera pagos={pagos} />
+          </div>
+        </div>
+        <div className="app-surface-primary p-4 flex flex-col">
+          <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Análisis de cartera</h3>
+          <p className="text-sm text-app-text-secondary mb-3">Estado financiero consolidado del conjunto.</p>
+          <div className="h-[360px]">
+            <GraficaCartera pagos={pagos} />
+          </div>
+        </div>
       </div>
 
-      <div className="app-surface-primary p-5">
+      <div className="app-surface-primary p-6 mt-3">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Últimas visitas</h3>
-          <span className="text-xs text-app-text-secondary">{visitas.slice(0, 5).length} registros recientes</span>
+          <h3 className="text-app-text-primary text-lg font-bold">Últimas visitas</h3>
+          <span className="text-sm text-app-text-secondary">{visitas.slice(0, 5).length} registros recientes</span>
         </div>
         <div className="space-y-2">
           {visitas.slice(0, 5).map(v => (
