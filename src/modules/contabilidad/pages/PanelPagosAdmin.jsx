@@ -11,11 +11,14 @@ const formatFechaBogota = (value) => {
 };
 
 export default function PanelPagosAdmin({ usuarioApp }) {
+  const CAUSALES_ECONOMICAS = ['no asistió', 'daño', 'tiempo excedido', 'depósito retenido'];
   const [pagos, setPagos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filtroTorre, setFiltroTorre] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [busquedaApto, setBusquedaApto] = useState('');
+  const [causalDraft, setCausalDraft] = useState({});
+  const [impactoDraft, setImpactoDraft] = useState({});
 
   async function cargarPagos() {
     setLoading(true);
@@ -106,8 +109,32 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         </div>
       </div>
       {pago.estado === 'pendiente' && (
-        <div className="mt-3 flex justify-end">
-          <button className="app-btn-secondary text-xs" onClick={() => aprobarPago(pago)}>Aprobar pago</button>
+        <div className="mt-3 space-y-2">
+          <div className="app-surface-primary p-2 border border-brand-primary/20">
+            <p className="text-xs text-app-text-secondary mb-1">Causal económica (preparación UI)</p>
+            <div className="flex flex-wrap gap-1">
+              {CAUSALES_ECONOMICAS.map((causal) => (
+                <button
+                  key={causal}
+                  type="button"
+                  onClick={() => setCausalDraft((prev) => ({ ...prev, [pago.id]: causal }))}
+                  className={`app-btn text-[11px] ${causalDraft[pago.id] === causal ? 'app-btn-secondary' : 'app-btn-ghost'}`}
+                >
+                  {causal}
+                </button>
+              ))}
+            </div>
+            <input
+              className="app-input mt-2 text-xs"
+              placeholder="Impacto económico estimado (placeholder)"
+              value={impactoDraft[pago.id] || ''}
+              onChange={(e) => setImpactoDraft((prev) => ({ ...prev, [pago.id]: e.target.value }))}
+            />
+            <p className="text-[11px] text-app-text-secondary mt-1">Referencia visual, aún sin persistencia backend.</p>
+          </div>
+          <div className="flex justify-end">
+            <button className="app-btn-secondary text-xs" onClick={() => aprobarPago(pago)}>Aprobar pago</button>
+          </div>
         </div>
       )}
     </div>
