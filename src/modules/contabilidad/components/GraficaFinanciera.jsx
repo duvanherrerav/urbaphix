@@ -75,32 +75,55 @@ export default function GraficaFinanciera({ pagos }) {
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
+    layout: {
+      padding: { top: 4, right: 10, bottom: 6, left: 6 }
+    },
     plugins: {
       legend: {
-        position: 'bottom'
+        position: 'bottom',
+        align: 'center',
+        labels: {
+          color: '#E5E7EB',
+          boxWidth: 12,
+          padding: 16,
+          font: { size: 12, weight: '600' }
+        }
+      },
+      tooltip: {
+        backgroundColor: '#0F172A',
+        titleColor: '#F8FAFC',
+        bodyColor: '#E2E8F0'
       }
     },
     scales: {
       x: {
         grid: {
           display: false
+        },
+        ticks: {
+          color: '#E5E7EB',
+          font: { size: 11, weight: '600' }
         }
       },
       y: {
-        beginAtZero: true
+        beginAtZero: true,
+        ticks: {
+          color: '#E5E7EB',
+          font: { size: 11, weight: '600' }
+        },
+        grid: {
+          color: 'rgba(148, 163, 184, 0.18)'
+        }
       }
     }
   };
 
   return (
-    <div className="bg-app-bg-alt p-6 rounded-xl shadow mb-6">
-
-      <h3 className="text-lg font-semibold mb-4">
-        Flujo financiero 📊
-      </h3>
-
-      <Bar data={data} options={options} />
-
+    <div className="h-full w-full rounded-xl bg-app-bg-alt p-3">
+      <div className="h-full w-full">
+        <Bar data={data} options={options} />
+      </div>
     </div>
   );
 }

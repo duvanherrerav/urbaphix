@@ -1,22 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
-import { Bar, Doughnut } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  ArcElement,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  Tooltip,
-  Legend
-} from 'chart.js';
 
+import GraficaVisitas from '../components/GraficaVisitas';
+import GraficaFinanciera from '../../contabilidad/components/GraficaFinanciera';
 import PaquetesPorTorre from '../components/PaquetesPorTorre';
 import KPIsAdmin from '../components/KPIsAdmin';
 import DashboardResumen from '../components/DashboardResumen';
 import CarteraResumen from '../../contabilidad/components/CarteraResumen';
-
-ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+import GraficaCartera from '../../contabilidad/components/GraficaCartera';
 
 export default function DashboardAdmin({ usuarioApp }) {
 
@@ -70,180 +61,6 @@ export default function DashboardAdmin({ usuarioApp }) {
 
     return { pagosPendientes, incidentesAltos, reservasPendientes, proximaReserva };
   }, [pagos, incidentes, reservas]);
-
-  const chartTextColor = '#E5E7EB';
-  const chartGridColor = 'rgba(148, 163, 184, 0.18)';
-
-  const visitasChart = useMemo(() => {
-    const visitasPorDia = {};
-
-    visitas.forEach((v) => {
-      const fecha = v.fecha_visita;
-      if (!visitasPorDia[fecha]) visitasPorDia[fecha] = 0;
-      visitasPorDia[fecha] += 1;
-    });
-
-    const fechas = Object.keys(visitasPorDia).sort();
-    const labels = fechas.map((f) => new Date(f).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
-
-    return {
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Visitas',
-            data: fechas.map((f) => visitasPorDia[f]),
-            backgroundColor: 'rgba(59, 130, 246, 0.9)',
-            hoverBackgroundColor: 'rgba(37, 99, 235, 1)',
-            borderRadius: 8,
-            maxBarThickness: 36
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: chartTextColor, boxWidth: 12, padding: 14, font: { size: 12, weight: '600' } }
-          },
-          tooltip: {
-            backgroundColor: '#0F172A',
-            titleColor: '#F8FAFC',
-            bodyColor: '#E2E8F0'
-          }
-        },
-        layout: {
-          padding: { top: 4, right: 8, bottom: 2, left: 4 }
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { color: chartTextColor, font: { size: 11, weight: '600' } }
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { color: chartTextColor, stepSize: 1, font: { size: 11, weight: '600' } },
-            grid: { color: chartGridColor }
-          }
-        }
-      }
-    };
-  }, [visitas]);
-
-  const flujoChart = useMemo(() => {
-    const agrupado = {};
-
-    pagos.forEach((p) => {
-      const fecha = p.created_at.split('T')[0];
-      if (!agrupado[fecha]) agrupado[fecha] = { pagado: 0, pendiente: 0 };
-      if (p.estado === 'pagado') agrupado[fecha].pagado += Number(p.valor || 0);
-      else agrupado[fecha].pendiente += Number(p.valor || 0);
-    });
-
-    const fechas = Object.keys(agrupado).sort();
-    const labels = fechas.map((f) => new Date(f).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }));
-
-    return {
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Pagado',
-            data: fechas.map((f) => agrupado[f].pagado),
-            backgroundColor: 'rgba(16, 185, 129, 0.9)',
-            borderRadius: 8,
-            maxBarThickness: 30
-          },
-          {
-            label: 'Pendiente',
-            data: fechas.map((f) => agrupado[f].pendiente),
-            backgroundColor: 'rgba(245, 158, 11, 0.9)',
-            borderRadius: 8,
-            maxBarThickness: 30
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            align: 'center',
-            labels: { color: chartTextColor, boxWidth: 12, padding: 16, font: { size: 12, weight: '600' } }
-          },
-          tooltip: {
-            backgroundColor: '#0F172A',
-            titleColor: '#F8FAFC',
-            bodyColor: '#E2E8F0'
-          }
-        },
-        layout: {
-          padding: { top: 4, right: 10, bottom: 6, left: 6 }
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { color: chartTextColor, font: { size: 11, weight: '600' } }
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { color: chartTextColor, font: { size: 11, weight: '600' } },
-            grid: { color: chartGridColor }
-          }
-        }
-      }
-    };
-  }, [pagos]);
-
-  const carteraChart = useMemo(() => {
-    const totalPagado = pagos
-      .filter((p) => p.estado === 'pagado')
-      .reduce((acc, p) => acc + Number(p.valor || 0), 0);
-    const totalPendiente = pagos
-      .filter((p) => p.estado !== 'pagado')
-      .reduce((acc, p) => acc + Number(p.valor || 0), 0);
-
-    return {
-      totalPagado,
-      totalPendiente,
-      data: {
-        labels: ['Pagado', 'Pendiente'],
-        datasets: [
-          {
-            data: [totalPagado, totalPendiente],
-            backgroundColor: ['#10B981', '#F59E0B'],
-            borderColor: ['#059669', '#D97706'],
-            borderWidth: 1,
-            hoverOffset: 4
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '72%',
-        radius: '82%',
-        plugins: {
-          legend: {
-            position: 'bottom',
-            align: 'center',
-            labels: { color: chartTextColor, boxWidth: 12, padding: 14, font: { size: 12, weight: '600' } }
-          },
-          tooltip: {
-            backgroundColor: '#0F172A',
-            titleColor: '#F8FAFC',
-            bodyColor: '#E2E8F0'
-          }
-        },
-        layout: {
-          padding: { top: 4, right: 6, bottom: 0, left: 6 }
-        }
-      }
-    };
-  }, [pagos]);
 
   async function obtenerVisitas() {
     try {
@@ -423,8 +240,8 @@ export default function DashboardAdmin({ usuarioApp }) {
         <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Visitas por día</h3>
           <p className="text-sm text-app-text-secondary mb-3">Comportamiento diario de ingresos y salidas.</p>
-          <div className="h-[320px] rounded-xl bg-app-bg-alt p-3">
-            <Bar data={visitasChart.data} options={visitasChart.options} />
+          <div className="h-[320px]">
+            <GraficaVisitas visitas={visitas} />
           </div>
         </div>
         <div className="app-surface-primary p-4 flex flex-col">
@@ -447,27 +264,15 @@ export default function DashboardAdmin({ usuarioApp }) {
               <p className="text-base font-bold text-state-warning">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
             </div>
           </div>
-          <div className="h-[300px] rounded-xl bg-app-bg-alt p-3">
-            <Bar data={flujoChart.data} options={flujoChart.options} />
+          <div className="h-[300px]">
+            <GraficaFinanciera pagos={pagos} />
           </div>
         </div>
         <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Análisis de cartera</h3>
           <p className="text-sm text-app-text-secondary mb-3">Estado financiero consolidado del conjunto.</p>
-          <div className="rounded-xl bg-app-bg-alt p-3">
-            <div className="h-[240px] max-w-[320px] w-full mx-auto">
-              <Doughnut data={carteraChart.data} options={carteraChart.options} />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg border border-app-border bg-app-bg p-2">
-                <p className="font-semibold text-app-text-primary">Pagado</p>
-                <p className="text-sm font-bold text-state-success">${carteraChart.totalPagado.toLocaleString('es-CO')}</p>
-              </div>
-              <div className="rounded-lg border border-app-border bg-app-bg p-2">
-                <p className="font-semibold text-app-text-primary">Pendiente</p>
-                <p className="text-sm font-bold text-state-warning">${carteraChart.totalPendiente.toLocaleString('es-CO')}</p>
-              </div>
-            </div>
+          <div className="h-[360px]">
+            <GraficaCartera pagos={pagos} />
           </div>
         </div>
       </div>
