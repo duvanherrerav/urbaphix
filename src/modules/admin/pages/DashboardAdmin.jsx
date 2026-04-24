@@ -158,6 +158,22 @@ export default function DashboardAdmin({ usuarioApp }) {
 
   }, [usuarioApp]);
 
+  const obtenerPlacaVisita = (visita) => {
+    const posiblesPlacas = [
+      visita?.placa,
+      visita?.vehiculo_placa,
+      visita?.vehiculo?.placa,
+      visita?.vehiculos?.placa,
+      visita?.vehiculo_visitante?.placa
+    ];
+
+    const placaValida = posiblesPlacas
+      .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
+      .find((valor) => valor.length > 0);
+
+    return placaValida || 'Sin placa';
+  };
+
   return (
     <div className="space-y-5">
       <div className="app-surface-primary p-6 text-app-text-primary">
@@ -287,7 +303,7 @@ export default function DashboardAdmin({ usuarioApp }) {
             <div key={v.id} className="app-surface-muted p-3 flex justify-between items-center">
               <div>
                 <p className="font-medium">{v.nombre_visitante || 'Visitante'}</p>
-                <p className="text-sm text-app-text-secondary">{v.documento || '-'} • {v.placa || 'Sin placa'}</p>
+                <p className="text-sm text-app-text-secondary">{v.documento || '-'} • {obtenerPlacaVisita(v)}</p>
                 <p className="text-xs text-app-text-secondary">
                   Fecha: {v.fecha_visita || '-'} · Ingreso: {v.hora_ingreso || 'Pendiente'} · Salida: {v.hora_salida || 'Pendiente'}
                 </p>
