@@ -11,6 +11,8 @@ const formatFechaBogota = (value) => {
 };
 
 export default function PanelPagosAdmin({ usuarioApp }) {
+  const PREVIEW_LIMIT = 4;
+  const MODAL_PAGE_SIZE = 8;
   const CAUSALES_ECONOMICAS = ['no asistió', 'daño', 'tiempo excedido', 'depósito retenido'];
   const ESTADOS_BANDEJA = [
     { key: 'pendiente', label: 'Pendientes', badge: 'app-badge-warning', titleClass: 'text-state-warning' },
@@ -22,6 +24,9 @@ export default function PanelPagosAdmin({ usuarioApp }) {
   const [filtroTorre, setFiltroTorre] = useState('');
   const [busquedaApto, setBusquedaApto] = useState('');
   const [bandejaActiva, setBandejaActiva] = useState('pendiente');
+  const [panelAmpliadoOpen, setPanelAmpliadoOpen] = useState(false);
+  const [busquedaPanel, setBusquedaPanel] = useState('');
+  const [paginaPanel, setPaginaPanel] = useState(1);
   const [causalDraft, setCausalDraft] = useState({});
   const [impactoDraft, setImpactoDraft] = useState({});
 
@@ -170,6 +175,28 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
   const pagosBandejaActiva = pagosAgrupados[bandejaActiva] || [];
   const bandejaSeleccionada = ESTADOS_BANDEJA.find((b) => b.key === bandejaActiva) || ESTADOS_BANDEJA[0];
+  const pagosBandejaPreview = pagosBandejaActiva.slice(0, PREVIEW_LIMIT);
+  const textoBotonVerTodos = `Ver todos los ${bandejaSeleccionada.label.toLowerCase()}`;
+  const pagosPanelFiltrados = useMemo(() => {
+    const termino = busquedaPanel.trim().toLowerCase();
+    if (!termino) return pagosBandejaActiva;
+    return pagosBandejaActiva.filter((p) => {
+      const radicado = String(p.id || '').slice(0, 8).toLowerCase();
+      const nombre = String(p.nombre || '').toLowerCase();
+      const apto = String(p.apartamento || '').toLowerCase();
+      const concepto = String(p.concepto || '').toLowerCase();
+      return radicado.includes(termino) || nombre.includes(termino) || apto.includes(termino) || concepto.includes(termino);
+    });
+  }, [pagosBandejaActiva, busquedaPanel]);
+  const totalPaginasPanel = Math.max(1, Math.ceil(pagosPanelFiltrados.length / MODAL_PAGE_SIZE));
+  const pagosPanelPaginados = useMemo(() => {
+    const desde = (paginaPanel - 1) * MODAL_PAGE_SIZE;
+    return pagosPanelFiltrados.slice(desde, desde + MODAL_PAGE_SIZE);
+  }, [pagosPanelFiltrados, paginaPanel]);
+
+  useEffect(() => {
+    setPaginaPanel(1);
+  }, [bandejaActiva, busquedaPanel]);
 
   return (
     <div className="app-surface-primary p-5 space-y-4">
@@ -220,12 +247,84 @@ export default function PanelPagosAdmin({ usuarioApp }) {
             <h4 className={`font-semibold ${bandejaSeleccionada.titleClass}`}>Bandeja: {bandejaSeleccionada.label}</h4>
             <span className="text-xs text-app-text-secondary">{pagosBandejaActiva.length} registros</span>
           </div>
-          <div className="max-h-[55vh] overflow-y-auto pr-1 space-y-2">
-            {pagosBandejaActiva.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos para esta bandeja.</p>}
-            {pagosBandejaActiva.map(renderTarjetaPago)}
+          {pagosBandejaActiva.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos para esta bandeja.</p>}
+          <div className="space-y-2">
+            {pagosBandejaPreview.map(renderTarjetaPago)}
           </div>
+          {pagosBandejaActiva.length > PREVIEW_LIMIT && (
+            <button
+              type="button"
+              className="app-btn-ghost text-xs"
+              onClick={() => {
+                setBusquedaPanel('');
+                setPaginaPanel(1);
+                setPanelAmpliadoOpen(true);
+              }}
+            >
+              {textoBotonVerTodos} ({pagosBandejaActiva.length})
+            </button>
+          )}
         </div>
       </div>
+
+      {panelAmpliadoOpen && (
+        <div className="fixed inset-0 bg-app-bg/85 backdrop-blur-sm z-50 p-4 flex items-center justify-center">
+          <div className="app-surface-primary w-full max-w-5xl p-4 space-y-4 border border-brand-primary/20 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className={`font-semibold text-lg ${bandejaSeleccionada.titleClass}`}>Panel ampliado: {bandejaSeleccionada.label}</h4>
+                <p className="text-xs text-app-text-secondary">{pagosBandejaActiva.length} registros en la bandeja activa</p>
+              </div>
+              <button type="button" className="app-btn-ghost text-xs" onClick={() => setPanelAmpliadoOpen(false)}>
+                Cerrar
+              </button>
+            </div>
+
+            <div className="app-surface-muted p-2 md:grid md:grid-cols-[1fr_auto] gap-2">
+              <input
+                className="app-input"
+                placeholder="Buscar por residente, apto, concepto o radicado"
+                value={busquedaPanel}
+                onChange={(e) => setBusquedaPanel(e.target.value)}
+              />
+              <div className="text-xs text-app-text-secondary flex items-center justify-end">
+                {pagosPanelFiltrados.length} resultado(s)
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-[68vh] overflow-y-auto pr-1">
+              {pagosPanelPaginados.length === 0 && <p className="text-xs text-app-text-secondary">Sin resultados en esta búsqueda.</p>}
+              {pagosPanelPaginados.map(renderTarjetaPago)}
+            </div>
+
+            {pagosPanelFiltrados.length > MODAL_PAGE_SIZE && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-app-text-secondary">
+                  Página {paginaPanel} de {totalPaginasPanel}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="app-btn-ghost text-xs disabled:opacity-40"
+                    disabled={paginaPanel === 1}
+                    onClick={() => setPaginaPanel((prev) => Math.max(1, prev - 1))}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    className="app-btn-ghost text-xs disabled:opacity-40"
+                    disabled={paginaPanel === totalPaginasPanel}
+                    onClick={() => setPaginaPanel((prev) => Math.min(totalPaginasPanel, prev + 1))}
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
