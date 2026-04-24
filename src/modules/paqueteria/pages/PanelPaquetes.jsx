@@ -3,6 +3,13 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { entregarPaquete as entregarPaqueteService, listarPaquetesConDetalle } from '../services/paquetesService';
 
+const formatDateTime = (value) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return parsed.toLocaleString();
+};
+
 export default function PanelPaquetes({ usuarioApp }) {
     const [paquetes, setPaquetes] = useState([]);
     const [filtroEstado, setFiltroEstado] = useState('pendiente');
@@ -38,6 +45,7 @@ export default function PanelPaquetes({ usuarioApp }) {
     }, [usuarioApp?.conjunto_id, filtroEstado, busqueda]);
 
     const entregables = useMemo(() => paquetes.filter((p) => p.estado === 'pendiente'), [paquetes]);
+    const entregados = useMemo(() => paquetes.filter((p) => p.estado === 'entregado'), [paquetes]);
     const serviciosPendientes = useMemo(() => entregables.filter((p) => p.categoria === 'servicio_publico').length, [entregables]);
 
     const entregarPaquete = async (paquete) => {
@@ -53,7 +61,7 @@ export default function PanelPaquetes({ usuarioApp }) {
     };
 
     return (
-        <div className="app-surface-primary rounded-2xl p-5 space-y-5">
+        <div className="app-surface-primary rounded-2xl p-5 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold">Panel de paquetería 📬</h2>
@@ -79,19 +87,52 @@ export default function PanelPaquetes({ usuarioApp }) {
             {loading && <p className="text-sm text-app-text-secondary">Cargando paquetería...</p>}
             {!loading && paquetes.length === 0 && <p className="text-sm text-app-text-secondary">No hay registros para este filtro.</p>}
 
-            <div className="space-y-3">
-                {paquetes.map((p) => (
-                    <div key={p.id} className="app-surface-muted p-4 border border-app-border/70">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-medium">{p.descripcion_visible || 'Sin descripción'}</p>
-                            <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>
+            <div className="space-y-4">
+                {(filtroEstado === 'pendiente' || filtroEstado === 'todos') && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-state-warning">Recepción pendiente de entrega</h3>
+                            <span className="text-xs text-app-text-secondary">{entregables.length}</span>
                         </div>
-                        <p className="text-sm text-app-text-secondary mt-1">Torre: <b>{p.torre_nombre || '-'}</b> · Apto: <b>{p.apartamento_numero || '-'}</b></p>
-                        <p className="text-xs text-app-text-secondary">Recibido: {p.fecha_recibido ? new Date(p.fecha_recibido).toLocaleString() : '-'}</p>
-                        {p.fecha_entrega && <p className="text-xs text-app-text-secondary">Entregado: {new Date(p.fecha_entrega).toLocaleString()}</p>}
-                        {p.estado === 'pendiente' && <button className="mt-2 app-btn-primary text-xs" onClick={() => entregarPaquete(p)}>Marcar entregado</button>}
+                        {entregables.map((p) => (
+                            <div key={p.id} className="app-surface-muted p-3 border border-state-warning/30">
+                                <div className="grid md:grid-cols-[1fr_auto] gap-2 items-start">
+                                    <div>
+                                        <p className="font-medium">{p.descripcion_visible || 'Sin descripción'}</p>
+                                        <p className="text-xs text-app-text-secondary">Torre <b>{p.torre_nombre || '-'}</b> · Apto <b>{p.apartamento_numero || '-'}</b> · Recibido {formatDateTime(p.fecha_recibido)}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>
+                                        <button className="app-btn-primary text-xs" onClick={() => entregarPaquete(p)}>Marcar entregado</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {entregables.length === 0 && <p className="text-xs text-app-text-secondary">No hay paquetes pendientes.</p>}
                     </div>
-                ))}
+                )}
+
+                {(filtroEstado === 'entregado' || filtroEstado === 'todos') && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-state-success">Entregas confirmadas</h3>
+                            <span className="text-xs text-app-text-secondary">{entregados.length}</span>
+                        </div>
+                        {entregados.map((p) => (
+                            <div key={p.id} className="app-surface-muted p-3 border border-state-success/20">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <p className="font-medium">{p.descripcion_visible || 'Sin descripción'}</p>
+                                        <p className="text-xs text-app-text-secondary">Torre <b>{p.torre_nombre || '-'}</b> · Apto <b>{p.apartamento_numero || '-'}</b></p>
+                                        <p className="text-xs text-app-text-secondary">Recibido {formatDateTime(p.fecha_recibido)} · Entregado {formatDateTime(p.fecha_entrega)}</p>
+                                    </div>
+                                    <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>
+                                </div>
+                            </div>
+                        ))}
+                        {entregados.length === 0 && <p className="text-xs text-app-text-secondary">No hay entregas en este filtro.</p>}
+                    </div>
+                )}
             </div>
         </div>
     );
