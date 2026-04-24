@@ -32,6 +32,13 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
   }, [usuarioApp?.conjunto_id, filtroEstado]);
 
   const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
+  const estadoPostReserva = (estado) => {
+    if (estado === 'finalizada') return 'Cierre operativo';
+    if (estado === 'no_show') return 'No asistió';
+    if (estado === 'en_curso') return 'En curso';
+    if (estado === 'aprobada') return 'Lista para check-in';
+    return 'Pendiente';
+  };
   const resumen = useMemo(() => ({
     operativas: reservas.filter((r) => ['aprobada', 'en_curso'].includes(r.estado)).length,
     finalizadas: reservas.filter((r) => r.estado === 'finalizada').length,
@@ -75,6 +82,20 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
             <div className="grid md:grid-cols-2 gap-2 text-sm">
               <p className="text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
               <p className="text-app-text-secondary md:text-right">Residente ID: {r.residente_id}</p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-2 text-xs">
+              <div className="app-surface-primary p-2">
+                <p className="text-app-text-secondary">Post-reserva</p>
+                <p>{estadoPostReserva(r.estado)}</p>
+              </div>
+              <div className="app-surface-primary p-2">
+                <p className="text-app-text-secondary">Depósito</p>
+                <p>{r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
+              </div>
+              <div className="app-surface-primary p-2">
+                <p className="text-app-text-secondary">Causal económica</p>
+                <p>{r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
+              </div>
             </div>
 
             {r.estado === 'aprobada' && (

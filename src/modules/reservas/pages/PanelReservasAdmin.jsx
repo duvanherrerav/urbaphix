@@ -850,6 +850,20 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
                                                 <p className="text-sm text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
                                                 <p className="text-sm text-app-text-secondary">Residente ID: {r.residente_id}</p>
+                                                <div className="grid md:grid-cols-3 gap-2 text-xs">
+                                                    <div className="app-surface-primary p-2">
+                                                        <p className="text-app-text-secondary">Post-reserva</p>
+                                                        <p>{r.estado === 'finalizada' ? 'Finalizada' : r.estado === 'no_show' ? 'No asistió' : r.estado === 'en_curso' ? 'En curso' : 'Pendiente de cierre'}</p>
+                                                    </div>
+                                                    <div className="app-surface-primary p-2">
+                                                        <p className="text-app-text-secondary">Depósito</p>
+                                                        <p>{r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
+                                                    </div>
+                                                    <div className="app-surface-primary p-2">
+                                                        <p className="text-app-text-secondary">Causal económica</p>
+                                                        <p>{r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
+                                                    </div>
+                                                </div>
                                                 {r.estado === 'solicitada' && (
                                                     <div className="flex gap-2 mt-2">
                                                         <button className="app-btn-secondary text-xs" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
