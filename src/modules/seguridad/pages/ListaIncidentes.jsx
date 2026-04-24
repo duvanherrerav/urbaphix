@@ -5,9 +5,17 @@ import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechas
 
 const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
 const formatBogota = (value, localEpoch) => {
-  if (localEpoch) return new Date(localEpoch).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short' });
-  if (!value) return '-';
-  return new Date(value).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+  const source = localEpoch || value;
+  if (!source) return '-';
+
+  const parsed = new Date(source);
+  if (Number.isNaN(parsed.getTime())) return '-';
+
+  if (localEpoch) {
+    return parsed.toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'short', timeStyle: 'short' });
+  }
+
+  return parsed.toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 };
 
 export default function ListaIncidentes({ usuarioApp }) {
@@ -108,7 +116,7 @@ export default function ListaIncidentes({ usuarioApp }) {
           <div className="grid md:grid-cols-3 gap-2 text-sm">
             <p><span className="text-app-text-secondary">Estado:</span> <span className="capitalize font-semibold">{estadosLocal[i.id]?.estado || 'Nuevo'}</span></p>
             <p className="text-app-text-secondary">Reporte: {formatBogota(i.created_at, fechasLocal[i.id])}</p>
-            <p className="text-app-text-secondary md:text-right">ID: {i.id.slice(0, 8)}...</p>
+            <p className="text-app-text-secondary md:text-right">ID: {typeof i.id === 'string' && i.id ? `${i.id.slice(0, 8)}...` : '-'}</p>
           </div>
 
           {usuarioApp?.rol_id === 'admin' && (
