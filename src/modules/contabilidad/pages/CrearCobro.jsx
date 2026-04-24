@@ -30,8 +30,6 @@ export default function CrearCobro({ usuarioApp }) {
     mediano: '80000',
     grande: '96000'
   });
-  const [ultimosCobros, setUltimosCobros] = useState([]);
-  const [loadingCobros, setLoadingCobros] = useState(false);
 
   const formatearMiles = (value) => {
     const limpio = String(value || '').replace(/\D/g, '');
@@ -43,19 +41,6 @@ export default function CrearCobro({ usuarioApp }) {
 
   const notificarError = (codigo, detalle) => toast.error(`${codigo}: ${detalle}`);
 
-  const cargarUltimosCobros = async () => {
-    if (!usuarioApp?.conjunto_id) return;
-    setLoadingCobros(true);
-    const { data } = await supabase
-      .from('pagos')
-      .select('id, concepto, valor, estado, created_at')
-      .eq('conjunto_id', usuarioApp.conjunto_id)
-      .order('created_at', { ascending: false })
-      .limit(4);
-    setUltimosCobros(data || []);
-    setLoadingCobros(false);
-  };
-
   useEffect(() => {
     const cargarTorres = async () => {
       if (!usuarioApp?.conjunto_id) return;
@@ -66,7 +51,6 @@ export default function CrearCobro({ usuarioApp }) {
       setTorres(data || []);
     };
     cargarTorres();
-    cargarUltimosCobros();
   }, [usuarioApp]);
 
   const limpiar = () => {
@@ -155,7 +139,6 @@ export default function CrearCobro({ usuarioApp }) {
 
     toast.success('💰 Cobro individual creado');
     limpiar();
-    cargarUltimosCobros();
     setLoading(false);
   };
 
@@ -235,14 +218,13 @@ export default function CrearCobro({ usuarioApp }) {
       notificarError('COBRO-009', 'No se logró generar cobros');
     } else {
       toast.success(`💰 Cobros masivos generados: ${exitosos}. Omitidos: ${omitidos}`);
-      cargarUltimosCobros();
     }
 
     setLoading(false);
   };
 
   return (
-    <div className="bg-app-bg-alt p-6 rounded-xl shadow max-w-2xl">
+    <div className="app-surface-primary p-5 space-y-4">
       <h2 className="text-xl font-bold mb-1">Crear cobro 💰</h2>
       <p className="text-sm text-app-text-secondary mb-4">Cobro individual por apartamento escrito o masivo por tipo de apartamento.</p>
 
@@ -323,31 +305,35 @@ export default function CrearCobro({ usuarioApp }) {
             <div>
               <label className="text-xs text-app-text-secondary">Pequeño</label>
               <input
-                type="number"
-                value={tarifasTipo.pequeno}
-                onChange={(e) => setTarifasTipo({ ...tarifasTipo, pequeno: e.target.value })}
+                type="text"
+                inputMode="numeric"
+                value={formatearMiles(tarifasTipo.pequeno)}
+                onChange={(e) => setTarifasTipo({ ...tarifasTipo, pequeno: normalizarInputMoneda(e.target.value) })}
                 className="app-input"
               />
             </div>
             <div>
               <label className="text-xs text-app-text-secondary">Mediano</label>
               <input
-                type="number"
-                value={tarifasTipo.mediano}
-                onChange={(e) => setTarifasTipo({ ...tarifasTipo, mediano: e.target.value })}
+                type="text"
+                inputMode="numeric"
+                value={formatearMiles(tarifasTipo.mediano)}
+                onChange={(e) => setTarifasTipo({ ...tarifasTipo, mediano: normalizarInputMoneda(e.target.value) })}
                 className="app-input"
               />
             </div>
             <div>
               <label className="text-xs text-app-text-secondary">Grande</label>
               <input
-                type="number"
-                value={tarifasTipo.grande}
-                onChange={(e) => setTarifasTipo({ ...tarifasTipo, grande: e.target.value })}
+                type="text"
+                inputMode="numeric"
+                value={formatearMiles(tarifasTipo.grande)}
+                onChange={(e) => setTarifasTipo({ ...tarifasTipo, grande: normalizarInputMoneda(e.target.value) })}
                 className="app-input"
               />
             </div>
           </div>
+          <p className="text-xs text-app-text-secondary">Los valores se guardan como número, con visualización en miles para facilitar la carga.</p>
         </div>
       )}
 
@@ -358,28 +344,6 @@ export default function CrearCobro({ usuarioApp }) {
       >
         {loading ? 'Procesando...' : modo === 'masivo' ? 'Generar cobro masivo' : 'Crear cobro'}
       </button>
-
-      <div className="mt-4 app-surface-muted p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Últimos cobros creados</h3>
-          <span className="text-[11px] text-app-text-secondary">Top 4</span>
-        </div>
-        {loadingCobros && <p className="text-xs text-app-text-secondary">Cargando...</p>}
-        {!loadingCobros && ultimosCobros.length === 0 && (
-          <p className="text-xs text-app-text-secondary">Aún no hay cobros registrados.</p>
-        )}
-        {!loadingCobros && ultimosCobros.map((cobro) => (
-          <div key={cobro.id} className="bg-app-bg-alt border border-app-border rounded-lg px-3 py-2 text-xs flex items-center justify-between gap-2">
-            <div>
-              <p className="font-medium">{cobro.concepto || '-'}</p>
-              <p className="text-app-text-secondary">
-                {new Date(cobro.created_at).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })} · {cobro.estado || '-'}
-              </p>
-            </div>
-            <p className="font-semibold">${Number(cobro.valor || 0).toLocaleString('es-CO')}</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
