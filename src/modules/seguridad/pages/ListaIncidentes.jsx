@@ -4,6 +4,8 @@ import { supabase } from '../../../services/supabaseClient';
 import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechasIncidentesLocal } from '../services/seguridadService';
 
 const ESTADOS_GESTION = ['en_gestion', 'resuelto', 'cerrado'];
+const PRIORIDAD_ORDEN = { alto: 0, medio: 1, bajo: 2 };
+const ESTADO_LABEL = { nuevo: 'Nuevo', en_gestion: 'En gestión', resuelto: 'Resuelto', cerrado: 'Cerrado' };
 const formatBogota = (value, localEpoch) => {
   const source = localEpoch || value;
   if (!source) return '-';
@@ -69,6 +71,9 @@ export default function ListaIncidentes({ usuarioApp }) {
       const eb = estadosLocal[b.id]?.estado || 'nuevo';
       if (ea === 'cerrado' && eb !== 'cerrado') return 1;
       if (ea !== 'cerrado' && eb === 'cerrado') return -1;
+      const pa = PRIORIDAD_ORDEN[a.nivel] ?? 99;
+      const pb = PRIORIDAD_ORDEN[b.nivel] ?? 99;
+      if (pa !== pb) return pa - pb;
       return 0;
     });
   }, [incidentes, estadosLocal, filtroEstado, busqueda]);
@@ -108,15 +113,31 @@ export default function ListaIncidentes({ usuarioApp }) {
       </div>
 
       {listaPaginada.map((i) => (
-        <div key={i.id} className="app-surface-muted p-4 space-y-3 border-l-2 border-l-brand-primary/40">
+        <div key={i.id} className={`app-surface-muted p-4 space-y-3 border-l-4 ${i.nivel === 'alto' ? 'border-l-state-error' : i.nivel === 'medio' ? 'border-l-state-warning' : 'border-l-brand-primary/40'}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="font-medium leading-relaxed flex-1">{i.descripcion}</p>
-            <span className={`app-badge ${i.nivel === 'alto' ? 'app-badge-error' : i.nivel === 'medio' ? 'app-badge-warning' : 'app-badge-info'} capitalize`}>{i.nivel}</span>
+            <div className="flex items-center gap-2">
+              <span className={`app-badge ${i.nivel === 'alto' ? 'app-badge-error' : i.nivel === 'medio' ? 'app-badge-warning' : 'app-badge-info'} capitalize`}>{i.nivel}</span>
+              <span className={`app-badge ${(estadosLocal[i.id]?.estado || 'nuevo') === 'cerrado' ? 'app-badge-success' : (estadosLocal[i.id]?.estado || 'nuevo') === 'en_gestion' ? 'app-badge-info' : 'app-badge-warning'}`}>
+                {ESTADO_LABEL[estadosLocal[i.id]?.estado || 'nuevo'] || 'Nuevo'}
+              </span>
+            </div>
           </div>
           <div className="grid md:grid-cols-3 gap-2 text-sm">
-            <p><span className="text-app-text-secondary">Estado:</span> <span className="capitalize font-semibold">{estadosLocal[i.id]?.estado || 'Nuevo'}</span></p>
+            <p><span className="text-app-text-secondary">Estado operativo:</span> <span className="capitalize font-semibold">{ESTADO_LABEL[estadosLocal[i.id]?.estado || 'nuevo'] || 'Nuevo'}</span></p>
             <p className="text-app-text-secondary">Reporte: {formatBogota(i.created_at, fechasLocal[i.id])}</p>
             <p className="text-app-text-secondary md:text-right">ID: {typeof i.id === 'string' && i.id ? `${i.id.slice(0, 8)}...` : '-'}</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-2 text-xs">
+            <div className="app-surface-primary p-2">
+              <p className="text-app-text-secondary">Evidencia</p>
+              <p className="text-app-text-secondary mt-1">{i.evidencia_url ? 'Adjunta' : 'Sin evidencia adjunta'}</p>
+              {i.evidencia_url && <a href={i.evidencia_url} target="_blank" rel="noreferrer" className="text-brand-secondary">Ver evidencia</a>}
+            </div>
+            <div className="app-surface-primary p-2">
+              <p className="text-app-text-secondary">Resolución</p>
+              <p className="text-app-text-secondary mt-1">{i.resolucion || 'Pendiente por documentar'}</p>
+            </div>
           </div>
 
           {usuarioApp?.rol_id === 'admin' && (
