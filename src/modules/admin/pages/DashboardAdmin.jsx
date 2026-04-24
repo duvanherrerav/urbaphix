@@ -13,6 +13,8 @@ export default function DashboardAdmin({ usuarioApp }) {
 
   const [visitas, setVisitas] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [incidentes, setIncidentes] = useState([]);
+  const [reservas, setReservas] = useState([]);
 
   const [stats, setStats] = useState({
     total: 0,
@@ -49,6 +51,16 @@ export default function DashboardAdmin({ usuarioApp }) {
 
     return { ocupacion, finalizacion };
   }, [stats]);
+
+  const atencionInmediata = useMemo(() => {
+    const pagosPendientes = pagos.filter((p) => p.estado === 'pendiente').length;
+    const incidentesAltos = incidentes.filter((i) => i.nivel === 'alto').length;
+    const reservasPendientes = reservas.filter((r) => r.estado === 'pendiente').length;
+    const proximaReserva = [...reservas]
+      .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())[0] || null;
+
+    return { pagosPendientes, incidentesAltos, reservasPendientes, proximaReserva };
+  }, [pagos, incidentes, reservas]);
 
   async function obtenerVisitas() {
     try {
@@ -97,12 +109,39 @@ export default function DashboardAdmin({ usuarioApp }) {
     setPagos(data || []);
   }
 
+  async function obtenerIncidentes() {
+    const { data, error } = await supabase
+      .from('incidentes')
+      .select('id, nivel, created_at')
+      .eq('conjunto_id', usuarioApp.conjunto_id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) return;
+    setIncidentes(data || []);
+  }
+
+  async function obtenerReservas() {
+    const { data, error } = await supabase
+      .from('reservas_zonas')
+      .select('id, estado, fecha_inicio')
+      .eq('conjunto_id', usuarioApp.conjunto_id)
+      .gte('fecha_inicio', new Date().toISOString())
+      .order('fecha_inicio', { ascending: true })
+      .limit(20);
+
+    if (error) return;
+    setReservas(data || []);
+  }
+
   useEffect(() => {
     if (!usuarioApp?.conjunto_id) return;
 
     const timer = setTimeout(() => {
       obtenerVisitas();
       obtenerPagos();
+      obtenerIncidentes();
+      obtenerReservas();
     }, 0);
 
     const channel = supabase
@@ -170,6 +209,29 @@ export default function DashboardAdmin({ usuarioApp }) {
       </div>
 
       <div className="app-surface-primary p-4">
+        <h3 className="font-semibold text-app-text-primary mb-3">🚨 Atención inmediata</h3>
+        <div className="grid md:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-xl border border-app-border bg-app-bg p-3">
+            <p className="text-app-text-secondary">Pagos pendientes</p>
+            <p className="text-2xl font-bold text-state-warning">{atencionInmediata.pagosPendientes}</p>
+            <p className="text-xs text-app-text-secondary mt-1">Priorizar gestión de cartera y recordatorios.</p>
+          </div>
+          <div className="rounded-xl border border-app-border bg-app-bg p-3">
+            <p className="text-app-text-secondary">Incidentes nivel alto</p>
+            <p className="text-2xl font-bold text-state-error">{atencionInmediata.incidentesAltos}</p>
+            <p className="text-xs text-app-text-secondary mt-1">Escalar seguridad cuando el conteo suba.</p>
+          </div>
+          <div className="rounded-xl border border-app-border bg-app-bg p-3">
+            <p className="text-app-text-secondary">Reservas por revisar</p>
+            <p className="text-2xl font-bold text-state-info">{atencionInmediata.reservasPendientes}</p>
+            <p className="text-xs text-app-text-secondary mt-1">
+              Próxima: {atencionInmediata.proximaReserva?.fecha_inicio ? new Date(atencionInmediata.proximaReserva.fecha_inicio).toLocaleString('es-CO') : 'sin programación cercana'}.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="app-surface-primary p-4">
         <h3 className="font-semibold text-state-error mb-2">🔥 Cartera en riesgo</h3>
         <CarteraResumen usuarioApp={usuarioApp} />
       </div>
@@ -192,6 +254,9 @@ export default function DashboardAdmin({ usuarioApp }) {
               <div>
                 <p className="font-medium">{v.nombre_visitante || 'Visitante'}</p>
                 <p className="text-sm text-app-text-secondary">{v.documento || '-'} • {v.placa || 'Sin placa'}</p>
+                <p className="text-xs text-app-text-secondary">
+                  Fecha: {v.fecha_visita || '-'} · Ingreso: {v.hora_ingreso || 'Pendiente'} · Salida: {v.hora_salida || 'Pendiente'}
+                </p>
               </div>
               <span className={v.estado === 'pendiente' ? 'app-badge app-badge-warning' : v.estado === 'ingresado' ? 'app-badge app-badge-info' : 'app-badge app-badge-success'}>{v.estado}</span>
             </div>
