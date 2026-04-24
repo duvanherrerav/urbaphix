@@ -81,6 +81,37 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     pagados: pagosFiltrados.filter((p) => p.estado === 'pagado').length,
     cartera: pagosFiltrados.filter((p) => p.estado === 'pendiente').reduce((acc, p) => acc + Number(p.valor || 0), 0)
   }), [pagosFiltrados]);
+  const pagosAgrupados = useMemo(() => ({
+    pendientes: pagosFiltrados.filter((p) => p.estado === 'pendiente'),
+    aprobados: pagosFiltrados.filter((p) => p.estado === 'pagado'),
+    rechazados: pagosFiltrados.filter((p) => p.estado === 'rechazado')
+  }), [pagosFiltrados]);
+
+  const renderTarjetaPago = (pago) => (
+    <div key={pago.id} className={`app-surface-muted p-3 ${pago.estado === 'pendiente' ? 'border border-state-warning/40' : ''}`}>
+      <div className="grid md:grid-cols-[1fr_auto] gap-2 items-start">
+        <div>
+          <p className="font-medium">{pago.nombre}</p>
+          <p className="text-xs text-app-text-secondary">Torre {pago.torre} · Apto {pago.apartamento} · {pago.concepto}</p>
+          <p className="text-xs text-app-text-secondary">Creado: {formatFechaBogota(pago.created_at)} · Pago: {formatFechaBogota(pago.fecha_pago)}</p>
+          <p className="text-xs text-app-text-secondary">
+            Comprobante: {pago.comprobante_url ? 'Adjunto' : 'Sin soporte'} · Tipo: {pago.tipo_pago || '-'}
+          </p>
+          <p className="text-xs text-app-text-secondary">Radicado: {String(pago.id || '-').slice(0, 8)}</p>
+          {pago.comprobante_url && <a href={pago.comprobante_url} target="_blank" rel="noreferrer" className="text-xs text-brand-secondary">Ver comprobante 📄</a>}
+        </div>
+        <div className="text-right space-y-1">
+          <p className="font-semibold text-lg">${Number(pago.valor || 0).toLocaleString('es-CO')}</p>
+          <span className={`app-badge ${pago.estado === 'pendiente' ? 'app-badge-warning' : pago.estado === 'rechazado' ? 'app-badge-error' : 'app-badge-success'} capitalize`}>{pago.estado}</span>
+        </div>
+      </div>
+      {pago.estado === 'pendiente' && (
+        <div className="mt-3 flex justify-end">
+          <button className="app-btn-secondary text-xs" onClick={() => aprobarPago(pago)}>Aprobar pago</button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="app-surface-primary p-5 space-y-4">
@@ -116,27 +147,33 @@ export default function PanelPagosAdmin({ usuarioApp }) {
       {loading && <p className="text-sm text-app-text-secondary">Cargando pagos...</p>}
       {!loading && pagosFiltrados.length === 0 && <p className="text-sm text-app-text-secondary">Sin resultados para filtros actuales.</p>}
 
-      <div className="space-y-2">
-        {pagosFiltrados.map((pago) => (
-          <div key={pago.id} className="app-surface-muted p-3">
-            <div className="grid md:grid-cols-[1fr_auto] gap-2 items-start">
-              <div>
-                <p className="font-medium">{pago.nombre}</p>
-                <p className="text-xs text-app-text-secondary">Torre {pago.torre} · Apto {pago.apartamento} · {pago.concepto}</p>
-                <p className="text-xs text-app-text-secondary">Creado: {formatFechaBogota(pago.created_at)}</p>
-              </div>
-              <div className="text-right space-y-1">
-                <p className="font-semibold text-lg">${Number(pago.valor || 0).toLocaleString('es-CO')}</p>
-                <span className={`app-badge ${pago.estado === 'pendiente' ? 'app-badge-warning' : 'app-badge-success'} capitalize`}>{pago.estado}</span>
-              </div>
-            </div>
-            {pago.estado === 'pendiente' && (
-              <div className="mt-3 flex justify-end">
-                <button className="app-btn-secondary text-xs" onClick={() => aprobarPago(pago)}>Aprobar pago</button>
-              </div>
-            )}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-state-warning">Pendientes</h4>
+            <span className="text-xs text-app-text-secondary">{pagosAgrupados.pendientes.length}</span>
           </div>
-        ))}
+          {pagosAgrupados.pendientes.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos pendientes.</p>}
+          {pagosAgrupados.pendientes.map(renderTarjetaPago)}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-state-success">Aprobados</h4>
+            <span className="text-xs text-app-text-secondary">{pagosAgrupados.aprobados.length}</span>
+          </div>
+          {pagosAgrupados.aprobados.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos aprobados.</p>}
+          {pagosAgrupados.aprobados.map(renderTarjetaPago)}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-state-error">Rechazados</h4>
+            <span className="text-xs text-app-text-secondary">{pagosAgrupados.rechazados.length}</span>
+          </div>
+          {pagosAgrupados.rechazados.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos rechazados.</p>}
+          {pagosAgrupados.rechazados.map(renderTarjetaPago)}
+        </div>
       </div>
     </div>
   );
