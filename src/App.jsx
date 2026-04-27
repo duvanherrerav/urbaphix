@@ -376,19 +376,8 @@ function App() {
 
                 {moduloActual === 'pagos' && (
                   <>
-                    <div className="grid xl:grid-cols-2 gap-4 items-start">
-                      <div className="space-y-4">
-                        <CrearCobro usuarioApp={usuarioApp} />
-                        <div className="app-surface-primary p-4 text-sm space-y-2">
-                          <h4 className="font-semibold">Guía rápida de operación</h4>
-                          <ol className="list-decimal pl-4 space-y-1 text-app-text-secondary">
-                            <li>Crear cobro individual o masivo.</li>
-                            <li>Monitorear la bandeja por estado.</li>
-                            <li>Validar comprobante antes de aprobar.</li>
-                            <li>Usar el estado de cuenta para seguimiento.</li>
-                          </ol>
-                        </div>
-                      </div>
+                    <div className="space-y-4">
+                      <CrearCobro usuarioApp={usuarioApp} />
                       <PanelPagosAdmin usuarioApp={usuarioApp} />
                     </div>
                     <EstadoCuenta usuarioApp={usuarioApp} />
