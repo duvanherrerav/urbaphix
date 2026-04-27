@@ -15,6 +15,7 @@ import {
 } from '../services/reservasService';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
+import AppTimePicker from '../../../components/ui/AppTimePicker';
 import {
     getReservaAccionLabel,
     formatearMilesCOP,
@@ -72,16 +73,6 @@ function ToggleField({ checked, onChange, label, description }) {
     );
 }
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, idx) => {
-    const totalMinutes = idx * 30;
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    const hh = String(hours).padStart(2, '0');
-    const mm = String(minutes).padStart(2, '0');
-    const period = hours >= 12 ? 'p. m.' : 'a. m.';
-    const hour12 = ((hours + 11) % 12) + 1;
-    return { value: `${hh}:${mm}`, label: `${hour12}:${mm === 0 ? '00' : mm} ${period}` };
-});
 
 const buildDefaultDia = () => ({
     activo: true,
@@ -730,8 +721,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                             </label>
                                                             {cfg.modo === 'slots' ? (
                                                                 <div className="grid md:grid-cols-2 gap-2">
-                                                                    <label className="text-sm">Hora de apertura<input type="time" className="app-input mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
-                                                                    <label className="text-sm">Hora de cierre<input type="time" className="app-input mt-1" value={cfg.slots.hora_cierre} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Hora de apertura<AppTimePicker className="mt-1" value={cfg.slots.hora_apertura} onChange={(nextValue) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: nextValue } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<AppTimePicker className="mt-1" value={cfg.slots.hora_cierre} onChange={(nextValue) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: nextValue } }))} /></label>
                                                                     <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="app-input mt-1" value={cfg.slots.duracion_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, duracion_min: e.target.value } }))} /></label>
                                                                     <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="app-input mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
                                                                 </div>
@@ -741,8 +732,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                                     {cfg.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque(dia.key, idx, 'nombre', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque(dia.key, idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<AppTimePicker className="mt-1" value={bloque.hora_inicio} onChange={(nextValue) => editBloque(dia.key, idx, 'hora_inicio', nextValue)} /></label>
+                                                                            <label className="text-xs">Hora de fin<AppTimePicker className="mt-1" value={bloque.hora_fin} onChange={(nextValue) => editBloque(dia.key, idx, 'hora_fin', nextValue)} /></label>
                                                                             <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
@@ -783,8 +774,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                             </label>
                                                             {recursoForm.festivos.especial.modo === 'slots' && (
                                                                 <div className="grid md:grid-cols-2 gap-2">
-                                                                    <label className="text-sm">Hora de apertura<input type="time" className="app-input mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: e.target.value } } }))} /></label>
-                                                                    <label className="text-sm">Hora de cierre<input type="time" className="app-input mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Hora de apertura<AppTimePicker className="mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(nextValue) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: nextValue } } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<AppTimePicker className="mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(nextValue) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: nextValue } } }))} /></label>
                                                                     <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="app-input mt-1" value={recursoForm.festivos.especial.slots.duracion_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, duracion_min: e.target.value } } }))} /></label>
                                                                     <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="app-input mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
                                                                 </div>
@@ -795,8 +786,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                                     {recursoForm.festivos.especial.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`wizard-festivos-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque('festivos', idx, 'nombre', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque('festivos', idx, 'hora_inicio', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque('festivos', idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<AppTimePicker className="mt-1" value={bloque.hora_inicio} onChange={(nextValue) => editBloque('festivos', idx, 'hora_inicio', nextValue)} /></label>
+                                                                            <label className="text-xs">Hora de fin<AppTimePicker className="mt-1" value={bloque.hora_fin} onChange={(nextValue) => editBloque('festivos', idx, 'hora_fin', nextValue)} /></label>
                                                                             <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
@@ -913,8 +904,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                             </label>
                                                             {cfg.modo === 'slots' ? (
                                                                 <div className="grid md:grid-cols-2 gap-2">
-                                                                    <label className="text-sm">Hora de apertura<input type="time" className="app-input mt-1" value={cfg.slots.hora_apertura} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: e.target.value } }))} /></label>
-                                                                    <label className="text-sm">Hora de cierre<input type="time" className="app-input mt-1" value={cfg.slots.hora_cierre} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: e.target.value } }))} /></label>
+                                                                    <label className="text-sm">Hora de apertura<AppTimePicker className="mt-1" value={cfg.slots.hora_apertura} onChange={(nextValue) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_apertura: nextValue } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<AppTimePicker className="mt-1" value={cfg.slots.hora_cierre} onChange={(nextValue) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, hora_cierre: nextValue } }))} /></label>
                                                                     <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="app-input mt-1" value={cfg.slots.duracion_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, duracion_min: e.target.value } }))} /></label>
                                                                     <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="app-input mt-1" value={cfg.slots.intervalo_min} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, slots: { ...d.slots, intervalo_min: e.target.value } }))} /></label>
                                                                 </div>
@@ -924,8 +915,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                                     {cfg.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`${dia.key}-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque(dia.key, idx, 'nombre', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque(dia.key, idx, 'hora_inicio', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque(dia.key, idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<AppTimePicker className="mt-1" value={bloque.hora_inicio} onChange={(nextValue) => editBloque(dia.key, idx, 'hora_inicio', nextValue)} /></label>
+                                                                            <label className="text-xs">Hora de fin<AppTimePicker className="mt-1" value={bloque.hora_fin} onChange={(nextValue) => editBloque(dia.key, idx, 'hora_fin', nextValue)} /></label>
                                                                             <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque(dia.key, idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
@@ -966,8 +957,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                             </label>
                                                             {recursoForm.festivos.especial.modo === 'slots' && (
                                                                 <div className="grid md:grid-cols-2 gap-2">
-                                                                    <label className="text-sm">Hora de apertura<input type="time" className="app-input mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: e.target.value } } }))} /></label>
-                                                                    <label className="text-sm">Hora de cierre<input type="time" className="app-input mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: e.target.value } } }))} /></label>
+                                                                    <label className="text-sm">Hora de apertura<AppTimePicker className="mt-1" value={recursoForm.festivos.especial.slots.hora_apertura} onChange={(nextValue) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_apertura: nextValue } } }))} /></label>
+                                                                    <label className="text-sm">Hora de cierre<AppTimePicker className="mt-1" value={recursoForm.festivos.especial.slots.hora_cierre} onChange={(nextValue) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, hora_cierre: nextValue } } }))} /></label>
                                                                     <label className="text-sm">Duración por reserva (min)<input type="number" min="15" className="app-input mt-1" value={recursoForm.festivos.especial.slots.duracion_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, duracion_min: e.target.value } } }))} /></label>
                                                                     <label className="text-sm">Intervalo entre inicios (min)<input type="number" min="0" className="app-input mt-1" value={recursoForm.festivos.especial.slots.intervalo_min} onChange={(e) => updateFestivosConfig((f) => ({ ...f, especial: { ...f.especial, slots: { ...f.especial.slots, intervalo_min: e.target.value } } }))} /></label>
                                                                 </div>
@@ -978,8 +969,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                                     {recursoForm.festivos.especial.bloques_fijos.map((bloque, idx) => (
                                                                         <div key={`detalle-festivos-${idx}`} className="grid md:grid-cols-4 gap-2 items-end border rounded-lg p-2">
                                                                             <label className="text-xs md:col-span-2">Nombre del bloque<input className="app-input mt-1" value={bloque.nombre} onChange={(e) => editBloque('festivos', idx, 'nombre', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de inicio<input type="time" className="app-input mt-1" value={bloque.hora_inicio} onChange={(e) => editBloque('festivos', idx, 'hora_inicio', e.target.value)} /></label>
-                                                                            <label className="text-xs">Hora de fin<input type="time" className="app-input mt-1" value={bloque.hora_fin} onChange={(e) => editBloque('festivos', idx, 'hora_fin', e.target.value)} /></label>
+                                                                            <label className="text-xs">Hora de inicio<AppTimePicker className="mt-1" value={bloque.hora_inicio} onChange={(nextValue) => editBloque('festivos', idx, 'hora_inicio', nextValue)} /></label>
+                                                                            <label className="text-xs">Hora de fin<AppTimePicker className="mt-1" value={bloque.hora_fin} onChange={(nextValue) => editBloque('festivos', idx, 'hora_fin', nextValue)} /></label>
                                                                             <button type="button" className="app-btn-danger text-xs h-8 md:col-span-4" onClick={() => removeBloque('festivos', idx)}>Eliminar bloque</button>
                                                                         </div>
                                                                     ))}
@@ -1040,16 +1031,10 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                     <input type="date" min={hoyBloqueo} className="app-input app-date-input mt-1" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
                                                 </label>
                                                 <label className="text-sm">🕒 Hora inicio
-                                                    <select className="app-input mt-1" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))}>
-                                                        <option value="">Selecciona hora inicio</option>
-                                                        {TIME_OPTIONS.map((opt) => <option key={`inicio-${opt.value}`} value={opt.value}>{opt.label}</option>)}
-                                                    </select>
+                                                    <AppTimePicker className="mt-1" value={bloqueoForm.hora_inicio} onChange={(nextValue) => setBloqueoForm((s) => ({ ...s, hora_inicio: nextValue }))} placeholder="Selecciona hora inicio" />
                                                 </label>
                                                 <label className="text-sm">🕒 Hora fin
-                                                    <select className="app-input mt-1" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))}>
-                                                        <option value="">Selecciona hora fin</option>
-                                                        {TIME_OPTIONS.map((opt) => <option key={`fin-${opt.value}`} value={opt.value}>{opt.label}</option>)}
-                                                    </select>
+                                                    <AppTimePicker className="mt-1" value={bloqueoForm.hora_fin} onChange={(nextValue) => setBloqueoForm((s) => ({ ...s, hora_fin: nextValue }))} placeholder="Selecciona hora fin" />
                                                 </label>
                                                 <label className="text-sm md:col-span-2">Motivo del cierre temporal
                                                     <input className="app-input mt-1" placeholder="Ej: mantenimiento preventivo" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />

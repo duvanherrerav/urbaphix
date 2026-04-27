@@ -177,4 +177,16 @@
   .app-toggle-active {
     @apply border-brand-secondary bg-[#38BDF822];
   }
+
+  .app-time-dropdown {
+    @apply absolute z-40 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-app-border bg-app-bg-alt p-1 shadow-app;
+  }
+
+  .app-time-item {
+    @apply w-full rounded-lg px-3 py-2 text-left text-sm text-app-text-secondary transition-colors hover:bg-[#38BDF822] hover:text-app-text-primary;
+  }
+
+  .app-time-selected {
+    @apply bg-[#38BDF833] text-brand-secondary;
+  }
 }
