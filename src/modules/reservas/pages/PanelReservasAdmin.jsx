@@ -43,6 +43,19 @@ const POLITICAS_CONFIRMACION = [
 const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
 const HISTORIAL_PREVIEW_LIMITE = 3;
 const HISTORIAL_PAGE_SIZE = 5;
+const ESTADOS_ACTIVOS_RESERVA = new Set(['solicitada', 'aprobada', 'en_curso']);
+
+const RECURSO_TIPO_LABEL = Object.freeze({
+    salon_social: 'Salón social',
+    cancha: 'Cancha',
+    bbq: 'BBQ',
+    logistica: 'Logística',
+    enseres: 'Enseres',
+    gimnasio: 'Gimnasio',
+    generica: 'Genérica'
+});
+
+const getTipoRecursoLabel = (tipo) => RECURSO_TIPO_LABEL[tipo] || tipo || 'Sin tipo';
 
 const getTodayInputDate = () => {
     const now = new Date();
@@ -634,6 +647,36 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         }
     }, [paginaHistorial, totalPaginasHistorial]);
 
+    const resumenRecursos = useMemo(() => {
+        const now = new Date();
+        return recursos.map((recurso) => {
+            const reservasRecurso = reservas.filter((reserva) => reserva.recurso_id === recurso.id);
+            const bloqueosRecurso = bloqueos.filter((bloqueo) => bloqueo.recurso_id === recurso.id);
+
+            const bloqueosActivos = bloqueosRecurso.filter((bloqueo) => {
+                const inicio = new Date(bloqueo.fecha_inicio);
+                const fin = new Date(bloqueo.fecha_fin);
+                return inicio <= now && fin >= now;
+            }).length;
+
+            const proximaReserva = reservasRecurso
+                .filter((reserva) => ESTADOS_ACTIVOS_RESERVA.has(reserva.estado) && new Date(reserva.fecha_inicio) >= now)
+                .sort((a, b) => new Date(a.fecha_inicio) - new Date(b.fecha_inicio))[0] || null;
+
+            const disponibilidad = recurso?.reglas?.disponibilidad;
+            const disponibilidadConfigurada = disponibilidad && typeof disponibilidad === 'object'
+                ? 'Configurada'
+                : 'Sin configuración explícita';
+
+            return {
+                recurso,
+                bloqueosActivos,
+                proximaReserva,
+                disponibilidadConfigurada
+            };
+        });
+    }, [bloqueos, reservas, recursos]);
+
     return (
         <div className="space-y-5">
             <div className="app-surface-primary rounded-2xl p-5 shadow space-y-4">
@@ -649,13 +692,40 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
                 {vistaAdmin === 'lista' && (
                     <div className="space-y-2">
-                        {recursos.map((r) => (
-                            <div key={r.id} className="app-surface-muted p-3 flex items-center justify-between gap-3">
-                                <div>
-                                    <p className="font-medium">{r.nombre}</p>
-                                    <p className="text-sm text-app-text-secondary">{r.tipo} · Capacidad: {r.capacidad || 'N/A'}</p>
+                        {resumenRecursos.map(({ recurso, bloqueosActivos, proximaReserva, disponibilidadConfigurada }) => (
+                            <div key={recurso.id} className="app-surface-muted p-4 space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="space-y-2">
+                                        <p className="text-base font-semibold">{recurso.nombre}</p>
+                                        <div className="flex flex-wrap gap-2 text-xs">
+                                            <span className="app-badge app-badge-info">{getTipoRecursoLabel(recurso.tipo)}</span>
+                                            <span className="app-badge app-badge-warning">Capacidad: {recurso.capacidad || 'No definida'}</span>
+                                            <span className={`app-badge ${recurso.requiere_deposito ? 'app-badge-warning' : 'app-badge-success'}`}>
+                                                {recurso.requiere_deposito ? 'Depósito requerido' : 'Sin depósito'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button className="app-btn-ghost text-xs" onClick={() => abrirDetalleRecurso(recurso.id)}>Editar</button>
                                 </div>
-                                <button className="app-btn-ghost text-xs" onClick={() => abrirDetalleRecurso(r.id)}>Editar</button>
+
+                                <div className="grid gap-2 md:grid-cols-3 text-xs">
+                                    <div className="rounded-lg border border-app-border bg-app-bg-alt/70 p-2">
+                                        <p className="text-app-text-secondary">Disponibilidad</p>
+                                        <p className="text-app-text-primary">{disponibilidadConfigurada}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-app-border bg-app-bg-alt/70 p-2">
+                                        <p className="text-app-text-secondary">Bloqueos activos</p>
+                                        <p className="text-app-text-primary">{bloqueosActivos > 0 ? bloqueosActivos : 'Sin bloqueos activos'}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-app-border bg-app-bg-alt/70 p-2">
+                                        <p className="text-app-text-secondary">Próxima reserva</p>
+                                        <p className="text-app-text-primary">
+                                            {proximaReserva
+                                                ? formatDateTimeBogota(proximaReserva.fecha_inicio)
+                                                : 'Sin reservas programadas'}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                         {recursos.length === 0 && <p className="text-sm text-app-text-secondary">No hay recursos creados.</p>}
