@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { puedeTransicionarEstado } from '../utils/incidenteUI';
 const INCIDENTE_ESTADOS_KEY = 'urbaphix_incidentes_estado_local_v1';
 const INCIDENTE_FECHAS_KEY = 'urbaphix_incidentes_fecha_local_v1';
 
@@ -82,9 +83,15 @@ export const crearIncidente = async (data, user) => {
     }
 };
 
-export const actualizarEstadoIncidente = async ({ incidenteId, estado, usuarioId }) => {
+export const actualizarEstadoIncidente = async ({ incidenteId, estado, usuarioId, estadoActual = 'nuevo' }) => {
     try {
         const estados = getEstadoLocal();
+        const estadoBase = estados[incidenteId]?.estado || estadoActual || 'nuevo';
+
+        if (!puedeTransicionarEstado(estadoBase, estado)) {
+            throw new Error('Transición de estado no permitida');
+        }
+
         estados[incidenteId] = {
             estado,
             asignado_a: usuarioId || null,
