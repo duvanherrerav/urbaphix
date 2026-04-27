@@ -17,6 +17,18 @@ const RESERVA_ESTADO_LABEL = Object.freeze({
     pendiente_cierre: 'Pendiente de cierre'
 });
 
+const RESERVA_ACCION_LABEL = Object.freeze({
+    crear: 'Reserva creada',
+    aprobada: 'Aprobada',
+    rechazada: 'Rechazada',
+    cancelada: 'Cancelada',
+    en_curso: 'En curso',
+    finalizada: 'Finalizada',
+    no_show: 'No asistió',
+    checkin: 'Check-in',
+    checkout: 'Check-out'
+});
+
 const resolverApartamento = (reserva) => (
     reserva?.apartamentos
     || reserva?.residentes?.apartamentos
@@ -38,3 +50,4 @@ export const getReservaTorreAptoLabel = (reserva) => {
 };
 
 export const getReservaEstadoLabel = (estado) => RESERVA_ESTADO_LABEL[estado] || 'Sin estado';
+export const getReservaAccionLabel = (accion) => RESERVA_ACCION_LABEL[accion] || accion || 'Sin acción';

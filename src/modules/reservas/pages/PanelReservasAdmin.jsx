@@ -16,6 +16,7 @@ import {
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
 import {
+    getReservaAccionLabel,
     formatearMilesCOP,
     getReservaEstadoLabel,
     getReservaResidenteLabel,
@@ -39,6 +40,7 @@ const POLITICAS_CONFIRMACION = [
 ];
 const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
 const HISTORIAL_PREVIEW_LIMITE = 3;
+const HISTORIAL_PAGE_SIZE = 5;
 
 const getTodayInputDate = () => {
     const now = new Date();
@@ -69,6 +71,17 @@ function ToggleField({ checked, onChange, label, description }) {
         </button>
     );
 }
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, idx) => {
+    const totalMinutes = idx * 30;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const period = hours >= 12 ? 'p. m.' : 'a. m.';
+    const hour12 = ((hours + 11) % 12) + 1;
+    return { value: `${hh}:${mm}`, label: `${hour12}:${mm === 0 ? '00' : mm} ${period}` };
+});
 
 const buildDefaultDia = () => ({
     activo: true,
@@ -299,6 +312,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     const [mostrarHistorialCompleto, setMostrarHistorialCompleto] = useState(false);
     const [busquedaHistorial, setBusquedaHistorial] = useState('');
     const [filtroEstadoHistorial, setFiltroEstadoHistorial] = useState('todos');
+    const [paginaHistorial, setPaginaHistorial] = useState(1);
     const [hoyBloqueo] = useState(getTodayInputDate());
 
     const cargar = async () => {
@@ -574,6 +588,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         setMostrarHistorialCompleto(false);
         setBusquedaHistorial('');
         setFiltroEstadoHistorial('todos');
+        setPaginaHistorial(1);
     };
 
     const guardarDesdeVista = async () => {
@@ -611,6 +626,21 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     );
 
     const hayMasHistorial = recursosHistorial.length > HISTORIAL_PREVIEW_LIMITE;
+    const totalPaginasHistorial = Math.max(1, Math.ceil(historialFiltrado.length / HISTORIAL_PAGE_SIZE));
+    const historialPaginado = useMemo(() => {
+        const start = (paginaHistorial - 1) * HISTORIAL_PAGE_SIZE;
+        return historialFiltrado.slice(start, start + HISTORIAL_PAGE_SIZE);
+    }, [historialFiltrado, paginaHistorial]);
+
+    useEffect(() => {
+        setPaginaHistorial(1);
+    }, [busquedaHistorial, filtroEstadoHistorial, mostrarHistorialCompleto]);
+
+    useEffect(() => {
+        if (paginaHistorial > totalPaginasHistorial) {
+            setPaginaHistorial(totalPaginasHistorial);
+        }
+    }, [paginaHistorial, totalPaginasHistorial]);
 
     return (
         <div className="space-y-5">
@@ -652,12 +682,20 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 <div className="grid md:grid-cols-2 gap-3">
                                     {wizardStep === 0 && (
                                         <>
-                                            <input className="app-input" placeholder="Nombre del recurso" value={recursoForm.nombre} onChange={(e) => setRecursoForm((s) => ({ ...s, nombre: e.target.value }))} />
-                                            <select className="app-input" value={recursoForm.tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, tipo: e.target.value }))}>
-                                                <option value="salon_social">Salón social</option><option value="cancha">Cancha</option><option value="bbq">BBQ</option><option value="logistica">Logística</option><option value="enseres">Enseres</option><option value="gimnasio">Gimnasio</option><option value="generica">Genérica</option>
-                                            </select>
-                                            <input className="app-input" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
-                                            <input className="app-input" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                            <label className="text-sm">Nombre del recurso
+                                                <input className="app-input mt-1" placeholder="Ej: Salón social torre 1" value={recursoForm.nombre} onChange={(e) => setRecursoForm((s) => ({ ...s, nombre: e.target.value }))} />
+                                            </label>
+                                            <label className="text-sm">Tipo de recurso
+                                                <select className="app-input mt-1" value={recursoForm.tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, tipo: e.target.value }))}>
+                                                    <option value="salon_social">Salón social</option><option value="cancha">Cancha</option><option value="bbq">BBQ</option><option value="logistica">Logística</option><option value="enseres">Enseres</option><option value="gimnasio">Gimnasio</option><option value="generica">Genérica</option>
+                                                </select>
+                                            </label>
+                                            <label className="text-sm">Capacidad máxima
+                                                <input className="app-input mt-1" placeholder="Opcional" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
+                                            </label>
+                                            <label className="text-sm">Descripción
+                                                <input className="app-input mt-1" placeholder="Opcional" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                            </label>
                                             <label className="text-sm md:col-span-2">Política de confirmación
                                                 <select className="app-input mt-1" value={recursoForm.confirmacion_politica} onChange={(e) => setRecursoForm((s) => ({ ...s, confirmacion_politica: e.target.value }))}>
                                                     {POLITICAS_CONFIRMACION.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -827,12 +865,20 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
                                 {detalleTab === 'general' && (
                                     <div className="grid md:grid-cols-2 gap-3">
-                                        <input className="app-input" placeholder="Nombre del recurso" value={recursoForm.nombre} onChange={(e) => setRecursoForm((s) => ({ ...s, nombre: e.target.value }))} />
-                                        <select className="app-input" value={recursoForm.tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, tipo: e.target.value }))}>
-                                            <option value="salon_social">Salón social</option><option value="cancha">Cancha</option><option value="bbq">BBQ</option><option value="logistica">Logística</option><option value="enseres">Enseres</option><option value="gimnasio">Gimnasio</option><option value="generica">Genérica</option>
-                                        </select>
-                                        <input className="app-input" placeholder="Capacidad (opcional)" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
-                                        <input className="app-input" placeholder="Descripción (opcional)" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                        <label className="text-sm">Nombre del recurso
+                                            <input className="app-input mt-1" placeholder="Ej: Salón social torre 1" value={recursoForm.nombre} onChange={(e) => setRecursoForm((s) => ({ ...s, nombre: e.target.value }))} />
+                                        </label>
+                                        <label className="text-sm">Tipo de recurso
+                                            <select className="app-input mt-1" value={recursoForm.tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, tipo: e.target.value }))}>
+                                                <option value="salon_social">Salón social</option><option value="cancha">Cancha</option><option value="bbq">BBQ</option><option value="logistica">Logística</option><option value="enseres">Enseres</option><option value="gimnasio">Gimnasio</option><option value="generica">Genérica</option>
+                                            </select>
+                                        </label>
+                                        <label className="text-sm">Capacidad máxima
+                                            <input className="app-input mt-1" placeholder="Opcional" value={recursoForm.capacidad} onChange={(e) => setRecursoForm((s) => ({ ...s, capacidad: e.target.value }))} />
+                                        </label>
+                                        <label className="text-sm">Descripción
+                                            <input className="app-input mt-1" placeholder="Opcional" value={recursoForm.descripcion} onChange={(e) => setRecursoForm((s) => ({ ...s, descripcion: e.target.value }))} />
+                                        </label>
                                         <label className="text-sm md:col-span-2">Política de confirmación
                                             <select className="app-input mt-1" value={recursoForm.confirmacion_politica} onChange={(e) => setRecursoForm((s) => ({ ...s, confirmacion_politica: e.target.value }))}>
                                                 {POLITICAS_CONFIRMACION.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -994,10 +1040,16 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                     <input type="date" min={hoyBloqueo} className="app-input app-date-input mt-1" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
                                                 </label>
                                                 <label className="text-sm">🕒 Hora inicio
-                                                    <input type="time" className="app-input app-date-input mt-1" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
+                                                    <select className="app-input mt-1" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))}>
+                                                        <option value="">Selecciona hora inicio</option>
+                                                        {TIME_OPTIONS.map((opt) => <option key={`inicio-${opt.value}`} value={opt.value}>{opt.label}</option>)}
+                                                    </select>
                                                 </label>
                                                 <label className="text-sm">🕒 Hora fin
-                                                    <input type="time" className="app-input app-date-input mt-1" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
+                                                    <select className="app-input mt-1" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))}>
+                                                        <option value="">Selecciona hora fin</option>
+                                                        {TIME_OPTIONS.map((opt) => <option key={`fin-${opt.value}`} value={opt.value}>{opt.label}</option>)}
+                                                    </select>
                                                 </label>
                                                 <label className="text-sm md:col-span-2">Motivo del cierre temporal
                                                     <input className="app-input mt-1" placeholder="Ej: mantenimiento preventivo" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
@@ -1063,7 +1115,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                     {eventosPorReserva[r.id]?.length > 0 && (
                                                         <ul className="text-xs text-app-text-secondary list-disc pl-4">
                                                             {eventosPorReserva[r.id].map((ev) => (
-                                                                <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
+                                                                <li key={ev.id}>{getReservaAccionLabel(ev.accion)} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
                                                             ))}
                                                         </ul>
                                                     )}
@@ -1096,7 +1148,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                         </select>
                                                     </div>
                                                     <div className="mt-3 max-h-[65vh] space-y-2 overflow-y-auto pr-1 app-scrollbar">
-                                                        {historialFiltrado.map((item) => (
+                                                        {historialPaginado.map((item) => (
                                                             <div key={`modal-${item.id}`} className="app-surface-muted p-3">
                                                                 <div className="flex items-center justify-between gap-2"><p className="font-medium">{item.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={item.estado} /></div>
                                                                 <p className="text-xs text-app-text-secondary">Inicio: {formatDateTimeBogota(item.fecha_inicio)} · Fin: {formatDateTimeBogota(item.fecha_fin)}</p>
@@ -1104,6 +1156,15 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                             </div>
                                                         ))}
                                                         {historialFiltrado.length === 0 && <p className="text-sm text-app-text-secondary">No hay resultados para el filtro actual.</p>}
+                                                    </div>
+                                                    <div className="mt-3 flex items-center justify-between">
+                                                        <button className="app-btn-ghost text-xs disabled:opacity-50" disabled={paginaHistorial <= 1} onClick={() => setPaginaHistorial((p) => Math.max(1, p - 1))}>
+                                                            Anterior
+                                                        </button>
+                                                        <p className="text-xs text-app-text-secondary">Página {paginaHistorial} de {totalPaginasHistorial}</p>
+                                                        <button className="app-btn-ghost text-xs disabled:opacity-50" disabled={paginaHistorial >= totalPaginasHistorial} onClick={() => setPaginaHistorial((p) => Math.min(totalPaginasHistorial, p + 1))}>
+                                                            Siguiente
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
