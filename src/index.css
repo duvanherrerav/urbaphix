@@ -148,4 +148,28 @@
   .app-scrollbar::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, rgba(56, 189, 248, 0.75) 0%, rgba(37, 99, 235, 0.75) 100%);
   }
+
+  .app-input[type='number']::-webkit-outer-spin-button,
+  .app-input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .app-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .app-date-input {
+    color-scheme: dark;
+    cursor: pointer;
+  }
+
+  .app-toggle {
+    @apply w-full rounded-xl border border-app-border bg-app-bg-alt px-3 py-2 transition-all;
+  }
+
+  .app-toggle-active {
+    @apply border-brand-secondary bg-[#38BDF822];
+  }
 }

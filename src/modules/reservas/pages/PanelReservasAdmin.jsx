@@ -17,6 +17,7 @@ import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
 import {
     formatearMilesCOP,
+    getReservaEstadoLabel,
     getReservaResidenteLabel,
     getReservaTorreAptoLabel,
     normalizarInputMoneda
@@ -37,7 +38,37 @@ const POLITICAS_CONFIRMACION = [
     { value: 'confirmacion_automatica', label: 'Confirmación automática' }
 ];
 const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
-const HISTORIAL_PREVIEW_LIMITE = 8;
+const HISTORIAL_PREVIEW_LIMITE = 3;
+
+const getTodayInputDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+function ToggleField({ checked, onChange, label, description }) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            onClick={() => onChange(!checked)}
+            className={`app-toggle ${checked ? 'app-toggle-active' : ''}`}
+        >
+            <span className="flex items-center justify-between gap-3">
+                <span className="text-left">
+                    <span className="block text-sm font-medium text-app-text-primary">{label}</span>
+                    {description && <span className="block text-xs text-app-text-secondary">{description}</span>}
+                </span>
+                <span className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${checked ? 'bg-brand-secondary' : 'bg-app-border'}`}>
+                    <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : ''}`} />
+                </span>
+            </span>
+        </button>
+    );
+}
 
 const buildDefaultDia = () => ({
     activo: true,
@@ -267,6 +298,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     const [detalleTab, setDetalleTab] = useState('general'); // general | disponibilidad | deposito | bloqueos | historial
     const [mostrarHistorialCompleto, setMostrarHistorialCompleto] = useState(false);
     const [busquedaHistorial, setBusquedaHistorial] = useState('');
+    const [filtroEstadoHistorial, setFiltroEstadoHistorial] = useState('todos');
+    const [hoyBloqueo] = useState(getTodayInputDate());
 
     const cargar = async () => {
         if (!usuarioApp?.conjunto_id) return;
@@ -475,6 +508,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
     const crearBloqueoAdmin = async () => {
         if (!bloqueoForm.recurso_id || !bloqueoForm.fecha || !bloqueoForm.hora_inicio || !bloqueoForm.hora_fin || !bloqueoForm.motivo?.trim()) return toast.error('Completa recurso, horario y motivo del cierre temporal');
+        if (bloqueoForm.fecha < hoyBloqueo) return toast.error('No puedes registrar bloqueos en fechas pasadas.');
         if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) return toast.error('La hora final debe ser mayor a la hora inicial');
 
         const resp = await crearBloqueo({
@@ -539,6 +573,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         setDetalleTab('general');
         setMostrarHistorialCompleto(false);
         setBusquedaHistorial('');
+        setFiltroEstadoHistorial('todos');
     };
 
     const guardarDesdeVista = async () => {
@@ -554,19 +589,21 @@ export default function PanelReservasAdmin({ usuarioApp }) {
 
     const historialFiltrado = useMemo(() => {
         const term = busquedaHistorial.trim().toLowerCase();
-        if (!term) return recursosHistorial;
-
         return recursosHistorial.filter((r) => {
+            const cumpleEstado = filtroEstadoHistorial === 'todos' || r.estado === filtroEstadoHistorial;
+            if (!cumpleEstado) return false;
+            if (!term) return true;
             const candidato = [
                 r.recursos_comunes?.nombre,
                 r.estado,
+                getReservaEstadoLabel(r.estado),
                 r.motivo,
                 getReservaResidenteLabel(r),
                 getReservaTorreAptoLabel(r)
             ].filter(Boolean).join(' ').toLowerCase();
             return candidato.includes(term);
         });
-    }, [busquedaHistorial, recursosHistorial]);
+    }, [busquedaHistorial, filtroEstadoHistorial, recursosHistorial]);
 
     const historialPreview = useMemo(
         () => recursosHistorial.slice(0, HISTORIAL_PREVIEW_LIMITE),
@@ -641,7 +678,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <div key={dia.key} className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <h5 className="font-medium">{dia.label}</h5>
-                                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />Disponible</label>
+                                                        <ToggleField
+                                                            checked={cfg.activo}
+                                                            onChange={(checked) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: checked }))}
+                                                            label="Disponible"
+                                                            description={`Controla si ${dia.label.toLowerCase()} se habilita para reservas.`}
+                                                        />
                                                     </div>
                                                     {cfg.activo && (
                                                         <>
@@ -679,10 +721,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <h5 className="font-medium">Días festivos</h5>
                                                 <p className="text-xs text-app-text-secondary">Define si el recurso operará en festivos y qué horario se aplicará.</p>
                                             </div>
-                                            <label className="text-sm flex items-center gap-2">
-                                                <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
-                                                Disponible en festivos
-                                            </label>
+                                            <ToggleField
+                                                checked={recursoForm.festivos.activo}
+                                                onChange={(checked) => updateFestivosConfig((f) => ({ ...f, activo: checked }))}
+                                                label="Disponible en festivos"
+                                                description="Permite reservas en días festivos con la regla que elijas abajo."
+                                            />
                                             {recursoForm.festivos.activo && (
                                                 <>
                                                     <label className="text-sm block">Aplicar horario de festivo
@@ -730,7 +774,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 {wizardStep === 2 && (
                                     <div className="app-surface-muted p-4 space-y-3 bg-app-bg/70">
                                         <h4 className="font-semibold">Depósito</h4>
-                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
+                                        <ToggleField
+                                            checked={recursoForm.requiere_deposito}
+                                            onChange={(checked) => setRecursoForm((s) => ({ ...s, requiere_deposito: checked }))}
+                                            label="¿Requiere depósito?"
+                                            description="Actívalo para solicitar depósito antes de confirmar reservas."
+                                        />
                                         {recursoForm.requiere_deposito && (
                                             <div className="grid md:grid-cols-2 gap-3">
                                                 <label className="text-sm">Valor del depósito (COP)
@@ -804,7 +853,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <div key={dia.key} className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
                                                     <div className="flex items-center justify-between gap-2">
                                                         <h5 className="font-medium">{dia.label}</h5>
-                                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={cfg.activo} onChange={(e) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: e.target.checked }))} />Disponible</label>
+                                                        <ToggleField
+                                                            checked={cfg.activo}
+                                                            onChange={(checked) => updateDiaConfig(dia.key, (d) => ({ ...d, activo: checked }))}
+                                                            label="Disponible"
+                                                            description={`Controla si ${dia.label.toLowerCase()} se habilita para reservas.`}
+                                                        />
                                                     </div>
                                                     {cfg.activo && (
                                                         <>
@@ -842,10 +896,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <h5 className="font-medium">Días festivos</h5>
                                                 <p className="text-xs text-app-text-secondary">Define si el recurso operará en festivos y qué horario se aplicará.</p>
                                             </div>
-                                            <label className="text-sm flex items-center gap-2">
-                                                <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
-                                                Disponible en festivos
-                                            </label>
+                                            <ToggleField
+                                                checked={recursoForm.festivos.activo}
+                                                onChange={(checked) => updateFestivosConfig((f) => ({ ...f, activo: checked }))}
+                                                label="Disponible en festivos"
+                                                description="Permite reservas en días festivos con la regla que elijas abajo."
+                                            />
                                             {recursoForm.festivos.activo && (
                                                 <>
                                                     <label className="text-sm block">Aplicar horario de festivo
@@ -894,7 +950,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 {detalleTab === 'deposito' && (
                                     <div className="app-surface-muted p-4 space-y-3 bg-app-bg/70">
                                         <h4 className="font-semibold">Depósito</h4>
-                                        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
+                                        <ToggleField
+                                            checked={recursoForm.requiere_deposito}
+                                            onChange={(checked) => setRecursoForm((s) => ({ ...s, requiere_deposito: checked }))}
+                                            label="¿Requiere depósito?"
+                                            description="Actívalo para solicitar depósito antes de confirmar reservas."
+                                        />
                                         {recursoForm.requiere_deposito && (
                                             <div className="grid md:grid-cols-2 gap-3">
                                                 <label className="text-sm">Valor del depósito (COP)
@@ -930,13 +991,13 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                     </select>
                                                 </label>
                                                 <label className="text-sm">📅 Fecha del bloqueo
-                                                    <input type="date" className="app-input mt-1 [color-scheme:dark]" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
+                                                    <input type="date" min={hoyBloqueo} className="app-input app-date-input mt-1" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
                                                 </label>
                                                 <label className="text-sm">🕒 Hora inicio
-                                                    <input type="time" className="app-input mt-1 [color-scheme:dark]" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
+                                                    <input type="time" className="app-input app-date-input mt-1" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
                                                 </label>
                                                 <label className="text-sm">🕒 Hora fin
-                                                    <input type="time" className="app-input mt-1 [color-scheme:dark]" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
+                                                    <input type="time" className="app-input app-date-input mt-1" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
                                                 </label>
                                                 <label className="text-sm md:col-span-2">Motivo del cierre temporal
                                                     <input className="app-input mt-1" placeholder="Ej: mantenimiento preventivo" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
@@ -964,12 +1025,12 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                             return (
                                                 <div key={r.id} className="app-surface-muted p-3 space-y-2">
                                                     <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
-                                                    <p className="text-sm text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                                    <p className="text-sm text-app-text-secondary">Inicio: {formatDateTimeBogota(r.fecha_inicio)} · Fin: {formatDateTimeBogota(r.fecha_fin)}</p>
                                                     <p className="text-sm text-app-text-secondary">{getReservaResidenteLabel(r)} · {getReservaTorreAptoLabel(r)}</p>
                                                     <div className="grid md:grid-cols-3 gap-2 text-xs">
                                                         <div className="app-surface-primary p-2">
                                                             <p className="text-app-text-secondary">Post-reserva</p>
-                                                            <p>{r.estado === 'finalizada' ? 'Finalizada' : r.estado === 'no_show' ? 'No asistió' : r.estado === 'en_curso' ? 'En curso' : 'Pendiente de cierre'}</p>
+                                                            <p>{getReservaEstadoLabel(r.estado)}</p>
                                                         </div>
                                                         <div className="app-surface-primary p-2">
                                                             <p className="text-app-text-secondary">Depósito</p>
@@ -1021,14 +1082,24 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                         <h4 className="font-semibold">Historial completo del recurso</h4>
                                                         <button className="app-btn-ghost text-xs" onClick={() => setMostrarHistorialCompleto(false)}>Cerrar</button>
                                                     </div>
-                                                    <div className="mt-3">
+                                                    <div className="mt-3 grid gap-2 md:grid-cols-2">
                                                         <input className="app-input" placeholder="Buscar por residente, estado, motivo o recurso" value={busquedaHistorial} onChange={(e) => setBusquedaHistorial(e.target.value)} />
+                                                        <select className="app-input" value={filtroEstadoHistorial} onChange={(e) => setFiltroEstadoHistorial(e.target.value)}>
+                                                            <option value="todos">Todos los estados</option>
+                                                            <option value="solicitada">Solicitada</option>
+                                                            <option value="aprobada">Aprobada</option>
+                                                            <option value="rechazada">Rechazada</option>
+                                                            <option value="cancelada">Cancelada</option>
+                                                            <option value="en_curso">En curso</option>
+                                                            <option value="finalizada">Finalizada</option>
+                                                            <option value="no_show">No asistió</option>
+                                                        </select>
                                                     </div>
                                                     <div className="mt-3 max-h-[65vh] space-y-2 overflow-y-auto pr-1 app-scrollbar">
                                                         {historialFiltrado.map((item) => (
                                                             <div key={`modal-${item.id}`} className="app-surface-muted p-3">
                                                                 <div className="flex items-center justify-between gap-2"><p className="font-medium">{item.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={item.estado} /></div>
-                                                                <p className="text-xs text-app-text-secondary">{formatDateRangeBogota(item.fecha_inicio, item.fecha_fin)}</p>
+                                                                <p className="text-xs text-app-text-secondary">Inicio: {formatDateTimeBogota(item.fecha_inicio)} · Fin: {formatDateTimeBogota(item.fecha_fin)}</p>
                                                                 <p className="text-xs text-app-text-secondary">{getReservaResidenteLabel(item)} · {getReservaTorreAptoLabel(item)}</p>
                                                             </div>
                                                         ))}
