@@ -31,6 +31,14 @@ export default function CrearCobro({ usuarioApp }) {
     grande: '96000'
   });
 
+  const formatearMiles = (value) => {
+    const limpio = String(value || '').replace(/\D/g, '');
+    if (!limpio) return '';
+    return Number(limpio).toLocaleString('es-CO');
+  };
+
+  const normalizarInputMoneda = (value) => String(value || '').replace(/\D/g, '');
+
   const notificarError = (codigo, detalle) => toast.error(`${codigo}: ${detalle}`);
 
   useEffect(() => {
@@ -216,7 +224,7 @@ export default function CrearCobro({ usuarioApp }) {
   };
 
   return (
-    <div className="bg-app-bg-alt p-6 rounded-xl shadow max-w-2xl">
+    <div className="app-surface-primary p-5 space-y-4">
       <h2 className="text-xl font-bold mb-1">Crear cobro 💰</h2>
       <p className="text-sm text-app-text-secondary mb-4">Cobro individual por apartamento escrito o masivo por tipo de apartamento.</p>
 
@@ -275,12 +283,18 @@ export default function CrearCobro({ usuarioApp }) {
           )}
 
           <input
-            value={form.valor}
-            type="number"
-            placeholder="Valor"
-            onChange={(e) => setForm({ ...form, valor: e.target.value })}
+            value={formatearMiles(form.valor)}
+            type="text"
+            inputMode="numeric"
+            placeholder="Valor (ej: 100.000)"
+            onChange={(e) => setForm({ ...form, valor: normalizarInputMoneda(e.target.value) })}
             className="app-input"
           />
+          {form.valor && (
+            <p className="text-xs text-app-text-secondary">
+              Valor a cobrar: ${formatearMiles(form.valor)}
+            </p>
+          )}
         </div>
       )}
 
@@ -291,31 +305,35 @@ export default function CrearCobro({ usuarioApp }) {
             <div>
               <label className="text-xs text-app-text-secondary">Pequeño</label>
               <input
-                type="number"
-                value={tarifasTipo.pequeno}
-                onChange={(e) => setTarifasTipo({ ...tarifasTipo, pequeno: e.target.value })}
+                type="text"
+                inputMode="numeric"
+                value={formatearMiles(tarifasTipo.pequeno)}
+                onChange={(e) => setTarifasTipo({ ...tarifasTipo, pequeno: normalizarInputMoneda(e.target.value) })}
                 className="app-input"
               />
             </div>
             <div>
               <label className="text-xs text-app-text-secondary">Mediano</label>
               <input
-                type="number"
-                value={tarifasTipo.mediano}
-                onChange={(e) => setTarifasTipo({ ...tarifasTipo, mediano: e.target.value })}
+                type="text"
+                inputMode="numeric"
+                value={formatearMiles(tarifasTipo.mediano)}
+                onChange={(e) => setTarifasTipo({ ...tarifasTipo, mediano: normalizarInputMoneda(e.target.value) })}
                 className="app-input"
               />
             </div>
             <div>
               <label className="text-xs text-app-text-secondary">Grande</label>
               <input
-                type="number"
-                value={tarifasTipo.grande}
-                onChange={(e) => setTarifasTipo({ ...tarifasTipo, grande: e.target.value })}
+                type="text"
+                inputMode="numeric"
+                value={formatearMiles(tarifasTipo.grande)}
+                onChange={(e) => setTarifasTipo({ ...tarifasTipo, grande: normalizarInputMoneda(e.target.value) })}
                 className="app-input"
               />
             </div>
           </div>
+          <p className="text-xs text-app-text-secondary">Los valores se guardan como número, con visualización en miles para facilitar la carga.</p>
         </div>
       )}
 

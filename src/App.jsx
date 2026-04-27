@@ -376,7 +376,7 @@ function App() {
 
                 {moduloActual === 'pagos' && (
                   <>
-                    <div className="grid xl:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <CrearCobro usuarioApp={usuarioApp} />
                       <PanelPagosAdmin usuarioApp={usuarioApp} />
                     </div>
