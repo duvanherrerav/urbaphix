@@ -24,7 +24,9 @@ const BASE_RESERVA_SELECT = `
   checkout_por,
   created_at,
   updated_at,
-  recursos_comunes ( id, nombre, tipo, requiere_aprobacion, tiempo_buffer_min )
+  recursos_comunes ( id, nombre, tipo, requiere_aprobacion, tiempo_buffer_min ),
+  residentes ( id, apartamento_id, usuarios_app ( nombre ), apartamentos ( numero, torres ( nombre ) ) ),
+  apartamentos ( numero, torres ( nombre ) )
 `;
 
 const ESTADOS_ACTIVOS_RESERVA = ['solicitada', 'aprobada', 'en_curso'];

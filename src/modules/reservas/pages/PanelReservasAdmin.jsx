@@ -15,6 +15,12 @@ import {
 } from '../services/reservasService';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
+import {
+    formatearMilesCOP,
+    getReservaResidenteLabel,
+    getReservaTorreAptoLabel,
+    normalizarInputMoneda
+} from '../utils/reservaFormatters';
 
 const GRUPOS_DIAS = [
     { key: 'lun_vie', label: 'Lunes a viernes' },
@@ -31,6 +37,7 @@ const POLITICAS_CONFIRMACION = [
     { value: 'confirmacion_automatica', label: 'Confirmación automática' }
 ];
 const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
+const HISTORIAL_PREVIEW_LIMITE = 8;
 
 const buildDefaultDia = () => ({
     activo: true,
@@ -258,6 +265,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     const [vistaAdmin, setVistaAdmin] = useState('lista'); // lista | crear | detalle
     const [wizardStep, setWizardStep] = useState(0); // 0 general, 1 disponibilidad, 2 deposito
     const [detalleTab, setDetalleTab] = useState('general'); // general | disponibilidad | deposito | bloqueos | historial
+    const [mostrarHistorialCompleto, setMostrarHistorialCompleto] = useState(false);
+    const [busquedaHistorial, setBusquedaHistorial] = useState('');
 
     const cargar = async () => {
         if (!usuarioApp?.conjunto_id) return;
@@ -369,23 +378,67 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         }));
     };
 
-    const guardarRecurso = async () => {
-        if (!recursoForm.nombre || !recursoForm.tipo) return toast.error('Nombre y tipo son obligatorios');
-        if (Number(recursoForm.tiempo_buffer_min) < 0) return toast.error('El tiempo de separación no puede ser negativo');
-        if (recursoForm.requiere_deposito) {
-            if (!(Number(recursoForm.deposito_valor) > 0)) return toast.error('El valor del depósito debe ser mayor a 0');
-            if (!['reembolsable', 'no_reembolsable'].includes(recursoForm.deposito_tipo)) return toast.error('Debes definir tipo de depósito');
+    const validarGeneralRecurso = () => {
+        if (!recursoForm.nombre?.trim() || !recursoForm.tipo) {
+            toast.error('Completa nombre y tipo del recurso para continuar.');
+            return false;
         }
+        if (Number(recursoForm.tiempo_buffer_min) < 0) {
+            toast.error('El tiempo de separación no puede ser negativo.');
+            return false;
+        }
+        return true;
+    };
 
+    const validarDisponibilidadRecurso = () => {
         for (const dia of GRUPOS_DIAS) {
             const error = validarDia(recursoForm.disponibilidad_semanal[dia.key], dia.label);
-            if (error) return toast.error(error);
+            if (error) {
+                toast.error(error);
+                return false;
+            }
         }
 
         if (recursoForm.festivos.activo && recursoForm.festivos.usar === 'especial') {
             const errorFestivo = validarDia({ ...recursoForm.festivos.especial, activo: true }, 'Festivos');
-            if (errorFestivo) return toast.error(errorFestivo);
+            if (errorFestivo) {
+                toast.error(errorFestivo);
+                return false;
+            }
         }
+
+        return true;
+    };
+
+    const validarDepositoRecurso = () => {
+        if (!recursoForm.requiere_deposito) return true;
+        if (!(Number(recursoForm.deposito_valor) > 0)) {
+            toast.error('El valor del depósito debe ser mayor a 0.');
+            return false;
+        }
+        if (!['reembolsable', 'no_reembolsable'].includes(recursoForm.deposito_tipo)) {
+            toast.error('Debes definir el tipo de depósito.');
+            return false;
+        }
+        return true;
+    };
+
+    const avanzarWizard = () => {
+        if (wizardStep === 0 && !validarGeneralRecurso()) return;
+        if (wizardStep === 1 && !validarDisponibilidadRecurso()) return;
+        setWizardStep((s) => Math.min(2, s + 1));
+    };
+
+    const onChangeDepositoValor = (rawValue) => {
+        const limpio = normalizarInputMoneda(rawValue);
+        setRecursoForm((s) => ({ ...s, deposito_valor: limpio }));
+    };
+
+
+    const guardarRecurso = async () => {
+        if (!validarGeneralRecurso()) return;
+        if (!validarDisponibilidadRecurso()) return;
+        if (!validarDepositoRecurso()) return;
 
         const payload = {
             conjunto_id: usuarioApp.conjunto_id,
@@ -421,7 +474,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
     };
 
     const crearBloqueoAdmin = async () => {
-        if (!bloqueoForm.recurso_id || !bloqueoForm.fecha || !bloqueoForm.hora_inicio || !bloqueoForm.hora_fin || !bloqueoForm.motivo) return toast.error('Completa recurso, horario y motivo del cierre temporal');
+        if (!bloqueoForm.recurso_id || !bloqueoForm.fecha || !bloqueoForm.hora_inicio || !bloqueoForm.hora_fin || !bloqueoForm.motivo?.trim()) return toast.error('Completa recurso, horario y motivo del cierre temporal');
         if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) return toast.error('La hora final debe ser mayor a la hora inicial');
 
         const resp = await crearBloqueo({
@@ -429,7 +482,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
             recurso_id: bloqueoForm.recurso_id,
             fecha_inicio: `${bloqueoForm.fecha}T${bloqueoForm.hora_inicio}:00`,
             fecha_fin: `${bloqueoForm.fecha}T${bloqueoForm.hora_fin}:00`,
-            motivo: bloqueoForm.motivo,
+            motivo: bloqueoForm.motivo.trim(),
             creado_por: usuarioApp.id
         });
 
@@ -484,6 +537,8 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         setVistaAdmin('lista');
         setWizardStep(0);
         setDetalleTab('general');
+        setMostrarHistorialCompleto(false);
+        setBusquedaHistorial('');
     };
 
     const guardarDesdeVista = async () => {
@@ -496,6 +551,29 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         () => reservas.filter((r) => !recursoEditId || r.recurso_id === recursoEditId),
         [reservas, recursoEditId]
     );
+
+    const historialFiltrado = useMemo(() => {
+        const term = busquedaHistorial.trim().toLowerCase();
+        if (!term) return recursosHistorial;
+
+        return recursosHistorial.filter((r) => {
+            const candidato = [
+                r.recursos_comunes?.nombre,
+                r.estado,
+                r.motivo,
+                getReservaResidenteLabel(r),
+                getReservaTorreAptoLabel(r)
+            ].filter(Boolean).join(' ').toLowerCase();
+            return candidato.includes(term);
+        });
+    }, [busquedaHistorial, recursosHistorial]);
+
+    const historialPreview = useMemo(
+        () => recursosHistorial.slice(0, HISTORIAL_PREVIEW_LIMITE),
+        [recursosHistorial]
+    );
+
+    const hayMasHistorial = recursosHistorial.length > HISTORIAL_PREVIEW_LIMITE;
 
     return (
         <div className="space-y-5">
@@ -596,8 +674,11 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                             );
                                         })}
 
-                                        <div className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
-                                            <h5 className="font-medium">Días festivos</h5>
+                                        <div className="rounded-xl border border-brand-primary/25 bg-app-bg-alt/80 p-4 space-y-3">
+                                            <div>
+                                                <h5 className="font-medium">Días festivos</h5>
+                                                <p className="text-xs text-app-text-secondary">Define si el recurso operará en festivos y qué horario se aplicará.</p>
+                                            </div>
                                             <label className="text-sm flex items-center gap-2">
                                                 <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
                                                 Disponible en festivos
@@ -652,7 +733,16 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
                                         {recursoForm.requiere_deposito && (
                                             <div className="grid md:grid-cols-2 gap-3">
-                                                <label className="text-sm">Valor del depósito (COP)<input type="number" min="1" className="app-input mt-1" value={recursoForm.deposito_valor} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_valor: e.target.value }))} /></label>
+                                                <label className="text-sm">Valor del depósito (COP)
+                                                    <input
+                                                        inputMode="numeric"
+                                                        placeholder="Ej: 100.000"
+                                                        className="app-input mt-1"
+                                                        value={formatearMilesCOP(recursoForm.deposito_valor)}
+                                                        onChange={(e) => onChangeDepositoValor(e.target.value)}
+                                                    />
+                                                    <span className="mt-1 block text-xs text-app-text-secondary">Se mostrará con separador de miles y se guardará como valor numérico.</span>
+                                                </label>
                                                 <label className="text-sm">Tipo de depósito
                                                     <select className="app-input mt-1" value={recursoForm.deposito_tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_tipo: e.target.value }))}>
                                                         <option value="reembolsable">Reembolsable</option><option value="no_reembolsable">No reembolsable</option>
@@ -666,7 +756,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 <div className="flex justify-between">
                                     <button className="app-btn-ghost text-xs" onClick={() => setWizardStep((s) => Math.max(0, s - 1))} disabled={wizardStep === 0}>Anterior</button>
                                     {wizardStep < 2
-                                        ? <button className="app-btn-primary text-xs" onClick={() => setWizardStep((s) => Math.min(2, s + 1))}>Siguiente</button>
+                                        ? <button className="app-btn-primary text-xs" onClick={avanzarWizard}>Siguiente</button>
                                         : <button className="app-btn-primary text-xs" onClick={guardarDesdeVista}>Crear recurso</button>}
                                 </div>
                             </>
@@ -747,8 +837,11 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                             );
                                         })}
 
-                                        <div className="rounded-lg border border-app-border bg-app-bg-alt/80 p-3 space-y-2">
-                                            <h5 className="font-medium">Días festivos</h5>
+                                        <div className="rounded-xl border border-brand-primary/25 bg-app-bg-alt/80 p-4 space-y-3">
+                                            <div>
+                                                <h5 className="font-medium">Días festivos</h5>
+                                                <p className="text-xs text-app-text-secondary">Define si el recurso operará en festivos y qué horario se aplicará.</p>
+                                            </div>
                                             <label className="text-sm flex items-center gap-2">
                                                 <input type="checkbox" checked={recursoForm.festivos.activo} onChange={(e) => updateFestivosConfig((f) => ({ ...f, activo: e.target.checked }))} />
                                                 Disponible en festivos
@@ -804,7 +897,16 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                         <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={recursoForm.requiere_deposito} onChange={(e) => setRecursoForm((s) => ({ ...s, requiere_deposito: e.target.checked }))} />¿Requiere depósito?</label>
                                         {recursoForm.requiere_deposito && (
                                             <div className="grid md:grid-cols-2 gap-3">
-                                                <label className="text-sm">Valor del depósito (COP)<input type="number" min="1" className="app-input mt-1" value={recursoForm.deposito_valor} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_valor: e.target.value }))} /></label>
+                                                <label className="text-sm">Valor del depósito (COP)
+                                                    <input
+                                                        inputMode="numeric"
+                                                        placeholder="Ej: 100.000"
+                                                        className="app-input mt-1"
+                                                        value={formatearMilesCOP(recursoForm.deposito_valor)}
+                                                        onChange={(e) => onChangeDepositoValor(e.target.value)}
+                                                    />
+                                                    <span className="mt-1 block text-xs text-app-text-secondary">Se mostrará con separador de miles y se guardará como valor numérico.</span>
+                                                </label>
                                                 <label className="text-sm">Tipo de depósito
                                                     <select className="app-input mt-1" value={recursoForm.deposito_tipo} onChange={(e) => setRecursoForm((s) => ({ ...s, deposito_tipo: e.target.value }))}>
                                                         <option value="reembolsable">Reembolsable</option><option value="no_reembolsable">No reembolsable</option>
@@ -819,17 +921,30 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 {detalleTab === 'bloqueos' && (
                                     <div className="space-y-3">
                                         <p className="text-sm text-app-text-secondary">Registra cierres temporales por mantenimiento o novedades operativas.</p>
-                                        <div className="grid md:grid-cols-2 gap-3">
-                                            <select className="app-input" value={bloqueoForm.recurso_id} onChange={(e) => setBloqueoForm((s) => ({ ...s, recurso_id: e.target.value }))}>
-                                                <option value="">Selecciona recurso</option>
-                                                {recursos.map((r) => <option key={r.id} value={r.id}>{r.nombre} · {r.tipo}</option>)}
-                                            </select>
-                                            <input type="date" className="app-input" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
-                                            <input type="time" className="app-input" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
-                                            <input type="time" className="app-input" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
-                                            <input className="app-input md:col-span-2" placeholder="Motivo del cierre temporal" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
+                                        <div className="rounded-xl border border-app-border bg-app-bg/40 p-4">
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                                <label className="text-sm">Recurso a bloquear
+                                                    <select className="app-input mt-1" value={bloqueoForm.recurso_id} onChange={(e) => setBloqueoForm((s) => ({ ...s, recurso_id: e.target.value }))}>
+                                                        <option value="">Selecciona recurso</option>
+                                                        {recursos.map((r) => <option key={r.id} value={r.id}>{r.nombre} · {r.tipo}</option>)}
+                                                    </select>
+                                                </label>
+                                                <label className="text-sm">📅 Fecha del bloqueo
+                                                    <input type="date" className="app-input mt-1 [color-scheme:dark]" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
+                                                </label>
+                                                <label className="text-sm">🕒 Hora inicio
+                                                    <input type="time" className="app-input mt-1 [color-scheme:dark]" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
+                                                </label>
+                                                <label className="text-sm">🕒 Hora fin
+                                                    <input type="time" className="app-input mt-1 [color-scheme:dark]" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
+                                                </label>
+                                                <label className="text-sm md:col-span-2">Motivo del cierre temporal
+                                                    <input className="app-input mt-1" placeholder="Ej: mantenimiento preventivo" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />
+                                                </label>
+                                            </div>
+                                            <p className="mt-2 text-xs text-app-text-secondary">La hora fin debe ser mayor que la hora inicio.</p>
                                         </div>
-                                        <button className="btn-primary px-3 py-2 rounded" onClick={crearBloqueoAdmin}>Registrar cierre temporal</button>
+                                        <button className="app-btn-primary text-xs" onClick={crearBloqueoAdmin}>Registrar cierre temporal</button>
                                         <div className="space-y-2">
                                             {bloqueos.filter((b) => !recursoEditId || b.recurso_id === recursoEditId).map((b) => (
                                                 <div key={b.id} className="app-surface-muted p-2 flex items-center justify-between">
@@ -842,70 +957,86 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                 )}
 
                                 {detalleTab === 'historial' && (
-                                    <div className="space-y-2">
-                                        {recursosHistorial.map((r) => {
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-app-text-secondary">Vista rápida de los últimos movimientos para evitar una lista infinita en pantalla.</p>
+                                        {historialPreview.map((r) => {
                                             const evaluacionNoShow = evaluarElegibilidadNoShow(r);
                                             return (
                                                 <div key={r.id} className="app-surface-muted p-3 space-y-2">
-                                                <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
-                                                <p className="text-sm text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-                                                <p className="text-sm text-app-text-secondary">Residente ID: {r.residente_id}</p>
-                                                <div className="grid md:grid-cols-3 gap-2 text-xs">
-                                                    <div className="app-surface-primary p-2">
-                                                        <p className="text-app-text-secondary">Post-reserva</p>
-                                                        <p>{r.estado === 'finalizada' ? 'Finalizada' : r.estado === 'no_show' ? 'No asistió' : r.estado === 'en_curso' ? 'En curso' : 'Pendiente de cierre'}</p>
+                                                    <div className="flex items-center justify-between gap-2"><p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={r.estado} /></div>
+                                                    <p className="text-sm text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                                    <p className="text-sm text-app-text-secondary">{getReservaResidenteLabel(r)} · {getReservaTorreAptoLabel(r)}</p>
+                                                    <div className="grid md:grid-cols-3 gap-2 text-xs">
+                                                        <div className="app-surface-primary p-2">
+                                                            <p className="text-app-text-secondary">Post-reserva</p>
+                                                            <p>{r.estado === 'finalizada' ? 'Finalizada' : r.estado === 'no_show' ? 'No asistió' : r.estado === 'en_curso' ? 'En curso' : 'Pendiente de cierre'}</p>
+                                                        </div>
+                                                        <div className="app-surface-primary p-2">
+                                                            <p className="text-app-text-secondary">Depósito</p>
+                                                            <p>{r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
+                                                        </div>
+                                                        <div className="app-surface-primary p-2">
+                                                            <p className="text-app-text-secondary">Causal económica</p>
+                                                            <p>{r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="app-surface-primary p-2">
-                                                        <p className="text-app-text-secondary">Depósito</p>
-                                                        <p>{r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
-                                                    </div>
-                                                    <div className="app-surface-primary p-2">
-                                                        <p className="text-app-text-secondary">Causal económica</p>
-                                                        <p>{r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
-                                                    </div>
-                                                </div>
-                                                {r.estado === 'solicitada' && (
-                                                    <div className="flex gap-2 mt-2">
-                                                        <button className="app-btn-secondary text-xs" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
-                                                        <button className="app-btn-danger text-xs" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
-                                                    </div>
-                                                )}
-                                                {r.estado === 'aprobada' && (
-                                                    <div className="flex flex-wrap gap-2 mt-2">
-                                                        <button className="app-btn-primary text-xs" onClick={() => actualizarEstado(r.id, 'en_curso', 'Check-in por admin')}>
-                                                            Check-in
-                                                        </button>
-                                                        <button
-                                                            className="app-btn-secondary text-xs disabled:opacity-50"
-                                                            disabled={!evaluacionNoShow.elegible}
-                                                            onClick={() => actualizarEstado(r.id, 'no_show', 'Marcada como no asistió por admin')}
-                                                        >
-                                                            Marcar como no asistió
-                                                        </button>
-                                                        {!evaluacionNoShow.elegible && (
-                                                            <p className="w-full text-xs text-amber-700">{evaluacionNoShow.motivo}</p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {r.estado === 'en_curso' && (
-                                                    <div className="flex gap-2 mt-2">
-                                                        <button className="app-btn-secondary text-xs" onClick={() => actualizarEstado(r.id, 'finalizada', 'Check-out por admin')}>
-                                                            Check-out
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                <button className="text-xs text-brand-secondary underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
-                                                {eventosPorReserva[r.id]?.length > 0 && (
-                                                    <ul className="text-xs text-app-text-secondary list-disc pl-4">
-                                                        {eventosPorReserva[r.id].map((ev) => (
-                                                            <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
-                                                        ))}
-                                                    </ul>
-                                                )}
+                                                    {r.estado === 'solicitada' && (
+                                                        <div className="flex gap-2 mt-2">
+                                                            <button className="app-btn-secondary text-xs" onClick={() => actualizarEstado(r.id, 'aprobada')}>Aprobar</button>
+                                                            <button className="app-btn-danger text-xs" onClick={() => actualizarEstado(r.id, 'rechazada')}>Rechazar</button>
+                                                        </div>
+                                                    )}
+                                                    {r.estado === 'aprobada' && (
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            <button className="app-btn-primary text-xs" onClick={() => actualizarEstado(r.id, 'en_curso', 'Check-in por admin')}>Check-in</button>
+                                                            <button className="app-btn-secondary text-xs disabled:opacity-50" disabled={!evaluacionNoShow.elegible} onClick={() => actualizarEstado(r.id, 'no_show', 'Marcada como no asistió por admin')}>Marcar como no asistió</button>
+                                                            {!evaluacionNoShow.elegible && <p className="w-full text-xs text-amber-700">{evaluacionNoShow.motivo}</p>}
+                                                        </div>
+                                                    )}
+                                                    {r.estado === 'en_curso' && (
+                                                        <div className="flex gap-2 mt-2">
+                                                            <button className="app-btn-secondary text-xs" onClick={() => actualizarEstado(r.id, 'finalizada', 'Check-out por admin')}>Check-out</button>
+                                                        </div>
+                                                    )}
+                                                    <button className="text-xs text-brand-secondary underline" onClick={() => verBitacora(r.id)}>Ver historial</button>
+                                                    {eventosPorReserva[r.id]?.length > 0 && (
+                                                        <ul className="text-xs text-app-text-secondary list-disc pl-4">
+                                                            {eventosPorReserva[r.id].map((ev) => (
+                                                                <li key={ev.id}>{ev.accion} · {formatDateTimeBogota(ev.created_at)} · {ev.detalle || 'Sin detalle'}</li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
                                                 </div>
                                             );
                                         })}
                                         {recursosHistorial.length === 0 && <p className="text-sm text-app-text-secondary">Sin historial para este recurso.</p>}
+                                        {hayMasHistorial && (
+                                            <button className="app-btn-ghost text-xs" onClick={() => setMostrarHistorialCompleto(true)}>Ver historial completo ({recursosHistorial.length})</button>
+                                        )}
+
+                                        {mostrarHistorialCompleto && (
+                                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                                                <div className="app-surface-primary w-full max-w-5xl rounded-2xl border border-app-border p-4">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <h4 className="font-semibold">Historial completo del recurso</h4>
+                                                        <button className="app-btn-ghost text-xs" onClick={() => setMostrarHistorialCompleto(false)}>Cerrar</button>
+                                                    </div>
+                                                    <div className="mt-3">
+                                                        <input className="app-input" placeholder="Buscar por residente, estado, motivo o recurso" value={busquedaHistorial} onChange={(e) => setBusquedaHistorial(e.target.value)} />
+                                                    </div>
+                                                    <div className="mt-3 max-h-[65vh] space-y-2 overflow-y-auto pr-1 app-scrollbar">
+                                                        {historialFiltrado.map((item) => (
+                                                            <div key={`modal-${item.id}`} className="app-surface-muted p-3">
+                                                                <div className="flex items-center justify-between gap-2"><p className="font-medium">{item.recursos_comunes?.nombre || 'Recurso'}</p><ReservaStatusBadge estado={item.estado} /></div>
+                                                                <p className="text-xs text-app-text-secondary">{formatDateRangeBogota(item.fecha_inicio, item.fecha_fin)}</p>
+                                                                <p className="text-xs text-app-text-secondary">{getReservaResidenteLabel(item)} · {getReservaTorreAptoLabel(item)}</p>
+                                                            </div>
+                                                        ))}
+                                                        {historialFiltrado.length === 0 && <p className="text-sm text-app-text-secondary">No hay resultados para el filtro actual.</p>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

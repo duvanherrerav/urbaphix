@@ -8,6 +8,7 @@ import {
 } from '../services/reservasService';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota } from '../utils/dateTimeBogota';
+import { getReservaResidenteLabel, getReservaTorreAptoLabel } from '../utils/reservaFormatters';
 
 export default function PanelReservasVigilancia({ usuarioApp }) {
   const [reservas, setReservas] = useState([]);
@@ -81,7 +82,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
             </div>
             <div className="grid md:grid-cols-2 gap-2 text-sm">
               <p className="text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-              <p className="text-app-text-secondary md:text-right">Residente ID: {r.residente_id}</p>
+              <p className="text-app-text-secondary md:text-right">{getReservaResidenteLabel(r)} · {getReservaTorreAptoLabel(r)}</p>
             </div>
             <div className="grid md:grid-cols-3 gap-2 text-xs">
               <div className="app-surface-primary p-2">
