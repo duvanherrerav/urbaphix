@@ -179,7 +179,7 @@
   }
 
   .app-time-dropdown {
-    @apply absolute z-40 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-app-border bg-app-bg-alt p-1 shadow-app;
+    @apply absolute z-40 mt-1 max-h-44 w-full overflow-y-auto rounded-xl border border-app-border bg-app-bg-alt p-1 shadow-app;
   }
 
   .app-time-item {
@@ -191,7 +191,7 @@
   }
 
   .app-date-dropdown {
-    @apply absolute z-40 mt-1 w-full rounded-xl border border-app-border bg-app-bg-alt p-3 shadow-app;
+    @apply absolute z-40 mt-1 w-[17rem] max-w-full rounded-xl border border-app-border bg-app-bg-alt p-2 shadow-app;
   }
 
   .app-date-nav-btn {
@@ -199,7 +199,7 @@
   }
 
   .app-date-day {
-    @apply rounded-md px-1 py-1.5 text-center text-sm text-app-text-primary transition-colors hover:bg-[#38BDF822] disabled:cursor-not-allowed disabled:opacity-40;
+    @apply rounded-md px-1 py-1 text-center text-sm text-app-text-primary transition-colors hover:bg-[#38BDF822] disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .app-date-day-outside {
