@@ -189,4 +189,24 @@
   .app-time-selected {
     @apply bg-[#38BDF833] text-brand-secondary;
   }
+
+  .app-date-dropdown {
+    @apply absolute z-40 mt-1 w-full rounded-xl border border-app-border bg-app-bg-alt p-3 shadow-app;
+  }
+
+  .app-date-nav-btn {
+    @apply rounded-md border border-app-border bg-app-bg px-2 py-1 text-app-text-secondary transition-colors hover:bg-[#38BDF822] hover:text-app-text-primary;
+  }
+
+  .app-date-day {
+    @apply rounded-md px-1 py-1.5 text-center text-sm text-app-text-primary transition-colors hover:bg-[#38BDF822] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .app-date-day-outside {
+    @apply text-app-text-secondary opacity-70;
+  }
+
+  .app-date-day-selected {
+    @apply bg-[#38BDF833] text-brand-secondary;
+  }
 }

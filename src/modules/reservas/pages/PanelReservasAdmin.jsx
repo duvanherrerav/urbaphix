@@ -16,6 +16,7 @@ import {
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
 import AppTimePicker from '../../../components/ui/AppTimePicker';
+import AppDatePicker from '../../../components/ui/AppDatePicker';
 import {
     getReservaAccionLabel,
     formatearMilesCOP,
@@ -1028,7 +1029,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                     </select>
                                                 </label>
                                                 <label className="text-sm">📅 Fecha del bloqueo
-                                                    <input type="date" min={hoyBloqueo} className="app-input app-date-input mt-1" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
+                                                    <AppDatePicker className="mt-1" value={bloqueoForm.fecha} minDate={hoyBloqueo} onChange={(nextValue) => setBloqueoForm((s) => ({ ...s, fecha: nextValue }))} placeholder="Selecciona fecha del bloqueo" />
                                                 </label>
                                                 <label className="text-sm">🕒 Hora inicio
                                                     <AppTimePicker className="mt-1" value={bloqueoForm.hora_inicio} onChange={(nextValue) => setBloqueoForm((s) => ({ ...s, hora_inicio: nextValue }))} placeholder="Selecciona hora inicio" />
