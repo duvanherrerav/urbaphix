@@ -14,20 +14,13 @@ export default function DashboardAdmin({ usuarioApp }) {
   const VISITAS_MODAL_PAGE_SIZE = 8;
   const VISITAS_RANGO_HORAS = 72;
 
-  const [visitas, setVisitas] = useState([]);
+  const [visitasBase, setVisitasBase] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [incidentes, setIncidentes] = useState([]);
   const [reservas, setReservas] = useState([]);
   const [visitasModalOpen, setVisitasModalOpen] = useState(false);
   const [busquedaVisitas, setBusquedaVisitas] = useState('');
   const [paginaVisitasModal, setPaginaVisitasModal] = useState(1);
-
-  const [stats, setStats] = useState({
-    total: 0,
-    ingresados: 0,
-    pendientes: 0,
-    salidos: 0
-  });
 
   const [kpis, setKpis] = useState({
     visitasHoy: 0,
@@ -50,14 +43,6 @@ export default function DashboardAdmin({ usuarioApp }) {
     };
   }, [pagos]);
 
-  const saludOperativa = useMemo(() => {
-    const totalVisitas = Math.max(stats.total, 1);
-    const ocupacion = Math.round((stats.ingresados / totalVisitas) * 100);
-    const finalizacion = Math.round((stats.salidos / totalVisitas) * 100);
-
-    return { ocupacion, finalizacion };
-  }, [stats]);
-
   const atencionInmediata = useMemo(() => {
     const pagosPendientes = pagos.filter((p) => p.estado === 'pendiente').length;
     const incidentesAltos = incidentes.filter((i) => i.nivel === 'alto').length;
@@ -68,45 +53,56 @@ export default function DashboardAdmin({ usuarioApp }) {
     return { pagosPendientes, incidentesAltos, reservasPendientes, proximaReserva };
   }, [pagos, incidentes, reservas]);
 
-  function obtenerFechaVisita(visita) {
-    const fechaBase = typeof visita?.fecha_visita === 'string' ? visita.fecha_visita.trim() : '';
-    if (!fechaBase) return null;
-
-    const horaBase = typeof visita?.hora_ingreso === 'string' && visita.hora_ingreso.trim()
-      ? visita.hora_ingreso.trim()
-      : '00:00:00';
-
-    const isoLocal = `${fechaBase}T${horaBase}`;
-    const parsed = new Date(isoLocal);
+  function parseFechaVisita(value) {
+    if (!value) return null;
+    const raw = String(value).trim().replace(' ', 'T');
+    const parsed = new Date(raw);
     if (Number.isNaN(parsed.getTime())) return null;
     return parsed;
   }
 
-  const ultimasVisitasRango = useMemo(() => {
+  function obtenerTimestampVisita(visita) {
+    const fechaOrden =
+      parseFechaVisita(visita?.created_at)
+      || parseFechaVisita(visita?.hora_ingreso)
+      || parseFechaVisita(visita?.fecha_visita ? `${visita.fecha_visita}T23:59:59` : null);
+
+    return fechaOrden ? fechaOrden.getTime() : 0;
+  }
+
+  const stats = useMemo(() => ({
+    total: visitasBase.length,
+    ingresados: visitasBase.filter((v) => v.estado === 'ingresado').length,
+    pendientes: visitasBase.filter((v) => v.estado === 'pendiente').length,
+    salidos: visitasBase.filter((v) => v.estado === 'salido').length
+  }), [visitasBase]);
+
+  const saludOperativa = useMemo(() => {
+    const totalVisitas = Math.max(stats.total, 1);
+    const ocupacion = Math.round((stats.ingresados / totalVisitas) * 100);
+    const finalizacion = Math.round((stats.salidos / totalVisitas) * 100);
+
+    return { ocupacion, finalizacion };
+  }, [stats]);
+
+  const visitasRecientes = useMemo(() => {
     const limite = Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000;
 
-    return visitas
-      .filter((visita) => {
-        const fecha = obtenerFechaVisita(visita);
-        return fecha ? fecha.getTime() >= limite : false;
-      })
-      .sort((a, b) => {
-        const fechaA = obtenerFechaVisita(a)?.getTime() || 0;
-        const fechaB = obtenerFechaVisita(b)?.getTime() || 0;
-        return fechaB - fechaA;
-      });
-  }, [visitas]);
+    return visitasBase
+      .filter((visita) => obtenerTimestampVisita(visita) >= limite)
+      .sort((a, b) => obtenerTimestampVisita(b) - obtenerTimestampVisita(a));
+  }, [visitasBase]);
 
   const visitasPreview = useMemo(
-    () => ultimasVisitasRango.slice(0, VISITAS_PREVIEW_LIMIT),
-    [ultimasVisitasRango]
+    () => visitasRecientes.slice(0, VISITAS_PREVIEW_LIMIT),
+    [visitasRecientes]
   );
 
-  const visitasFiltradasModal = useMemo(() => {
+  const visitasModal = useMemo(() => {
     const term = busquedaVisitas.trim().toLowerCase();
-    if (!term) return ultimasVisitasRango;
+    if (!term) return visitasRecientes;
 
-    return ultimasVisitasRango.filter((visita) => {
+    return visitasRecientes.filter((visita) => {
       const texto = [
         obtenerNombreVisita(visita),
         obtenerDocumentoVisita(visita),
@@ -120,13 +116,13 @@ export default function DashboardAdmin({ usuarioApp }) {
 
       return texto.includes(term);
     });
-  }, [ultimasVisitasRango, busquedaVisitas]);
+  }, [visitasRecientes, busquedaVisitas]);
 
-  const totalPaginasVisitas = Math.max(1, Math.ceil(visitasFiltradasModal.length / VISITAS_MODAL_PAGE_SIZE));
+  const totalPaginasVisitas = Math.max(1, Math.ceil(visitasModal.length / VISITAS_MODAL_PAGE_SIZE));
   const visitasPaginadasModal = useMemo(() => {
     const desde = (paginaVisitasModal - 1) * VISITAS_MODAL_PAGE_SIZE;
-    return visitasFiltradasModal.slice(desde, desde + VISITAS_MODAL_PAGE_SIZE);
-  }, [visitasFiltradasModal, paginaVisitasModal]);
+    return visitasModal.slice(desde, desde + VISITAS_MODAL_PAGE_SIZE);
+  }, [visitasModal, paginaVisitasModal]);
 
   async function obtenerVisitas() {
     try {
@@ -146,23 +142,13 @@ export default function DashboardAdmin({ usuarioApp }) {
         .order('hora_ingreso', { ascending: false });
 
       if (error) {
-        setVisitas([]);
-        setStats({ total: 0, ingresados: 0, pendientes: 0, salidos: 0 });
+        setVisitasBase([]);
         return;
       }
 
-      const visitasData = data || [];
-      setVisitas(visitasData);
-
-      setStats({
-        total: visitasData.length,
-        ingresados: visitasData.filter(v => v.estado === 'ingresado').length,
-        pendientes: visitasData.filter(v => v.estado === 'pendiente').length,
-        salidos: visitasData.filter(v => v.estado === 'salido').length
-      });
+      setVisitasBase(data || []);
     } catch {
-      setVisitas([]);
-      setStats({ total: 0, ingresados: 0, pendientes: 0, salidos: 0 });
+      setVisitasBase([]);
     }
   }
 
@@ -235,6 +221,20 @@ export default function DashboardAdmin({ usuarioApp }) {
       setPaginaVisitasModal(totalPaginasVisitas);
     }
   }, [paginaVisitasModal, totalPaginasVisitas]);
+
+  useEffect(() => {
+    const estados = visitasBase.reduce((acc, visita) => {
+      const estado = visita?.estado || 'sin_estado';
+      acc[estado] = (acc[estado] || 0) + 1;
+      return acc;
+    }, {});
+
+    console.log({
+      totalVisitas: visitasBase.length,
+      visitasFiltradas: visitasRecientes.length,
+      estados
+    });
+  }, [visitasBase, visitasRecientes]);
 
   function obtenerPlacaVisita(visita) {
     const posiblesPlacas = [
@@ -387,7 +387,7 @@ export default function DashboardAdmin({ usuarioApp }) {
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Visitas por día</h3>
           <p className="text-sm text-app-text-secondary mb-3">Comportamiento diario de ingresos y salidas.</p>
           <div className="h-[320px]">
-            <GraficaVisitas visitas={visitas} />
+            <GraficaVisitas visitas={visitasBase} />
           </div>
         </div>
         <div className="app-surface-primary p-4 flex flex-col">
@@ -426,7 +426,7 @@ export default function DashboardAdmin({ usuarioApp }) {
       <div className="app-surface-primary p-6 mt-3">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-app-text-primary text-lg font-bold">Últimas visitas</h3>
-          <span className="text-sm text-app-text-secondary">{visitasPreview.length} de {ultimasVisitasRango.length} registros recientes</span>
+          <span className="text-sm text-app-text-secondary">{visitasPreview.length} de {visitasRecientes.length} registros recientes</span>
         </div>
         <p className="text-xs text-app-text-secondary mb-3">Últimas visitas de los últimos 3 días.</p>
         <div className="space-y-2">
@@ -456,7 +456,7 @@ export default function DashboardAdmin({ usuarioApp }) {
             <p className="text-sm text-app-text-secondary">Sin visitas registradas en los últimos 3 días.</p>
           )}
         </div>
-        {ultimasVisitasRango.length > VISITAS_PREVIEW_LIMIT && (
+        {visitasRecientes.length > VISITAS_PREVIEW_LIMIT && (
           <div className="mt-3">
             <button
               type="button"
@@ -467,7 +467,7 @@ export default function DashboardAdmin({ usuarioApp }) {
                 setVisitasModalOpen(true);
               }}
             >
-              Ver todas las visitas ({ultimasVisitasRango.length})
+              Ver todas las visitas ({visitasRecientes.length})
             </button>
           </div>
         )}
@@ -479,7 +479,7 @@ export default function DashboardAdmin({ usuarioApp }) {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h4 className="font-semibold text-lg text-app-text-primary">Todas las visitas recientes</h4>
-                <p className="text-xs text-app-text-secondary">Rango consultado: últimos 3 días ({ultimasVisitasRango.length} registros).</p>
+                <p className="text-xs text-app-text-secondary">Rango consultado: últimos 3 días ({visitasRecientes.length} registros).</p>
               </div>
               <button type="button" className="app-btn-ghost text-xs" onClick={() => setVisitasModalOpen(false)}>
                 Cerrar
@@ -494,7 +494,7 @@ export default function DashboardAdmin({ usuarioApp }) {
                 onChange={(e) => setBusquedaVisitas(e.target.value)}
               />
               <div className="text-xs text-app-text-secondary flex items-center justify-end">
-                {visitasFiltradasModal.length} resultado(s)
+                {visitasModal.length} resultado(s)
               </div>
             </div>
 
@@ -526,7 +526,7 @@ export default function DashboardAdmin({ usuarioApp }) {
               })}
             </div>
 
-            {visitasFiltradasModal.length > VISITAS_MODAL_PAGE_SIZE && (
+            {visitasModal.length > VISITAS_MODAL_PAGE_SIZE && (
               <div className="flex items-center justify-between text-xs">
                 <span className="text-app-text-secondary">
                   Página {paginaVisitasModal} de {totalPaginasVisitas}
