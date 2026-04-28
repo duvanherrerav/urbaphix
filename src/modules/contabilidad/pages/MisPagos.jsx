@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
-
-const formatFechaBogota = (value) => {
-  if (!value) return '-';
-  const raw = String(value).trim().replace(' ', 'T');
-  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
-  const parsed = new Date(hasZone ? raw : `${raw}Z`);
-  if (Number.isNaN(parsed.getTime())) return '-';
-  return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
-};
+import { formatFechaBogota } from '../../../utils/dateFormatters';
 const getEstadoProcesoPago = (pago) => {
   if (pago?.estado === 'pagado') return { key: 'pagado', label: 'Aprobado', badge: 'app-badge-success' };
   if (pago?.estado === 'rechazado') return { key: 'rechazado', label: 'Rechazado', badge: 'app-badge-error' };

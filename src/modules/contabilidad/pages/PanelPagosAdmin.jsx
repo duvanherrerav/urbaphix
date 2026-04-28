@@ -1,15 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
-
-const formatFechaBogota = (value) => {
-    if (!value) return '-';
-    const raw = String(value).trim().replace(' ', 'T');
-    const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
-    const parsed = new Date(hasZone ? raw : `${raw}Z`);
-    if (Number.isNaN(parsed.getTime())) return '-';
-    return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
-};
+import { formatFechaBogota } from '../../../utils/dateFormatters';
 
 export default function PanelPagosAdmin({ usuarioApp }) {
     const PREVIEW_LIMIT = 3;
@@ -65,7 +57,11 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     }
 
     useEffect(() => {
-        if (usuarioApp?.conjunto_id) cargarPagos();
+        if (!usuarioApp?.conjunto_id) return undefined;
+        const timer = setTimeout(() => {
+            cargarPagos();
+        }, 0);
+        return () => clearTimeout(timer);
     }, [usuarioApp]);
 
     const aprobarPago = async (pago) => {
@@ -192,7 +188,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         );
     };
 
-    const pagosBandejaActiva = pagosAgrupados[bandejaActiva] || [];
+    const pagosBandejaActiva = useMemo(() => pagosAgrupados[bandejaActiva] || [], [pagosAgrupados, bandejaActiva]);
     const bandejaSeleccionada = ESTADOS_BANDEJA.find((b) => b.key === bandejaActiva) || ESTADOS_BANDEJA[0];
     const pagosBandejaPreview = pagosBandejaActiva.slice(0, PREVIEW_LIMIT);
     const textoBotonVerTodos = `Ver todos los ${bandejaSeleccionada.label.toLowerCase()}`;
@@ -208,14 +204,11 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         });
     }, [pagosBandejaActiva, busquedaPanel]);
     const totalPaginasPanel = Math.max(1, Math.ceil(pagosPanelFiltrados.length / MODAL_PAGE_SIZE));
+    const paginaPanelActual = Math.min(paginaPanel, totalPaginasPanel);
     const pagosPanelPaginados = useMemo(() => {
-        const desde = (paginaPanel - 1) * MODAL_PAGE_SIZE;
+        const desde = (paginaPanelActual - 1) * MODAL_PAGE_SIZE;
         return pagosPanelFiltrados.slice(desde, desde + MODAL_PAGE_SIZE);
-    }, [pagosPanelFiltrados, paginaPanel]);
-
-    useEffect(() => {
-        setPaginaPanel(1);
-    }, [bandejaActiva, busquedaPanel]);
+    }, [pagosPanelFiltrados, paginaPanelActual]);
 
     return (
         <div className="app-surface-primary p-5 space-y-4">
@@ -255,7 +248,11 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                         <button
                             key={bandeja.key}
                             type="button"
-                            onClick={() => setBandejaActiva(bandeja.key)}
+                            onClick={() => {
+                                setBandejaActiva(bandeja.key);
+                                setPaginaPanel(1);
+                                setBusquedaPanel('');
+                            }}
                             className={`app-btn text-xs ${bandejaActiva === bandeja.key ? 'app-btn-secondary' : 'app-btn-ghost'}`}
                         >
                             {bandeja.label}
@@ -307,7 +304,10 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                                 className="app-input"
                                 placeholder="Buscar por residente, apto, concepto o radicado"
                                 value={busquedaPanel}
-                                onChange={(e) => setBusquedaPanel(e.target.value)}
+                                onChange={(e) => {
+                                    setBusquedaPanel(e.target.value);
+                                    setPaginaPanel(1);
+                                }}
                             />
                             <div className="text-xs text-app-text-secondary flex items-center justify-end">
                                 {pagosPanelFiltrados.length} resultado(s)

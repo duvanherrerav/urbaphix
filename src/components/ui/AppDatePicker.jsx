@@ -65,6 +65,7 @@ export default function AppDatePicker({
   const [viewDate, setViewDate] = useState(selectedDate || new Date());
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (selectedDate) setViewDate(selectedDate);
   }, [selectedDate]);
 
