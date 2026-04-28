@@ -62,7 +62,6 @@ const getTiempoOperativo = (visita) => {
     }
     return null;
 };
-const getFechaReferenciaHoy = (visita) => visita.fecha_visita || bogotaDateOnlyFromTimestamp(visita.created_at);
 const esVisitaDeHoy = (visita) => {
     const hoyBogota = toDateOnly();
     const fechaVisita = String(visita?.fecha_visita || '').trim();
@@ -386,7 +385,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                                 </div>
                                 <div className="grid sm:grid-cols-2 gap-2 text-xs text-app-text-secondary">
                                     <p><b>Fecha visita:</b> {formatDateLabel(v.fecha_visita)}</p>
-                                    <p><b>Creado:</b> {toDateOnly() === getFechaReferenciaHoy(v) ? 'Hoy' : formatDateLabel(v.created_at)}</p>
+                                    <p><b>Creado:</b> {toDateOnly() === bogotaDateOnlyFromTimestamp(v.created_at) ? 'Hoy' : formatDateLabel(v.created_at)}</p>
                                     <p><b>Ingreso:</b> {formatDateTimeLabel(v.hora_ingreso)}</p>
                                     <p><b>Salida:</b> {formatDateTimeLabel(v.hora_salida)}</p>
                                 </div>
@@ -451,8 +450,8 @@ export default function PanelVigilancia({ usuarioApp }) {
             )}
 
             {modalIngreso.open && modalIngreso.visita && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-app-bg-alt rounded-xl shadow-xl w-full max-w-md p-4 space-y-3 max-h-[92vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto overflow-x-hidden">
+                    <div className="bg-app-bg-alt rounded-xl shadow-xl w-full max-w-md p-4 space-y-3 max-h-[92vh] overflow-y-auto overflow-x-hidden pr-1 app-scrollbar">
                         <h3 className="font-semibold text-lg">Validar QR para ingreso</h3>
                         <p className="text-sm text-app-text-secondary">
                             Visitante: <b>{modalIngreso.visita.nombre_visitante}</b> · Doc: <b>{modalIngreso.visita.documento}</b>
