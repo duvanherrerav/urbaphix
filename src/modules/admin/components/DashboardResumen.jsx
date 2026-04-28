@@ -2,10 +2,13 @@ import { useMemo } from 'react';
 
 export default function DashboardResumen({ stats, kpis }) {
   const mensaje = useMemo(() => {
-    let texto = `En los últimos 3 días tienes ${kpis.visitasRango || 0} visitas y ${kpis.paquetesPendientes || 0} paquetes pendientes.`;
+    const visitas = kpis.visitasRango || 0;
+    const paquetesPendientes = kpis.paquetesPendientes || 0;
+    const textoPaquetes = paquetesPendientes === 1 ? 'paquete pendiente' : 'paquetes pendientes';
+    let texto = `En los últimos 3 días tienes ${visitas} visitas y ${paquetesPendientes} ${textoPaquetes}.`;
 
     if (kpis.torreTop && kpis.torreTop !== '-') {
-      texto += ` ${kpis.torreTop} es la torre con más movimiento.`;
+      texto += ` La torre ${kpis.torreTop} concentra más paquetes en el periodo.`;
     }
     return texto;
   }, [kpis.paquetesPendientes, kpis.torreTop, kpis.visitasRango]);

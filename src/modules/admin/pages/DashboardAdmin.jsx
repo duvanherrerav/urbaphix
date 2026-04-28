@@ -9,6 +9,8 @@ import DashboardResumen from '../components/DashboardResumen';
 import CarteraResumen from '../../contabilidad/components/CarteraResumen';
 import GraficaCartera from '../../contabilidad/components/GraficaCartera';
 
+const ESTADOS_VISITA_VALIDOS = ['pendiente', 'ingresado', 'salido'];
+
 export default function DashboardAdmin({ usuarioApp }) {
   const VISITAS_PREVIEW_LIMIT = 4;
   const VISITAS_MODAL_PAGE_SIZE = 8;
@@ -73,7 +75,10 @@ export default function DashboardAdmin({ usuarioApp }) {
     const limite = Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000;
 
     return visitasBase
-      .filter((visita) => obtenerTimestampVisita(visita) >= limite)
+      .filter((visita) => (
+        obtenerTimestampVisita(visita) >= limite
+        && ESTADOS_VISITA_VALIDOS.includes(visita?.estado)
+      ))
       .sort((a, b) => obtenerTimestampVisita(b) - obtenerTimestampVisita(a));
   }, [visitasBase]);
 
@@ -81,7 +86,7 @@ export default function DashboardAdmin({ usuarioApp }) {
     const pendientes = visitasRecientes.filter((v) => v.estado === 'pendiente').length;
     const ingresados = visitasRecientes.filter((v) => v.estado === 'ingresado').length;
     const salidos = visitasRecientes.filter((v) => v.estado === 'salido').length;
-    const total = pendientes + ingresados + salidos;
+    const total = visitasRecientes.length;
 
     return { total, pendientes, ingresados, salidos };
   }, [visitasRecientes]);
@@ -371,7 +376,11 @@ export default function DashboardAdmin({ usuarioApp }) {
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Visitas por día</h3>
           <p className="text-sm text-app-text-secondary mb-3">Total diario de visitas registradas.</p>
           <div className="h-[320px]">
-            <GraficaVisitas visitas={visitasRecientes} />
+            <GraficaVisitas
+              visitas={visitasRecientes}
+              obtenerTimestampVisita={obtenerTimestampVisita}
+              totalEsperado={stats.total}
+            />
           </div>
         </div>
         <div className="app-surface-primary p-4 flex flex-col">
