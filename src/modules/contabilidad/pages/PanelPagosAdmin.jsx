@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { getTipoPagoLabel } from '../utils/pagosLabels';
 
 const formatFechaBogota = (value) => {
     if (!value) return '-';
@@ -108,26 +109,44 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     const renderTarjetaPago = (pago, expandida = false) => {
         const tieneComprobante = Boolean(String(pago.comprobante_url || '').trim());
         const estadoLegible = pago.estado === 'pagado' ? 'aprobado' : pago.estado;
+        const estadoClase = pago.estado === 'pendiente'
+            ? 'app-badge-warning'
+            : pago.estado === 'rechazado'
+                ? 'app-badge-error'
+                : 'app-badge-success';
 
         return (
-            <div key={pago.id} className={`app-surface-muted p-3 ${pago.estado === 'pendiente' ? 'border border-state-warning/40' : ''}`}>
-                <div className="grid md:grid-cols-[1fr_auto] gap-2 items-start">
-                    <div>
-                        <p className="font-medium">{pago.nombre}</p>
-                        <p className="text-xs text-app-text-secondary">Torre {pago.torre} · Apto {pago.apartamento}</p>
-                        <p className="text-xs text-app-text-secondary">Concepto: {pago.concepto || '-'}</p>
-                        <p className="text-xs text-app-text-secondary">Creado: {formatFechaBogota(pago.created_at)} · Pago: {formatFechaBogota(pago.fecha_pago)}</p>
-                        <p className="text-xs text-app-text-secondary">
-                            Comprobante: {tieneComprobante ? 'Adjunto' : 'Pendiente de comprobante'} · Tipo: {pago.tipo_pago || '-'}
-                        </p>
-                        <p className="text-xs text-app-text-secondary">Radicado: {String(pago.id || '-').slice(0, 8)}</p>
-                        {tieneComprobante && <a href={pago.comprobante_url} target="_blank" rel="noreferrer" className="text-xs text-brand-secondary">Ver comprobante 📄</a>}
+            <article key={pago.id} className={`rounded-xl border bg-app-bg px-4 py-3 shadow-[0_12px_30px_rgba(2,6,23,0.34)] ${pago.estado === 'pendiente' ? 'border-state-warning/35' : 'border-app-border'}`}>
+                <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-base">{pago.nombre}</p>
+                            <span className={`app-badge ${estadoClase} capitalize`}>{estadoLegible}</span>
+                            <span className="app-badge app-badge-info">Radicado {String(pago.id || '-').slice(0, 8)}</span>
+                        </div>
+
+                        <div className="grid gap-1 text-xs text-app-text-secondary sm:grid-cols-2">
+                            <p><span className="text-app-text-primary/90">Ubicación:</span> Torre {pago.torre} · Apto {pago.apartamento}</p>
+                            <p><span className="text-app-text-primary/90">Concepto:</span> {pago.concepto || '-'}</p>
+                            <p><span className="text-app-text-primary/90">Creación:</span> {formatFechaBogota(pago.created_at)}</p>
+                            <p><span className="text-app-text-primary/90">Fecha de pago:</span> {formatFechaBogota(pago.fecha_pago)}</p>
+                            <p><span className="text-app-text-primary/90">Tipo:</span> {getTipoPagoLabel(pago.tipo_pago)}</p>
+                            <p><span className="text-app-text-primary/90">Comprobante:</span> {tieneComprobante ? 'Adjunto' : 'Pendiente'}</p>
+                        </div>
+
+                        {tieneComprobante && (
+                            <a href={pago.comprobante_url} target="_blank" rel="noreferrer" className="inline-flex text-xs text-brand-secondary hover:text-brand-primary">
+                                Ver comprobante 📄
+                            </a>
+                        )}
                     </div>
-                    <div className="text-right space-y-1">
-                        <p className="font-semibold text-lg">${Number(pago.valor || 0).toLocaleString('es-CO')}</p>
-                        <span className={`app-badge ${pago.estado === 'pendiente' ? 'app-badge-warning' : pago.estado === 'rechazado' ? 'app-badge-error' : 'app-badge-success'} capitalize`}>{estadoLegible}</span>
+
+                    <div className="md:text-right">
+                        <p className="text-[11px] uppercase tracking-wide text-app-text-secondary">Valor registrado</p>
+                        <p className="font-bold text-2xl text-app-text-primary">${Number(pago.valor || 0).toLocaleString('es-CO')}</p>
                     </div>
                 </div>
+
                 {pago.estado === 'pendiente' && (
                     <div className="mt-3 space-y-2">
                         {expandida && (
@@ -154,25 +173,22 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                                 <p className="text-[11px] text-app-text-secondary mt-1">Referencia visual, aún sin persistencia backend.</p>
                             </div>
                         )}
-                        <div className="flex justify-end">
-                            <div className="space-y-1 text-right">
-                                {!tieneComprobante && (
-                                    <p className="text-[11px] text-state-warning">No se puede aprobar hasta que el residente adjunte comprobante.</p>
-                                )}
-                                <button
-                                    className="app-btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                                    onClick={() => aprobarPago(pago)}
-                                    disabled={!tieneComprobante}
-                                    title={!tieneComprobante ? 'Pendiente de comprobante' : 'Aprobar pago'}
-                                >
-                                    Aprobar pago
-                                </button>
-                            </div>
+                        <div className="space-y-1 text-right">
+                            {!tieneComprobante && (
+                                <p className="text-[11px] text-state-warning">No se puede aprobar hasta que el residente adjunte comprobante.</p>
+                            )}
+                            <button
+                                className="app-btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => aprobarPago(pago)}
+                                disabled={!tieneComprobante}
+                                title={!tieneComprobante ? 'Pendiente de comprobante' : 'Aprobar pago'}
+                            >
+                                Aprobar pago
+                            </button>
                         </div>
                     </div>
-                )
-                }
-            </div >
+                )}
+            </article>
         );
     };
 
@@ -192,37 +208,33 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         });
     }, [pagosBandejaActiva, busquedaPanel]);
     const totalPaginasPanel = Math.max(1, Math.ceil(pagosPanelFiltrados.length / MODAL_PAGE_SIZE));
-    const paginaPanelActual = Math.min(paginaPanel, totalPaginasPanel);
     const pagosPanelPaginados = useMemo(() => {
-        const desde = (paginaPanelActual - 1) * MODAL_PAGE_SIZE;
+        const desde = (paginaPanel - 1) * MODAL_PAGE_SIZE;
         return pagosPanelFiltrados.slice(desde, desde + MODAL_PAGE_SIZE);
-    }, [pagosPanelFiltrados, paginaPanelActual]);
+    }, [pagosPanelFiltrados, paginaPanel]);
 
     useEffect(() => {
         setPaginaPanel(1);
     }, [bandejaActiva, busquedaPanel]);
 
-    useEffect(() => {
-        if (paginaPanel > totalPaginasPanel) {
-            setPaginaPanel(totalPaginasPanel);
-        }
-    }, [paginaPanel, totalPaginasPanel]);
-
     return (
         <div className="app-surface-primary p-5 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h3 className="text-xl font-bold">Estado de cuenta consolidado</h3>
-                    <p className="text-sm text-app-text-secondary">Balance de cobros, filtros operativos y acciones administrativas.</p>
+                    <h3 className="text-xl font-bold">Gestión de pagos</h3>
+                    <p className="text-sm text-app-text-secondary">Resumen general de cartera y bandejas operativas para aprobación administrativa.</p>
                 </div>
                 <button className="app-btn-ghost text-xs" onClick={cargarPagos}>Actualizar panel</button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <div className="app-surface-muted"><span className="text-app-text-secondary">Registros</span><p className="text-lg font-semibold">{resumen.total}</p></div>
-                <div className="app-surface-muted"><span className="text-app-text-secondary">Pendientes</span><p className="text-lg font-semibold text-state-warning">{resumen.pendientes}</p></div>
-                <div className="app-surface-muted"><span className="text-app-text-secondary">Pagados</span><p className="text-lg font-semibold text-state-success">{resumen.pagados}</p></div>
-                <div className="app-surface-muted"><span className="text-app-text-secondary">Cartera</span><p className="text-lg font-semibold">${resumen.cartera.toLocaleString('es-CO')}</p></div>
+            <div>
+                <p className="text-xs uppercase tracking-wide text-app-text-secondary mb-2">Resumen general</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className="rounded-xl border border-app-border bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Registros</span><p className="text-xl font-semibold mt-1">{resumen.total}</p></div>
+                    <div className="rounded-xl border border-state-warning/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Pendientes</span><p className="text-xl font-semibold mt-1 text-state-warning">{resumen.pendientes}</p></div>
+                    <div className="rounded-xl border border-state-success/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Pagados</span><p className="text-xl font-semibold mt-1 text-state-success">{resumen.pagados}</p></div>
+                    <div className="rounded-xl border border-brand-primary/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Cartera pendiente</span><p className="text-xl font-semibold mt-1">${resumen.cartera.toLocaleString('es-CO')}</p></div>
+                </div>
             </div>
 
             <div className="app-surface-muted p-3 grid md:grid-cols-3 gap-2">

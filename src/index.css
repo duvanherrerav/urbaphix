@@ -41,6 +41,17 @@
         @apply w-full rounded-lg border border-app-border bg-app-bg-alt px-3 py-2 text-sm text-app-text-primary placeholder-app-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary;
     }
 
+    .app-date-picker {
+        color-scheme: dark;
+    }
+
+    .app-date-picker::-webkit-calendar-picker-indicator {
+        opacity: 0;
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+    }
+
     .app-card {
         @apply rounded-2xl border border-app-border bg-app-bg-alt p-6 shadow-app;
     }
