@@ -63,16 +63,24 @@ const getTiempoOperativo = (visita) => {
     return null;
 };
 const getFechaReferenciaHoy = (visita) => visita.fecha_visita || bogotaDateOnlyFromTimestamp(visita.created_at);
+const esVisitaDeHoy = (visita) => {
+    const hoyBogota = toDateOnly();
+    const fechaVisita = String(visita?.fecha_visita || '').trim();
+    if (fechaVisita) return normalizeFecha(fechaVisita) === hoyBogota;
+    return bogotaDateOnlyFromTimestamp(visita?.created_at) === hoyBogota;
+};
 
 const parseQRCode = (text) => {
+    const raw = String(text || '').trim();
     try {
-        const parsed = JSON.parse(text);
-        if (parsed?.visita_id) return parsed;
+        const parsed = JSON.parse(raw);
+        if (parsed?.qr_code) return { qr_code: String(parsed.qr_code).trim(), visita_id: parsed.visita_id || null };
+        if (parsed?.visita_id) return { visita_id: parsed.visita_id };
     } catch {
         // fallback below
     }
 
-    if (/^[0-9a-fA-F-]{8,}$/.test(text)) return { qr_code: text };
+    if (/^[0-9a-fA-F-]{8,}$/.test(raw)) return { qr_code: raw };
     return null;
 };
 
@@ -269,7 +277,6 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const filtradas = useMemo(() => {
         const term = busqueda.trim().toLowerCase();
-        const hoy = toDateOnly();
 
         return visitas.filter((v) => {
             const matchBusq = !term
@@ -282,7 +289,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             if (vista === 'pendientes') return v.estado_normalizado === 'pendiente';
             if (vista === 'ingresadas') return v.estado_normalizado === 'ingresado';
-            if (vista === 'hoy') return getFechaReferenciaHoy(v) === hoy;
+            if (vista === 'hoy') return esVisitaDeHoy(v);
             if (vista === 'finalizadas') return v.estado_normalizado === 'salido';
             return true;
         });
@@ -464,11 +471,12 @@ export default function PanelVigilancia({ usuarioApp }) {
                         </div>
 
                         <div className="text-xs text-app-text-secondary">Código de validación</div>
+                        <p className="text-xs text-app-text-secondary">Usa este campo solo si el lector QR no funciona.</p>
                         <input
                             className="app-input"
                             value={modalIngreso.manualQR}
                             onChange={(e) => setModalIngreso((prev) => ({ ...prev, manualQR: e.target.value }))}
-                            placeholder="Ingresa o escanea el código de la visita"
+                            placeholder="Ingresa el código de la visita"
                         />
 
                         <div className="flex justify-end gap-2">
