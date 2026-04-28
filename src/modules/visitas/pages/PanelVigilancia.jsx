@@ -35,8 +35,10 @@ const formatDateTimeLabel = (value) => {
 };
 const formatUbicacion = (torre, apartamento) => {
     if (!torre || !apartamento) return 'Ubicación no disponible';
-    const torreLabel = /^torre\b/i.test(String(torre).trim()) ? String(torre).trim() : `Torre ${String(torre).trim()}`;
-    return `${torreLabel} y Apto: ${apartamento}`;
+    const torreDigits = String(torre).replace(/\D/g, '');
+    const aptoDigits = String(apartamento).replace(/\D/g, '');
+    if (!torreDigits || !aptoDigits) return 'Ubicación no disponible';
+    return `Torre y Apto: ${torreDigits}${aptoDigits}`;
 };
 const minutesDiff = (value) => {
     if (!value) return 0;
@@ -44,6 +46,23 @@ const minutesDiff = (value) => {
     if (Number.isNaN(parsed.getTime())) return 0;
     return Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 60000));
 };
+const bogotaDateOnlyFromTimestamp = (value) => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+};
+const getBaseTimeForPendiente = (visita) => visita.created_at || (visita.fecha_visita ? `${visita.fecha_visita}T00:00:00-05:00` : null);
+const getTiempoOperativo = (visita) => {
+    if (visita.estado_normalizado === 'pendiente') {
+        return { label: 'Espera', minutos: minutesDiff(getBaseTimeForPendiente(visita)) };
+    }
+    if (visita.estado_normalizado === 'ingresado') {
+        return { label: 'Estancia', minutos: minutesDiff(visita.hora_ingreso || visita.created_at) };
+    }
+    return null;
+};
+const getFechaReferenciaHoy = (visita) => visita.fecha_visita || bogotaDateOnlyFromTimestamp(visita.created_at);
 
 const parseQRCode = (text) => {
     try {
@@ -263,7 +282,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             if (vista === 'pendientes') return v.estado_normalizado === 'pendiente';
             if (vista === 'ingresadas') return v.estado_normalizado === 'ingresado';
-            if (vista === 'hoy') return v.fecha_visita === hoy;
+            if (vista === 'hoy') return getFechaReferenciaHoy(v) === hoy;
             if (vista === 'finalizadas') return v.estado_normalizado === 'salido';
             return true;
         });
@@ -279,7 +298,7 @@ export default function PanelVigilancia({ usuarioApp }) {
         finalizadas: visitas.filter((v) => v.estado_normalizado === 'salido').length
     };
     const alertas = useMemo(() => {
-        const pendientesCriticos = visitas.filter((v) => v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30).length;
+        const pendientesCriticos = visitas.filter((v) => v.estado_normalizado === 'pendiente' && minutesDiff(getBaseTimeForPendiente(v)) >= 30).length;
         const enCursoProlongados = visitas.filter((v) => v.estado_normalizado === 'ingresado' && !v.hora_salida && minutesDiff(v.hora_ingreso || v.created_at) >= 180).length;
         return { pendientesCriticos, enCursoProlongados };
     }, [visitas]);
@@ -343,7 +362,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             <div className="space-y-3">
                 {filtradasPaginadas.map((v) => (
-                    <div key={v.id} className={`app-surface-muted p-4 border rounded-xl ${v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 ? 'border-state-warning/60' : 'border-app-border/70'}`}>
+                    <div key={v.id} className={`app-surface-muted p-4 border rounded-xl ${v.estado_normalizado === 'pendiente' && minutesDiff(getBaseTimeForPendiente(v)) >= 30 ? 'border-state-warning/60' : 'border-app-border/70'}`}>
                         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
                             <div className="space-y-2 min-w-0">
                                 <p className="text-base font-bold text-app-text-primary truncate">{v.nombre_visitante || 'Visitante sin nombre'}</p>
@@ -360,16 +379,21 @@ export default function PanelVigilancia({ usuarioApp }) {
                                 </div>
                                 <div className="grid sm:grid-cols-2 gap-2 text-xs text-app-text-secondary">
                                     <p><b>Fecha visita:</b> {formatDateLabel(v.fecha_visita)}</p>
-                                    <p><b>Creado:</b> {toDateOnly() === v.fecha_visita ? 'Hoy' : formatDateLabel(v.created_at)} · Espera: {minutesDiff(v.created_at)} min</p>
+                                    <p><b>Creado:</b> {toDateOnly() === getFechaReferenciaHoy(v) ? 'Hoy' : formatDateLabel(v.created_at)}</p>
                                     <p><b>Ingreso:</b> {formatDateTimeLabel(v.hora_ingreso)}</p>
                                     <p><b>Salida:</b> {formatDateTimeLabel(v.hora_salida)}</p>
                                 </div>
+                                {getTiempoOperativo(v) && (
+                                    <p className="text-xs text-app-text-secondary">
+                                        <b>{getTiempoOperativo(v).label}:</b> {getTiempoOperativo(v).minutos} min
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2 text-sm md:text-right shrink-0">
                                 <span className={`inline-flex px-2.5 py-1 rounded-full border text-xs font-semibold ${v.estado_normalizado === 'pendiente' ? 'text-state-warning border-state-warning/40 bg-state-warning/10' : v.estado_normalizado === 'ingresado' ? 'text-state-info border-state-info/40 bg-state-info/10' : 'text-state-success border-state-success/40 bg-state-success/10'}`}>
                                     Estado: {v.estado}
                                 </span>
-                                {v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 && <p className="text-state-warning font-semibold text-xs">⚠️ Atención inmediata</p>}
+                                {v.estado_normalizado === 'pendiente' && minutesDiff(getBaseTimeForPendiente(v)) >= 30 && <p className="text-state-warning font-semibold text-xs">⚠️ Atención inmediata</p>}
                             </div>
                         </div>
                         <div className="mt-3 flex gap-2">
@@ -439,12 +463,12 @@ export default function PanelVigilancia({ usuarioApp }) {
                             />
                         </div>
 
-                        <div className="text-xs text-app-text-secondary">Si la cámara falla, pega el QR manualmente:</div>
+                        <div className="text-xs text-app-text-secondary">Código de validación</div>
                         <input
                             className="app-input"
                             value={modalIngreso.manualQR}
                             onChange={(e) => setModalIngreso((prev) => ({ ...prev, manualQR: e.target.value }))}
-                            placeholder='{"visita_id":"..."} o código QR'
+                            placeholder="Ingresa o escanea el código de la visita"
                         />
 
                         <div className="flex justify-end gap-2">
