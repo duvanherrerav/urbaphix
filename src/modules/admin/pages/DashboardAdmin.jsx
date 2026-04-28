@@ -10,11 +10,17 @@ import CarteraResumen from '../../contabilidad/components/CarteraResumen';
 import GraficaCartera from '../../contabilidad/components/GraficaCartera';
 
 export default function DashboardAdmin({ usuarioApp }) {
+  const VISITAS_PREVIEW_LIMIT = 4;
+  const VISITAS_MODAL_PAGE_SIZE = 8;
+  const VISITAS_RANGO_HORAS = 72;
 
   const [visitas, setVisitas] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [incidentes, setIncidentes] = useState([]);
   const [reservas, setReservas] = useState([]);
+  const [visitasModalOpen, setVisitasModalOpen] = useState(false);
+  const [busquedaVisitas, setBusquedaVisitas] = useState('');
+  const [paginaVisitasModal, setPaginaVisitasModal] = useState(1);
 
   const [stats, setStats] = useState({
     total: 0,
@@ -62,6 +68,66 @@ export default function DashboardAdmin({ usuarioApp }) {
     return { pagosPendientes, incidentesAltos, reservasPendientes, proximaReserva };
   }, [pagos, incidentes, reservas]);
 
+  function obtenerFechaVisita(visita) {
+    const fechaBase = typeof visita?.fecha_visita === 'string' ? visita.fecha_visita.trim() : '';
+    if (!fechaBase) return null;
+
+    const horaBase = typeof visita?.hora_ingreso === 'string' && visita.hora_ingreso.trim()
+      ? visita.hora_ingreso.trim()
+      : '00:00:00';
+
+    const isoLocal = `${fechaBase}T${horaBase}`;
+    const parsed = new Date(isoLocal);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  }
+
+  const ultimasVisitasRango = useMemo(() => {
+    const limite = Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000;
+
+    return visitas
+      .filter((visita) => {
+        const fecha = obtenerFechaVisita(visita);
+        return fecha ? fecha.getTime() >= limite : false;
+      })
+      .sort((a, b) => {
+        const fechaA = obtenerFechaVisita(a)?.getTime() || 0;
+        const fechaB = obtenerFechaVisita(b)?.getTime() || 0;
+        return fechaB - fechaA;
+      });
+  }, [visitas]);
+
+  const visitasPreview = useMemo(
+    () => ultimasVisitasRango.slice(0, VISITAS_PREVIEW_LIMIT),
+    [ultimasVisitasRango]
+  );
+
+  const visitasFiltradasModal = useMemo(() => {
+    const term = busquedaVisitas.trim().toLowerCase();
+    if (!term) return ultimasVisitasRango;
+
+    return ultimasVisitasRango.filter((visita) => {
+      const texto = [
+        obtenerNombreVisita(visita),
+        obtenerDocumentoVisita(visita),
+        obtenerPlacaVisita(visita),
+        obtenerTorreAptoVisita(visita),
+        visita?.estado || '',
+        visita?.fecha_visita || ''
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return texto.includes(term);
+    });
+  }, [ultimasVisitasRango, busquedaVisitas]);
+
+  const totalPaginasVisitas = Math.max(1, Math.ceil(visitasFiltradasModal.length / VISITAS_MODAL_PAGE_SIZE));
+  const visitasPaginadasModal = useMemo(() => {
+    const desde = (paginaVisitasModal - 1) * VISITAS_MODAL_PAGE_SIZE;
+    return visitasFiltradasModal.slice(desde, desde + VISITAS_MODAL_PAGE_SIZE);
+  }, [visitasFiltradasModal, paginaVisitasModal]);
+
   async function obtenerVisitas() {
     try {
       const hoy = new Date();
@@ -75,7 +141,9 @@ export default function DashboardAdmin({ usuarioApp }) {
         .from('registro_visitas')
         .select('*, visitante:visitantes(nombre, documento, placa), apartamento:apartamentos(numero, torre:torres(nombre))')
         .eq('conjunto_id', usuarioApp.conjunto_id)
-        .gte('fecha_visita', fechaInicio);
+        .gte('fecha_visita', fechaInicio)
+        .order('fecha_visita', { ascending: false })
+        .order('hora_ingreso', { ascending: false });
 
       if (error) {
         setVisitas([]);
@@ -158,7 +226,17 @@ export default function DashboardAdmin({ usuarioApp }) {
 
   }, [usuarioApp]);
 
-  const obtenerPlacaVisita = (visita) => {
+  useEffect(() => {
+    setPaginaVisitasModal(1);
+  }, [busquedaVisitas, visitasModalOpen]);
+
+  useEffect(() => {
+    if (paginaVisitasModal > totalPaginasVisitas) {
+      setPaginaVisitasModal(totalPaginasVisitas);
+    }
+  }, [paginaVisitasModal, totalPaginasVisitas]);
+
+  function obtenerPlacaVisita(visita) {
     const posiblesPlacas = [
       visita?.placa,
       visita?.vehiculo_placa,
@@ -174,9 +252,9 @@ export default function DashboardAdmin({ usuarioApp }) {
       .find((valor) => valor.length > 0);
 
     return placaValida || 'Sin placa';
-  };
+  }
 
-  const obtenerNombreVisita = (visita) => {
+  function obtenerNombreVisita(visita) {
     const posiblesNombres = [
       visita?.nombre_visitante,
       visita?.visitante?.nombre,
@@ -188,9 +266,9 @@ export default function DashboardAdmin({ usuarioApp }) {
       .find((valor) => valor.length > 0);
 
     return nombreValido || 'Visitante';
-  };
+  }
 
-  const obtenerDocumentoVisita = (visita) => {
+  function obtenerDocumentoVisita(visita) {
     const posiblesDocumentos = [
       visita?.documento,
       visita?.visitante?.documento,
@@ -202,9 +280,9 @@ export default function DashboardAdmin({ usuarioApp }) {
       .find((valor) => valor.length > 0);
 
     return documentoValido || 'Sin documento';
-  };
+  }
 
-  const obtenerTorreAptoVisita = (visita) => {
+  function obtenerTorreAptoVisita(visita) {
     const torre = [
       visita?.torre,
       visita?.apartamento?.torre?.nombre,
@@ -224,7 +302,7 @@ export default function DashboardAdmin({ usuarioApp }) {
 
     if (torre && apto) return `Torre y Apto: ${torre}${apto}`;
     return 'Ubicación no disponible';
-  };
+  }
 
   return (
     <div className="space-y-5">
@@ -348,10 +426,11 @@ export default function DashboardAdmin({ usuarioApp }) {
       <div className="app-surface-primary p-6 mt-3">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-app-text-primary text-lg font-bold">Últimas visitas</h3>
-          <span className="text-sm text-app-text-secondary">{visitas.slice(0, 5).length} registros recientes</span>
+          <span className="text-sm text-app-text-secondary">{visitasPreview.length} de {ultimasVisitasRango.length} registros recientes</span>
         </div>
+        <p className="text-xs text-app-text-secondary mb-3">Últimas visitas de los últimos 3 días.</p>
         <div className="space-y-2">
-          {visitas.slice(0, 5).map(v => {
+          {visitasPreview.map(v => {
             const torreApto = obtenerTorreAptoVisita(v);
 
             return (
@@ -373,8 +452,108 @@ export default function DashboardAdmin({ usuarioApp }) {
               </div>
             );
           })}
+          {visitasPreview.length === 0 && (
+            <p className="text-sm text-app-text-secondary">Sin visitas registradas en los últimos 3 días.</p>
+          )}
         </div>
+        {ultimasVisitasRango.length > VISITAS_PREVIEW_LIMIT && (
+          <div className="mt-3">
+            <button
+              type="button"
+              className="app-btn-ghost text-xs"
+              onClick={() => {
+                setBusquedaVisitas('');
+                setPaginaVisitasModal(1);
+                setVisitasModalOpen(true);
+              }}
+            >
+              Ver todas las visitas ({ultimasVisitasRango.length})
+            </button>
+          </div>
+        )}
       </div>
+
+      {visitasModalOpen && (
+        <div className="fixed inset-0 bg-app-bg/85 backdrop-blur-sm z-50 p-4 flex items-center justify-center">
+          <div className="app-surface-primary w-full max-w-5xl p-4 space-y-4 border border-brand-primary/20 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="font-semibold text-lg text-app-text-primary">Todas las visitas recientes</h4>
+                <p className="text-xs text-app-text-secondary">Rango consultado: últimos 3 días ({ultimasVisitasRango.length} registros).</p>
+              </div>
+              <button type="button" className="app-btn-ghost text-xs" onClick={() => setVisitasModalOpen(false)}>
+                Cerrar
+              </button>
+            </div>
+
+            <div className="app-surface-muted p-2 md:grid md:grid-cols-[1fr_auto] gap-2">
+              <input
+                className="app-input"
+                placeholder="Buscar por visitante, documento, placa o torre/apto"
+                value={busquedaVisitas}
+                onChange={(e) => setBusquedaVisitas(e.target.value)}
+              />
+              <div className="text-xs text-app-text-secondary flex items-center justify-end">
+                {visitasFiltradasModal.length} resultado(s)
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-[68vh] overflow-y-auto pr-1 app-scrollbar">
+              {visitasPaginadasModal.length === 0 && (
+                <p className="text-xs text-app-text-secondary">Sin resultados para esta búsqueda.</p>
+              )}
+              {visitasPaginadasModal.map((v) => {
+                const torreApto = obtenerTorreAptoVisita(v);
+
+                return (
+                  <div key={v.id} className="app-surface-muted p-3 flex justify-between items-center">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{obtenerNombreVisita(v)}</p>
+                        <span className="text-xs text-app-text-secondary">• {obtenerDocumentoVisita(v)}</span>
+                      </div>
+                      <p className="text-sm text-app-text-secondary">Placa: {obtenerPlacaVisita(v)}</p>
+                      <p className="text-xs text-app-text-secondary">
+                        Fecha: {v.fecha_visita || '-'} · Ingreso: {v.hora_ingreso || 'Pendiente'} · Salida: {v.hora_salida || 'Pendiente'}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="text-[11px] px-2 py-1 rounded-lg bg-app-bg border border-app-border text-app-text-secondary">{torreApto}</span>
+                      <span className={v.estado === 'pendiente' ? 'app-badge app-badge-warning' : v.estado === 'ingresado' ? 'app-badge app-badge-info' : 'app-badge app-badge-success'}>{v.estado}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {visitasFiltradasModal.length > VISITAS_MODAL_PAGE_SIZE && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-app-text-secondary">
+                  Página {paginaVisitasModal} de {totalPaginasVisitas}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="app-btn-ghost text-xs disabled:opacity-40"
+                    disabled={paginaVisitasModal === 1}
+                    onClick={() => setPaginaVisitasModal((prev) => Math.max(1, prev - 1))}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    className="app-btn-ghost text-xs disabled:opacity-40"
+                    disabled={paginaVisitasModal === totalPaginasVisitas}
+                    onClick={() => setPaginaVisitasModal((prev) => Math.min(totalPaginasVisitas, prev + 1))}
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

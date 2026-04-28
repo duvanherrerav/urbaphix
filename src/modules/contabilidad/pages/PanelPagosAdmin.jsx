@@ -200,6 +200,12 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     setPaginaPanel(1);
   }, [bandejaActiva, busquedaPanel]);
 
+  useEffect(() => {
+    if (paginaPanel > totalPaginasPanel) {
+      setPaginaPanel(totalPaginasPanel);
+    }
+  }, [paginaPanel, totalPaginasPanel]);
+
   return (
     <div className="app-surface-primary p-5 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
