@@ -192,14 +192,21 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         });
     }, [pagosBandejaActiva, busquedaPanel]);
     const totalPaginasPanel = Math.max(1, Math.ceil(pagosPanelFiltrados.length / MODAL_PAGE_SIZE));
+    const paginaPanelActual = Math.min(paginaPanel, totalPaginasPanel);
     const pagosPanelPaginados = useMemo(() => {
-        const desde = (paginaPanel - 1) * MODAL_PAGE_SIZE;
+        const desde = (paginaPanelActual - 1) * MODAL_PAGE_SIZE;
         return pagosPanelFiltrados.slice(desde, desde + MODAL_PAGE_SIZE);
-    }, [pagosPanelFiltrados, paginaPanel]);
+    }, [pagosPanelFiltrados, paginaPanelActual]);
 
     useEffect(() => {
         setPaginaPanel(1);
     }, [bandejaActiva, busquedaPanel]);
+
+    useEffect(() => {
+        if (paginaPanel > totalPaginasPanel) {
+            setPaginaPanel(totalPaginasPanel);
+        }
+    }, [paginaPanel, totalPaginasPanel]);
 
     return (
         <div className="app-surface-primary p-5 space-y-4">
@@ -303,13 +310,13 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                         {pagosPanelFiltrados.length > MODAL_PAGE_SIZE && (
                             <div className="flex items-center justify-between text-xs">
                                 <span className="text-app-text-secondary">
-                                    Página {paginaPanel} de {totalPaginasPanel}
+                                    Página {paginaPanelActual} de {totalPaginasPanel}
                                 </span>
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
                                         className="app-btn-ghost text-xs disabled:opacity-40"
-                                        disabled={paginaPanel === 1}
+                                        disabled={paginaPanelActual === 1}
                                         onClick={() => setPaginaPanel((prev) => Math.max(1, prev - 1))}
                                     >
                                         Anterior
@@ -317,7 +324,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                                     <button
                                         type="button"
                                         className="app-btn-ghost text-xs disabled:opacity-40"
-                                        disabled={paginaPanel === totalPaginasPanel}
+                                        disabled={paginaPanelActual === totalPaginasPanel}
                                         onClick={() => setPaginaPanel((prev) => Math.min(totalPaginasPanel, prev + 1))}
                                     >
                                         Siguiente

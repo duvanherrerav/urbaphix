@@ -1,23 +1,11 @@
 import { useEffect } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
-export default function KPIsAdmin({ usuarioApp, setKpis }) {
-  const cargarKPIs = async (conjuntoId) => {
+export default function KPIsAdmin({ usuarioApp, setKpis, visitasTotal = 0 }) {
+  const cargarKPIs = async (conjuntoId, totalVisitasRango) => {
     if (!conjuntoId) return;
     try {
-      const hoy = new Date().toISOString().split('T')[0];
-
-      const hace7dias = new Date();
-      hace7dias.setDate(hace7dias.getDate() - 7);
-      const fechaInicio = hace7dias.toISOString().split('T')[0];
-
-      // 🔥 CONSULTAS EN PARALELO (PRO)
-      const [visitasRes, paquetesRes, apartamentosRes] = await Promise.all([
-
-        supabase
-          .from('registro_visitas')
-          .select('fecha_visita')
-          .eq('conjunto_id', conjuntoId),
+      const [paquetesRes, apartamentosRes] = await Promise.all([
 
         supabase
           .from('paquetes')
@@ -30,16 +18,8 @@ export default function KPIsAdmin({ usuarioApp, setKpis }) {
 
       ]);
 
-      const visitas = visitasRes.error ? [] : (visitasRes.data || []);
       const paquetes = paquetesRes.data || [];
       const apartamentos = apartamentosRes.data || [];
-
-      // 🔥 VISITAS
-      const visitasHoy = visitas.filter(v => v.fecha_visita === hoy).length;
-
-      const visitasSemana = visitas.filter(
-        v => v.fecha_visita >= fechaInicio
-      ).length;
 
       // 🔥 PAQUETES
       const paquetesPendientes = paquetes.filter(
@@ -88,21 +68,23 @@ export default function KPIsAdmin({ usuarioApp, setKpis }) {
 
       // 🔥 ENVIAR KPIs
       setKpis({
-        visitasHoy,
-        visitasSemana,
+        visitasRango: totalVisitasRango,
         paquetesPendientes,
         torreTop
       });
 
-    } catch (err) {
-      console.log('Error KPIs:', err);
+    } catch {
+      setKpis((prev) => ({
+        ...prev,
+        visitasRango: totalVisitasRango
+      }));
     }
   };
 
   useEffect(() => {
     if (!usuarioApp?.conjunto_id) return;
-    cargarKPIs(usuarioApp.conjunto_id);
-  }, [usuarioApp?.conjunto_id]);
+    cargarKPIs(usuarioApp.conjunto_id, visitasTotal);
+  }, [usuarioApp?.conjunto_id, visitasTotal]);
 
   return null;
 }

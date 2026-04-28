@@ -16,13 +16,24 @@ ChartJS.register(
   Legend
 );
 
-export default function GraficaVisitas({ visitas }) {
+const formatFechaKey = (timestamp) => {
+  if (!timestamp) return null;
+  const fecha = new Date(timestamp);
+  if (Number.isNaN(fecha.getTime())) return null;
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+};
+
+export default function GraficaVisitas({ visitas, obtenerTimestampVisita, totalEsperado = 0 }) {
 
   // 🔥 AGRUPAR POR FECHA
   const visitasPorDia = {};
 
   visitas.forEach(v => {
-    const fecha = v.fecha_visita;
+    const timestamp = typeof obtenerTimestampVisita === 'function'
+      ? obtenerTimestampVisita(v)
+      : new Date(v.fecha_visita || '').getTime();
+    const fecha = formatFechaKey(timestamp);
+    if (!fecha) return;
 
     if (!visitasPorDia[fecha]) {
       visitasPorDia[fecha] = 0;
@@ -34,6 +45,8 @@ export default function GraficaVisitas({ visitas }) {
   const fechas = Object.keys(visitasPorDia).sort();
 
   const valores = fechas.map(f => visitasPorDia[f]);
+  const totalGrafica = valores.reduce((acc, value) => acc + value, 0);
+  const totalFinal = totalGrafica === totalEsperado ? totalGrafica : totalEsperado;
 
   // 🔥 LABELS BONITOS
   const labels = fechas.map(f => {
@@ -110,6 +123,7 @@ export default function GraficaVisitas({ visitas }) {
 
   return (
     <div className="h-full w-full rounded-xl bg-app-bg-alt p-3">
+      <p className="text-[11px] text-app-text-secondary mb-2">Total del periodo: {totalFinal}</p>
       <div className="h-full w-full">
         <Bar data={data} options={options} />
       </div>

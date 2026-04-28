@@ -2,13 +2,16 @@ import { useMemo } from 'react';
 
 export default function DashboardResumen({ stats, kpis }) {
   const mensaje = useMemo(() => {
-    let texto = `Hoy tienes ${kpis.visitasHoy || 0} visitas y ${kpis.paquetesPendientes || 0} paquetes pendientes.`;
+    const visitas = kpis.visitasRango || 0;
+    const paquetesPendientes = kpis.paquetesPendientes || 0;
+    const textoPaquetes = paquetesPendientes === 1 ? 'paquete pendiente' : 'paquetes pendientes';
+    let texto = `En los últimos 3 días tienes ${visitas} visitas y ${paquetesPendientes} ${textoPaquetes}.`;
 
     if (kpis.torreTop && kpis.torreTop !== '-') {
-      texto += ` ${kpis.torreTop} es la torre con más movimiento.`;
+      texto += ` La torre ${kpis.torreTop} concentra más paquetes en el periodo.`;
     }
     return texto;
-  }, [kpis.paquetesPendientes, kpis.torreTop, kpis.visitasHoy]);
+  }, [kpis.paquetesPendientes, kpis.torreTop, kpis.visitasRango]);
 
   const alertas = useMemo(() => {
     let nuevasAlertas = [];
@@ -20,9 +23,9 @@ export default function DashboardResumen({ stats, kpis }) {
       });
     }
 
-    if (kpis.visitasHoy > 10) {
+    if ((kpis.visitasRango || 0) > 10) {
       nuevasAlertas.push({
-        texto: 'Alto flujo de visitas hoy',
+        texto: 'Alto flujo de visitas en el rango',
         tipo: 'danger'
       });
     }
@@ -34,7 +37,7 @@ export default function DashboardResumen({ stats, kpis }) {
       });
     }
     return nuevasAlertas;
-  }, [kpis.paquetesPendientes, kpis.visitasHoy, stats.pendientes]);
+  }, [kpis.paquetesPendientes, kpis.visitasRango, stats.pendientes]);
 
   return (
     <div className="space-y-4">
@@ -43,7 +46,7 @@ export default function DashboardResumen({ stats, kpis }) {
       <div className="bg-app-bg text-white p-5 rounded-xl shadow">
 
         <p className="text-sm text-app-text-secondary mb-1">
-          Resumen del día
+          Resumen operativo (3 días)
         </p>
 
         <p className="text-lg font-semibold">
