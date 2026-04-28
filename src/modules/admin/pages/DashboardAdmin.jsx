@@ -72,6 +72,7 @@ export default function DashboardAdmin({ usuarioApp }) {
   }
 
   const visitasRecientes = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity
     const limite = Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000;
 
     return visitasBase
