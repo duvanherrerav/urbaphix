@@ -55,6 +55,8 @@ export default function EstadoCuenta({ usuarioApp }) {
     const totalPagado = pagos
       .filter((p) => p.estado === 'pagado')
       .reduce((acc, p) => acc + Number(p.valor || 0), 0);
+    const totalMovimientos = pagos.length;
+    const totalValorPeriodo = pagos.reduce((acc, p) => acc + Number(p.valor || 0), 0);
 
     const porTipo = {};
     pagos.forEach((p) => {
@@ -70,6 +72,8 @@ export default function EstadoCuenta({ usuarioApp }) {
       filtroEstado,
       totalPendiente,
       totalPagado,
+      totalMovimientos,
+      totalValorPeriodo,
       pagos,
       porTipo
     });
@@ -121,11 +125,13 @@ export default function EstadoCuenta({ usuarioApp }) {
   };
 
   return (
-    <div className="bg-app-bg-alt p-6 rounded-xl shadow">
-      <h2 className="text-xl font-bold mb-2">📄 Estado de cuenta consolidado</h2>
-      <p className="text-sm text-app-text-secondary mb-4">Genera reporte por rango de fechas y estado de pago (sin filtro por torre o apartamento).</p>
+    <div className="app-surface-primary p-6 space-y-4">
+      <div>
+        <h2 className="text-xl font-bold mb-1">Estado de cuenta consolidado</h2>
+        <p className="text-sm text-app-text-secondary">Resumen financiero del periodo seleccionado. Este bloque respeta exclusivamente filtros de fecha y estado.</p>
+      </div>
 
-      <div className="grid md:grid-cols-4 gap-3 mb-4">
+      <div className="app-surface-muted p-3 grid md:grid-cols-4 gap-3">
         <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="app-input">
           <option value="todos">Todos</option>
           <option value="pendiente">Pendiente</option>
@@ -135,38 +141,49 @@ export default function EstadoCuenta({ usuarioApp }) {
         <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="app-input" />
         <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="app-input" />
 
-        <button onClick={generarEstado} className="bg-blue-600 text-white rounded-lg px-4 py-2">
+        <button onClick={generarEstado} className="app-btn-secondary">
           {loading ? 'Generando...' : 'Generar reporte'}
         </button>
       </div>
 
       {estado && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-red-100 p-4 rounded-lg">
-              <p className="text-sm text-app-text-secondary">Pendiente</p>
-              <p className="text-xl font-bold text-red-600">${estado.totalPendiente.toLocaleString('es-CO')}</p>
-            </div>
-
-            <div className="bg-green-100 p-4 rounded-lg">
-              <p className="text-sm text-app-text-secondary">Pagado</p>
-              <p className="text-xl font-bold text-green-600">${estado.totalPagado.toLocaleString('es-CO')}</p>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-app-text-secondary mb-2">Resumen del periodo seleccionado</p>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-state-success/35 bg-app-bg px-4 py-3">
+                <p className="text-xs text-app-text-secondary">Recaudado</p>
+                <p className="text-2xl font-bold text-state-success">${estado.totalPagado.toLocaleString('es-CO')}</p>
+              </div>
+              <div className="rounded-xl border border-state-warning/35 bg-app-bg px-4 py-3">
+                <p className="text-xs text-app-text-secondary">Pendiente</p>
+                <p className="text-2xl font-bold text-state-warning">${estado.totalPendiente.toLocaleString('es-CO')}</p>
+              </div>
+              <div className="rounded-xl border border-brand-secondary/35 bg-app-bg px-4 py-3">
+                <p className="text-xs text-app-text-secondary">Total movimientos</p>
+                <p className="text-2xl font-bold">{estado.totalMovimientos}</p>
+              </div>
+              <div className="rounded-xl border border-brand-primary/35 bg-app-bg px-4 py-3">
+                <p className="text-xs text-app-text-secondary">Valor total del periodo</p>
+                <p className="text-2xl font-bold">${estado.totalValorPeriodo.toLocaleString('es-CO')}</p>
+              </div>
             </div>
           </div>
-          <div className="bg-app-bg rounded-lg p-4">
-            <h3 className="font-semibold mb-2">Tipo de pago</h3>
+
+          <div className="app-surface-muted">
+            <h3 className="font-semibold mb-2">Tipos de pago del periodo</h3>
             <div className="grid md:grid-cols-3 gap-2 text-sm">
               {Object.entries(estado.porTipo).map(([tipo, info]) => (
-                <div key={tipo} className="border bg-app-bg-alt rounded px-3 py-2">
+                <div key={tipo} className="rounded-lg border border-app-border bg-app-bg px-3 py-2">
                   <p className="font-medium">{tipo}</p>
-                  <p>{info.cantidad} registros</p>
+                  <p className="text-app-text-secondary">{info.cantidad} registros</p>
                   <p className="text-app-text-secondary">${info.total.toLocaleString('es-CO')}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <button onClick={generarPDF} className="bg-app-bg text-white px-4 py-2 rounded-lg">
+          <button onClick={generarPDF} className="app-btn-ghost">
             Descargar PDF 📄
           </button>
 
@@ -174,12 +191,20 @@ export default function EstadoCuenta({ usuarioApp }) {
             <h3 className="font-semibold mb-2">Movimientos del periodo</h3>
             <div className="space-y-2 max-h-72 overflow-auto">
               {estado.pagos.map((p) => (
-                <div key={p.id} className="flex justify-between border p-2 rounded text-sm">
-                  <span>{formatFechaBogota(p.created_at)} · {p.tipo_pago || '-'}</span>
-                  <span className={p.estado === 'pendiente' ? 'text-red-600' : 'text-green-600'}>
-                    ${Number(p.valor || 0).toLocaleString('es-CO')} ({p.estado})
-                  </span>
-                </div>
+                <article key={p.id} className="rounded-xl border border-app-border bg-app-bg p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{p.concepto || 'Sin concepto'}</p>
+                      <p className="text-xs text-app-text-secondary">{formatFechaBogota(p.created_at)} · Tipo: {p.tipo_pago || '-'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">${Number(p.valor || 0).toLocaleString('es-CO')}</p>
+                      <span className={`app-badge capitalize ${p.estado === 'pendiente' ? 'app-badge-warning' : p.estado === 'pagado' ? 'app-badge-success' : 'app-badge-error'}`}>
+                        {p.estado}
+                      </span>
+                    </div>
+                  </div>
+                </article>
               ))}
               {estado.pagos.length === 0 && <p className="text-app-text-secondary">Sin pagos para ese filtro.</p>}
             </div>
