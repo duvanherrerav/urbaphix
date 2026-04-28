@@ -6,6 +6,7 @@ import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBit
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
 const normalizeEstado = (estado) => {
     const value = String(estado || '').trim().toLowerCase();
     if (value.includes('pend')) return 'pendiente';
@@ -14,8 +15,20 @@ const normalizeEstado = (estado) => {
     return value;
 };
 const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
+const formatearFechaVisitaLocal = (fechaVisita) => {
+    const value = String(fechaVisita || '').trim();
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return 'Sin fecha';
+    const [, y, m, d] = match;
+    const monthIdx = Number(m) - 1;
+    if (monthIdx < 0 || monthIdx > 11) return value;
+    return `${d} de ${MONTHS_ES[monthIdx]} de ${y}`;
+};
 const formatDateLabel = (value) => {
     if (!value) return 'Sin fecha';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) {
+        return formatearFechaVisitaLocal(value);
+    }
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return String(value);
     return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: 'short', year: 'numeric' });
@@ -62,11 +75,14 @@ const getTiempoOperativo = (visita) => {
     }
     return null;
 };
+const obtenerFechaVisitaKey = (visita) => {
+    const fechaVisita = normalizeFecha(visita?.fecha_visita);
+    if (fechaVisita) return fechaVisita;
+    return bogotaDateOnlyFromTimestamp(visita?.created_at);
+};
 const esVisitaDeHoy = (visita) => {
     const hoyBogota = toDateOnly();
-    const fechaVisita = String(visita?.fecha_visita || '').trim();
-    if (fechaVisita) return normalizeFecha(fechaVisita) === hoyBogota;
-    return bogotaDateOnlyFromTimestamp(visita?.created_at) === hoyBogota;
+    return obtenerFechaVisitaKey(visita) === hoyBogota;
 };
 
 const parseQRCode = (text) => {
@@ -384,7 +400,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                                     </span>
                                 </div>
                                 <div className="grid sm:grid-cols-2 gap-2 text-xs text-app-text-secondary">
-                                    <p><b>Fecha visita:</b> {formatDateLabel(v.fecha_visita)}</p>
+                                    <p><b>Fecha visita:</b> {formatearFechaVisitaLocal(v.fecha_visita)}</p>
                                     <p><b>Creado:</b> {toDateOnly() === bogotaDateOnlyFromTimestamp(v.created_at) ? 'Hoy' : formatDateLabel(v.created_at)}</p>
                                     <p><b>Ingreso:</b> {formatDateTimeLabel(v.hora_ingreso)}</p>
                                     <p><b>Salida:</b> {formatDateTimeLabel(v.hora_salida)}</p>
@@ -451,13 +467,13 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             {modalIngreso.open && modalIngreso.visita && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto overflow-x-hidden">
-                    <div className="bg-app-bg-alt rounded-xl shadow-xl w-full max-w-md p-4 space-y-3 max-h-[92vh] overflow-y-auto overflow-x-hidden pr-1 app-scrollbar">
+                    <div className="bg-app-bg-alt rounded-xl shadow-xl w-full max-w-md mx-auto p-4 space-y-3 max-h-[90vh] overflow-y-auto overflow-x-hidden pr-1 app-scrollbar">
                         <h3 className="font-semibold text-lg">Validar QR para ingreso</h3>
                         <p className="text-sm text-app-text-secondary">
                             Visitante: <b>{modalIngreso.visita.nombre_visitante}</b> · Doc: <b>{modalIngreso.visita.documento}</b>
                         </p>
 
-                        <div className="rounded-lg overflow-hidden border h-64">
+                        <div className="rounded-lg overflow-hidden border h-64 w-full max-w-full">
                             <Scanner
                                 constraints={{ facingMode: 'environment' }}
                                 styles={{ container: { width: '100%', height: '100%' }, video: { width: '100%', height: '100%', objectFit: 'cover' } }}
