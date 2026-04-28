@@ -1,0 +1,10 @@
+[33m66b7eef[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Ticket mejora modulo pagos Estado de cuenta consolidado se ajusta mejor PDF, mejora en UI/UX y paginadores para que el historial no se vea tan abrumador
+[33m39ed4aa[m Ticket mejora dashboard y pagos se corrige graficas y visualización de datos se agregan paginadores y mejora en diseño
+[33m94686ab[m Ticket 1 reservas mejoras en UX/UI con visualización mejorada para el usuario final, calendario y horas con diseño dark del aplicativo, mejora en historial con paginadores y mejora en nombres técnicos para una mejor visualización de la información
+[33m00acbb0[m Ticket 1 incidentes mejora en UI/UX y visualización de datos en los estados de cada incidente
+[33m677b7ec[m Ticket 1 pagos mejora en UI/UX validación de datos, mejorar scroll y una ventana para ver todos los comprobantes
+[33m8584ef2[m Ticket 2 - Visualización de datos de visitante en Dashboard últimas visitas y mostrar torre y apartamento
+[33m86344d8[m Ticket 1 - mejora en UI en Dashboard paa una mejor visualización y textos mas legibles
+[33mc9a2676[m Mejora Login
+[33ma2b0d59[m Preparación reservas para trazabilidad completa.
+[33mc210a9f[m Preparación pagos para causales económicas.
