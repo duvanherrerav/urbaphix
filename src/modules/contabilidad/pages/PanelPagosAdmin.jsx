@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { getTipoPagoLabel } from '../utils/pagosLabels';
 
 const formatFechaBogota = (value) => {
   if (!value) return '-';
@@ -129,7 +130,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
               <p><span className="text-app-text-primary/90">Concepto:</span> {pago.concepto || '-'}</p>
               <p><span className="text-app-text-primary/90">Creación:</span> {formatFechaBogota(pago.created_at)}</p>
               <p><span className="text-app-text-primary/90">Fecha de pago:</span> {formatFechaBogota(pago.fecha_pago)}</p>
-              <p><span className="text-app-text-primary/90">Tipo:</span> {pago.tipo_pago || '-'}</p>
+              <p><span className="text-app-text-primary/90">Tipo:</span> {getTipoPagoLabel(pago.tipo_pago)}</p>
               <p><span className="text-app-text-primary/90">Comprobante:</span> {tieneComprobante ? 'Adjunto' : 'Pendiente'}</p>
             </div>
 
