@@ -15,6 +15,7 @@ import {
 } from '../services/reservasService';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
+import AppDatePicker from '../../../components/ui/AppDatePicker';
 
 const GRUPOS_DIAS = [
     { key: 'lun_vie', label: 'Lunes a viernes' },
@@ -824,7 +825,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
                                                 <option value="">Selecciona recurso</option>
                                                 {recursos.map((r) => <option key={r.id} value={r.id}>{r.nombre} · {r.tipo}</option>)}
                                             </select>
-                                            <input type="date" className="app-input" value={bloqueoForm.fecha} onChange={(e) => setBloqueoForm((s) => ({ ...s, fecha: e.target.value }))} />
+                                            <AppDatePicker value={bloqueoForm.fecha} onChange={(next) => setBloqueoForm((s) => ({ ...s, fecha: next }))} />
                                             <input type="time" className="app-input" value={bloqueoForm.hora_inicio} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_inicio: e.target.value }))} />
                                             <input type="time" className="app-input" value={bloqueoForm.hora_fin} onChange={(e) => setBloqueoForm((s) => ({ ...s, hora_fin: e.target.value }))} />
                                             <input className="app-input md:col-span-2" placeholder="Motivo del cierre temporal" value={bloqueoForm.motivo} onChange={(e) => setBloqueoForm((s) => ({ ...s, motivo: e.target.value }))} />

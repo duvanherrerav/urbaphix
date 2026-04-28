@@ -1,3 +1,5 @@
+import AppDatePicker from '../../../../components/ui/AppDatePicker';
+
 const estadoFranjaUI = {
     disponible: {
         label: 'Disponible',
@@ -72,7 +74,7 @@ export default function ReservaCreateCard({
                     <option value="prestamo">Préstamo</option>
                 </select>
 
-                <input type="date" min={minFecha} className="app-input" value={form.fecha} onChange={(e) => onChange('fecha', e.target.value)} />
+                <AppDatePicker value={form.fecha} min={minFecha} onChange={(next) => onChange('fecha', next)} />
                 <div className="app-input text-xs text-app-text-secondary bg-app-bg">
                     {!disponibilidadConfig && 'Selecciona recurso y fecha para ver la disponibilidad.'}
                     {disponibilidadConfig && (
