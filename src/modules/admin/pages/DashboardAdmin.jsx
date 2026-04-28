@@ -23,8 +23,7 @@ export default function DashboardAdmin({ usuarioApp }) {
   const [paginaVisitasModal, setPaginaVisitasModal] = useState(1);
 
   const [kpis, setKpis] = useState({
-    visitasHoy: 0,
-    visitasSemana: 0,
+    visitasRango: 0,
     paquetesPendientes: 0,
     torreTop: '-'
   });
@@ -70,12 +69,22 @@ export default function DashboardAdmin({ usuarioApp }) {
     return fechaOrden ? fechaOrden.getTime() : 0;
   }
 
-  const stats = useMemo(() => ({
-    total: visitasBase.length,
-    ingresados: visitasBase.filter((v) => v.estado === 'ingresado').length,
-    pendientes: visitasBase.filter((v) => v.estado === 'pendiente').length,
-    salidos: visitasBase.filter((v) => v.estado === 'salido').length
-  }), [visitasBase]);
+  const visitasRecientes = useMemo(() => {
+    const limite = Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000;
+
+    return visitasBase
+      .filter((visita) => obtenerTimestampVisita(visita) >= limite)
+      .sort((a, b) => obtenerTimestampVisita(b) - obtenerTimestampVisita(a));
+  }, [visitasBase]);
+
+  const stats = useMemo(() => {
+    const pendientes = visitasRecientes.filter((v) => v.estado === 'pendiente').length;
+    const ingresados = visitasRecientes.filter((v) => v.estado === 'ingresado').length;
+    const salidos = visitasRecientes.filter((v) => v.estado === 'salido').length;
+    const total = pendientes + ingresados + salidos;
+
+    return { total, pendientes, ingresados, salidos };
+  }, [visitasRecientes]);
 
   const saludOperativa = useMemo(() => {
     const totalVisitas = Math.max(stats.total, 1);
@@ -84,14 +93,6 @@ export default function DashboardAdmin({ usuarioApp }) {
 
     return { ocupacion, finalizacion };
   }, [stats]);
-
-  const visitasRecientes = useMemo(() => {
-    const limite = Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000;
-
-    return visitasBase
-      .filter((visita) => obtenerTimestampVisita(visita) >= limite)
-      .sort((a, b) => obtenerTimestampVisita(b) - obtenerTimestampVisita(a));
-  }, [visitasBase]);
 
   const visitasPreview = useMemo(
     () => visitasRecientes.slice(0, VISITAS_PREVIEW_LIMIT),
@@ -126,12 +127,9 @@ export default function DashboardAdmin({ usuarioApp }) {
 
   async function obtenerVisitas() {
     try {
-      const hoy = new Date();
-      const hace7dias = new Date();
-
-      hace7dias.setDate(hoy.getDate() - 7);
-
-      const fechaInicio = hace7dias.toISOString().split('T')[0];
+      const fechaInicio = new Date(Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0];
 
       const { data, error } = await supabase
         .from('registro_visitas')
@@ -222,20 +220,6 @@ export default function DashboardAdmin({ usuarioApp }) {
     }
   }, [paginaVisitasModal, totalPaginasVisitas]);
 
-  useEffect(() => {
-    const estados = visitasBase.reduce((acc, visita) => {
-      const estado = visita?.estado || 'sin_estado';
-      acc[estado] = (acc[estado] || 0) + 1;
-      return acc;
-    }, {});
-
-    console.log({
-      totalVisitas: visitasBase.length,
-      visitasFiltradas: visitasRecientes.length,
-      estados
-    });
-  }, [visitasBase, visitasRecientes]);
-
   function obtenerPlacaVisita(visita) {
     const posiblesPlacas = [
       visita?.placa,
@@ -310,7 +294,7 @@ export default function DashboardAdmin({ usuarioApp }) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold">👋 Hola {usuarioApp?.nombre || 'Admin'}</h2>
-            <p className="text-sm text-app-text-secondary mt-1">Resumen del día del conjunto con foco operativo y financiero.</p>
+            <p className="text-sm text-app-text-secondary mt-1">Resumen operativo de los últimos 3 días con foco financiero y de visitas.</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs min-w-[280px]">
             <div className="app-surface-muted p-3"><p className="text-app-text-secondary">Activas</p><p className="text-lg font-semibold">{stats.ingresados}</p></div>
@@ -320,7 +304,7 @@ export default function DashboardAdmin({ usuarioApp }) {
         </div>
       </div>
 
-      <KPIsAdmin usuarioApp={usuarioApp} setKpis={setKpis} />
+      <KPIsAdmin usuarioApp={usuarioApp} setKpis={setKpis} visitasTotal={stats.total} />
       <DashboardResumen stats={stats} kpis={kpis} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -385,9 +369,9 @@ export default function DashboardAdmin({ usuarioApp }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">📊 Visitas por día</h3>
-          <p className="text-sm text-app-text-secondary mb-3">Comportamiento diario de ingresos y salidas.</p>
+          <p className="text-sm text-app-text-secondary mb-3">Total diario de visitas registradas.</p>
           <div className="h-[320px]">
-            <GraficaVisitas visitas={visitasBase} />
+            <GraficaVisitas visitas={visitasRecientes} />
           </div>
         </div>
         <div className="app-surface-primary p-4 flex flex-col">
