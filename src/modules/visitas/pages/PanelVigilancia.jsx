@@ -14,6 +14,30 @@ const normalizeEstado = (estado) => {
     return value;
 };
 const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
+const formatDateLabel = (value) => {
+    if (!value) return 'Sin fecha';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: 'short', year: 'numeric' });
+};
+const formatDateTimeLabel = (value) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+};
+const formatUbicacion = (torre, apartamento) => {
+    if (!torre || !apartamento) return 'Ubicación no disponible';
+    const torreLabel = /^torre\b/i.test(String(torre).trim()) ? String(torre).trim() : `Torre ${String(torre).trim()}`;
+    return `${torreLabel} y Apto: ${apartamento}`;
+};
 const minutesDiff = (value) => {
     if (!value) return 0;
     const parsed = new Date(value);
@@ -65,7 +89,16 @@ export default function PanelVigilancia({ usuarioApp }) {
             const [registroResp, seguridadResp] = await Promise.all([
                 supabase
                     .from('registro_visitas')
-                    .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                    .select(`
+                        id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
+                        apartamentos (
+                            id,
+                            numero,
+                            torres (
+                                nombre
+                            )
+                        )
+                    `)
                     .eq('conjunto_id', conjuntoId)
                     .order('fecha_visita', { ascending: false }),
                 obtenerSeguridadConsolidada(conjuntoId)
@@ -95,7 +128,16 @@ export default function PanelVigilancia({ usuarioApp }) {
             const { data: registrosFallback } = idsVisitantesConjunto.length
                 ? await supabase
                     .from('registro_visitas')
-                    .select('id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at')
+                    .select(`
+                        id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
+                        apartamentos (
+                            id,
+                            numero,
+                            torres (
+                                nombre
+                            )
+                        )
+                    `)
                     .in('visitante_id', idsVisitantesConjunto)
                     .order('fecha_visita', { ascending: false })
                 : { data: [] };
@@ -124,7 +166,10 @@ export default function PanelVigilancia({ usuarioApp }) {
                     created_at: v.created_at,
                     nombre_visitante: visitante?.nombre,
                     documento: visitante?.documento,
-                    placa: visitante?.placa
+                    placa: visitante?.placa,
+                    torre: v.apartamentos?.torres?.nombre || null,
+                    apartamento: v.apartamentos?.numero || null,
+                    ubicacion: formatUbicacion(v.apartamentos?.torres?.nombre, v.apartamentos?.numero)
                 };
             });
             setVisitas(mappedRegistro);
@@ -211,7 +256,8 @@ export default function PanelVigilancia({ usuarioApp }) {
             const matchBusq = !term
                 || v.nombre_visitante?.toLowerCase().includes(term)
                 || String(v.documento || '').toLowerCase().includes(term)
-                || String(v.placa || '').toLowerCase().includes(term);
+                || String(v.placa || '').toLowerCase().includes(term)
+                || String(v.ubicacion || '').toLowerCase().includes(term);
 
             if (!matchBusq) return false;
 
@@ -284,7 +330,7 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             <input
                 className="app-input"
-                placeholder="Buscar por nombre, documento o placa"
+                placeholder="Buscar por nombre, documento, placa o torre/apto"
                 value={busqueda}
                 onChange={(e) => {
                     setBusqueda(e.target.value);
@@ -297,20 +343,33 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             <div className="space-y-3">
                 {filtradasPaginadas.map((v) => (
-                    <div key={v.id} className={`app-surface-muted p-4 border ${v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 ? 'border-state-warning/60' : 'border-app-border/70'}`}>
-                        <div className="flex flex-col md:flex-row md:justify-between gap-2">
-                            <div className="space-y-1 text-sm">
-                                <p><b>Visitante:</b> {v.nombre_visitante}</p>
-                                <p><b>Documento:</b> {v.documento}</p>
-                                <p><b>Fecha visita:</b> {v.fecha_visita}</p>
-                                <p><b>Placa:</b> {v.placa || 'No registra'}</p>
-                                <p className="text-xs text-app-text-secondary"><b>Creado:</b> {toDateOnly() === v.fecha_visita ? 'Hoy' : v.fecha_visita} · Espera: {minutesDiff(v.created_at)} min</p>
+                    <div key={v.id} className={`app-surface-muted p-4 border rounded-xl ${v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 ? 'border-state-warning/60' : 'border-app-border/70'}`}>
+                        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                            <div className="space-y-2 min-w-0">
+                                <p className="text-base font-bold text-app-text-primary truncate">{v.nombre_visitante || 'Visitante sin nombre'}</p>
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                    <span className="px-2 py-1 rounded-full border border-brand-primary/40 bg-brand-primary/15 text-brand-secondary">
+                                        {v.ubicacion}
+                                    </span>
+                                    <span className="px-2 py-1 rounded-full border border-app-border bg-app-bg text-app-text-secondary">
+                                        Documento: {v.documento || 'No registra'}
+                                    </span>
+                                    <span className="px-2 py-1 rounded-full border border-app-border bg-app-bg text-app-text-secondary">
+                                        Placa: {v.placa || 'No registra'}
+                                    </span>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-2 text-xs text-app-text-secondary">
+                                    <p><b>Fecha visita:</b> {formatDateLabel(v.fecha_visita)}</p>
+                                    <p><b>Creado:</b> {toDateOnly() === v.fecha_visita ? 'Hoy' : formatDateLabel(v.created_at)} · Espera: {minutesDiff(v.created_at)} min</p>
+                                    <p><b>Ingreso:</b> {formatDateTimeLabel(v.hora_ingreso)}</p>
+                                    <p><b>Salida:</b> {formatDateTimeLabel(v.hora_salida)}</p>
+                                </div>
                             </div>
-                            <div className="space-y-1 text-sm md:text-right">
-                                <p><b>Estado:</b> <span className={v.estado_normalizado === 'pendiente' ? 'text-amber-600 font-semibold' : v.estado_normalizado === 'ingresado' ? 'text-blue-600 font-semibold' : 'text-green-600 font-semibold'}>{v.estado}</span></p>
-                                {v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 && <p className="text-state-warning font-semibold">⚠️ Atención inmediata</p>}
-                                {v.hora_ingreso && <p className="text-state-info">⏱ Ingreso: {v.hora_ingreso}</p>}
-                                {v.hora_salida && <p className="text-state-success">✅ Salida: {v.hora_salida}</p>}
+                            <div className="space-y-2 text-sm md:text-right shrink-0">
+                                <span className={`inline-flex px-2.5 py-1 rounded-full border text-xs font-semibold ${v.estado_normalizado === 'pendiente' ? 'text-state-warning border-state-warning/40 bg-state-warning/10' : v.estado_normalizado === 'ingresado' ? 'text-state-info border-state-info/40 bg-state-info/10' : 'text-state-success border-state-success/40 bg-state-success/10'}`}>
+                                    Estado: {v.estado}
+                                </span>
+                                {v.estado_normalizado === 'pendiente' && minutesDiff(v.created_at) >= 30 && <p className="text-state-warning font-semibold text-xs">⚠️ Atención inmediata</p>}
                             </div>
                         </div>
                         <div className="mt-3 flex gap-2">
