@@ -37,6 +37,15 @@ const normalizarEstado = (estado) => {
     return ESTADOS_INCIDENCIA.includes(estadoNormalizado) ? estadoNormalizado : ESTADO_POR_DEFECTO;
 };
 
+const validarEstadoEntrada = (estado) => {
+    const estadoTexto = String(estado || '').trim();
+    const estadoNormalizado = normalizarEstado(estadoTexto);
+    return {
+        estadoNormalizado,
+        esValido: estadoTexto.length > 0 && estadoNormalizado === estadoTexto.toLowerCase()
+    };
+};
+
 export const crearIncidente = async (data, user) => {
     try {
         if (!user?.id) {
@@ -99,8 +108,8 @@ export const crearIncidente = async (data, user) => {
 
 export const actualizarEstadoIncidente = async ({ incidenteId, estado, usuarioId, estadoActual = ESTADO_POR_DEFECTO }) => {
     try {
-        const estadoDestino = normalizarEstado(estado);
-        if (estadoDestino !== estado) {
+        const { estadoNormalizado: estadoDestino, esValido } = validarEstadoEntrada(estado);
+        if (!esValido) {
             throw new Error('Estado inválido');
         }
 
@@ -112,10 +121,21 @@ export const actualizarEstadoIncidente = async ({ incidenteId, estado, usuarioId
 
         if (incidenteError) throw incidenteError;
 
-        const estadoBase = incidenteActual?.estado || estadoActual || ESTADO_POR_DEFECTO;
+        // La fuente de verdad para el estado es DB; localStorage solo funciona como espejo/fallback UI.
+        const estadoBaseDb = normalizarEstado(incidenteActual?.estado);
+        const estadoBaseFallback = normalizarEstado(estadoActual);
+        const estadoBase = estadoBaseDb || estadoBaseFallback || ESTADO_POR_DEFECTO;
 
-        if (!puedeTransicionarEstado(estadoBase, estadoDestino)) {
-            throw new Error('Transición de estado no permitida');
+        const esMismoEstado = estadoBase === estadoDestino;
+        if (!esMismoEstado && !puedeTransicionarEstado(estadoBase, estadoDestino)) {
+            const estadosActuales = getEstadoLocal();
+            estadosActuales[incidenteId] = {
+                ...(estadosActuales[incidenteId] || {}),
+                estado: estadoBase,
+                updated_at: new Date().toISOString()
+            };
+            setEstadoLocal(estadosActuales);
+            throw new Error(`Transición de estado no permitida (estado actual: ${estadoBase})`);
         }
 
         const { error: updateError } = await supabase
@@ -148,8 +168,8 @@ export const actualizarGestionIncidente = async ({ incidenteId, resolucion, impa
         if (typeof impacto_economico !== 'undefined') payload.impacto_economico = impacto_economico || null;
         if (typeof evidencia_url !== 'undefined') payload.evidencia_url = evidencia_url || null;
         if (typeof estado !== 'undefined') {
-            const estadoNormalizado = normalizarEstado(estado);
-            if (estadoNormalizado !== estado) {
+            const { estadoNormalizado, esValido } = validarEstadoEntrada(estado);
+            if (!esValido) {
                 throw new Error('Estado inválido');
             }
             payload.estado = estadoNormalizado;
