@@ -20,6 +20,7 @@ const formatearUbicacion = (torre, apto) => {
 
 export default function PanelPaquetes({ usuarioApp }) {
   const [paquetes, setPaquetes] = useState([]);
+  const [entregadosRecientes, setEntregadosRecientes] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('pendiente');
   const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,11 +30,16 @@ export default function PanelPaquetes({ usuarioApp }) {
   const obtenerPaquetes = async () => {
     if (!usuarioApp?.conjunto_id) return;
     setLoading(true);
-    const result = await listarPaquetesConDetalle({ conjunto_id: usuarioApp.conjunto_id, estado: filtroEstado, busqueda });
+    const [result, recientesResult] = await Promise.all([
+      listarPaquetesConDetalle({ conjunto_id: usuarioApp.conjunto_id, estado: filtroEstado, busqueda }),
+      listarPaquetesConDetalle({ conjunto_id: usuarioApp.conjunto_id, estado: 'entregado', busqueda: '' })
+    ]);
     setLoading(false);
 
     if (!result.ok) return toast.error(result.error || 'No se pudo cargar paquetería');
+    if (!recientesResult.ok) return toast.error(recientesResult.error || 'No se pudieron cargar entregados recientes');
     setPaquetes(result.data || []);
+    setEntregadosRecientes((recientesResult.data || []).slice(0, ENTREGADOS_RECIENTES));
   };
 
   useEffect(() => {
@@ -61,7 +67,6 @@ export default function PanelPaquetes({ usuarioApp }) {
 
   const entregables = useMemo(() => paquetes.filter((p) => p.estado === 'pendiente'), [paquetes]);
   const entregados = useMemo(() => paquetes.filter((p) => p.estado === 'entregado'), [paquetes]);
-  const entregadosRecientes = useMemo(() => entregados.slice(0, ENTREGADOS_RECIENTES), [entregados]);
   const serviciosPendientes = useMemo(() => entregables.filter((p) => p.categoria === 'servicio_publico').length, [entregables]);
 
   const paginar = (registros, pagina) => {
@@ -159,7 +164,7 @@ export default function PanelPaquetes({ usuarioApp }) {
         <div className="space-y-2 border-t border-brand-primary/10 pt-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-state-success">Entregados recientes</h3>
-            {entregados.length > ENTREGADOS_RECIENTES && (
+            {entregadosRecientes.length >= ENTREGADOS_RECIENTES && (
               <button className="app-btn-ghost text-xs" onClick={() => setFiltroEstado('entregado')}>Ver historial completo</button>
             )}
           </div>
