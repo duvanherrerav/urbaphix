@@ -189,6 +189,12 @@ Tablas detectadas en `public`:
 - `reportado_por` (uuid, nullable)
 - `nivel` (text, nullable)
 - `descripcion` (text, nullable)
+- `estado` (text, NOT NULL, default: `'nuevo'::text`, check: `nuevo|en_gestion|resuelto|cerrado`)
+- `tipo` (text, NOT NULL, default: `'seguridad'::text`, check: `seguridad|convivencia|infraestructura|acceso`)
+- `ubicacion_texto` (text, nullable)
+- `evidencia_url` (text, nullable)
+- `resolucion` (text, nullable)
+- `impacto_economico` (text, nullable)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
 
 ### Relaciones
@@ -202,6 +208,9 @@ Tablas detectadas en `public`:
 - `incidentes por conjunto`
   - comando: `SELECT`
   - condición: mismo `conjunto_id`
+- `update incidentes admin conjunto`
+  - comando: `UPDATE`
+  - condición: rol `admin` del mismo `conjunto_id`
 
 ---
 
