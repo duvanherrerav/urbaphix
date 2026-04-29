@@ -14,7 +14,11 @@ const normalizeEstado = (estado) => {
     if (value.includes('sal') || value.includes('final')) return 'salido';
     return value;
 };
-const normalizeFecha = (fecha) => String(fecha || '').slice(0, 10);
+const normalizeFecha = (fecha) => {
+    const value = String(fecha || '').trim();
+    const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
+};
 const formatearFechaVisitaLocal = (fechaVisita) => {
     const value = String(fechaVisita || '').trim();
     const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -400,7 +404,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                                     </span>
                                 </div>
                                 <div className="grid sm:grid-cols-2 gap-2 text-xs text-app-text-secondary">
-                                    <p><b>Fecha visita:</b> {formatearFechaVisitaLocal(v.fecha_visita)}</p>
+                                    <p><b>Fecha visita:</b> {formatearFechaVisitaLocal(obtenerFechaVisitaKey(v))}</p>
                                     <p><b>Creado:</b> {toDateOnly() === bogotaDateOnlyFromTimestamp(v.created_at) ? 'Hoy' : formatDateLabel(v.created_at)}</p>
                                     <p><b>Ingreso:</b> {formatDateTimeLabel(v.hora_ingreso)}</p>
                                     <p><b>Salida:</b> {formatDateTimeLabel(v.hora_salida)}</p>
