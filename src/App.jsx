@@ -406,7 +406,7 @@ function App() {
                 {moduloActual === 'paquetes' && (
                   <section className="space-y-4">
                     <p className="text-xs text-app-text-secondary uppercase tracking-wide">Operación de portería</p>
-                    <div className="grid xl:grid-cols-[380px_1fr] gap-4 items-start">
+                    <div className="grid xl:grid-cols-[340px_minmax(0,1fr)] gap-4 items-start">
                       <CrearPaquete usuarioApp={usuarioApp} />
                       <PanelPaquetes usuarioApp={usuarioApp} />
                     </div>

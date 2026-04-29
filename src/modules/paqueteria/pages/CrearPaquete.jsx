@@ -56,13 +56,13 @@ export default function CrearPaquete({ usuarioApp }) {
   };
 
   return (
-    <div className="app-surface-primary p-5 rounded-2xl space-y-4 border border-brand-primary/10">
-      <div className="space-y-1 border-b border-brand-primary/10 pb-3">
-        <h2 className="text-2xl font-bold">Registrar recepción 📦</h2>
-        <p className="text-sm text-app-text-secondary">Carga rápida por torre y apartamento.</p>
+    <div className="app-surface-primary rounded-2xl border border-brand-primary/10 p-4 space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold">Registrar recepción 📦</h2>
+        <p className="text-xs text-app-text-secondary">Carga rápida por torre y apartamento.</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
         <label className="block space-y-1">
           <span className="text-xs font-medium text-app-text-secondary">Tipo de registro</span>
           <select className="app-input w-full" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
@@ -84,17 +84,15 @@ export default function CrearPaquete({ usuarioApp }) {
           <input className="app-input w-full" placeholder="Ej: 201" value={apartamentoManual} onChange={(e) => setApartamentoManual(e.target.value)} />
         </label>
 
-        <label className="block space-y-1">
+        <label className="block space-y-1 sm:col-span-2 xl:col-span-1">
           <span className="text-xs font-medium text-app-text-secondary">Descripción</span>
           <input className="app-input w-full" placeholder={categoria === 'servicio_publico' ? 'Ej: Factura de energía abril' : 'Ej: Amazon, MercadoLibre'} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </label>
       </div>
 
-      <div className="pt-1">
-        <button onClick={crearPaquete} disabled={loading} className="app-btn-primary w-full">
-          {loading ? 'Guardando...' : (categoria === 'servicio_publico' ? 'Registrar servicio público' : 'Guardar paquete')}
-        </button>
-      </div>
+      <button onClick={crearPaquete} disabled={loading} className="app-btn-primary w-full text-sm">
+        {loading ? 'Guardando...' : (categoria === 'servicio_publico' ? 'Registrar servicio público' : 'Guardar paquete')}
+      </button>
     </div>
   );
 }
