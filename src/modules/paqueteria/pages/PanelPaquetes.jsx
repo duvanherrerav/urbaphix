@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { entregarPaquete as entregarPaqueteService, listarPaquetesConDetalle } from '../services/paquetesService';
 
+const ITEMS_POR_PAGINA = 10;
+
 const formatDateTime = (value) => {
     if (!value) return '-';
     const parsed = new Date(value);
@@ -10,11 +12,18 @@ const formatDateTime = (value) => {
     return parsed.toLocaleString();
 };
 
+const formatearUbicacion = (torre, apto) => {
+    if (!torre || !apto) return 'Ubicación no disponible';
+    return `Torre y Apto: ${torre}${apto}`;
+};
+
 export default function PanelPaquetes({ usuarioApp }) {
     const [paquetes, setPaquetes] = useState([]);
     const [filtroEstado, setFiltroEstado] = useState('pendiente');
     const [busqueda, setBusqueda] = useState('');
     const [loading, setLoading] = useState(false);
+    const [paginaPendientes, setPaginaPendientes] = useState(1);
+    const [paginaEntregados, setPaginaEntregados] = useState(1);
 
     const obtenerPaquetes = async () => {
         if (!usuarioApp?.conjunto_id) return;
@@ -25,6 +34,11 @@ export default function PanelPaquetes({ usuarioApp }) {
         if (!result.ok) return toast.error(result.error || 'No se pudo cargar paquetería');
         setPaquetes(result.data || []);
     };
+
+    useEffect(() => {
+        setPaginaPendientes(1);
+        setPaginaEntregados(1);
+    }, [filtroEstado, busqueda]);
 
     useEffect(() => { obtenerPaquetes(); }, [usuarioApp?.conjunto_id, filtroEstado]);
     useEffect(() => {
@@ -48,6 +62,16 @@ export default function PanelPaquetes({ usuarioApp }) {
     const entregados = useMemo(() => paquetes.filter((p) => p.estado === 'entregado'), [paquetes]);
     const serviciosPendientes = useMemo(() => entregables.filter((p) => p.categoria === 'servicio_publico').length, [entregables]);
 
+    const paginar = (registros, pagina) => {
+        const inicio = (pagina - 1) * ITEMS_POR_PAGINA;
+        return registros.slice(inicio, inicio + ITEMS_POR_PAGINA);
+    };
+
+    const totalPaginasPendientes = Math.max(1, Math.ceil(entregables.length / ITEMS_POR_PAGINA));
+    const totalPaginasEntregados = Math.max(1, Math.ceil(entregados.length / ITEMS_POR_PAGINA));
+    const entregablesPaginados = paginar(entregables, paginaPendientes);
+    const entregadosPaginados = paginar(entregados, paginaEntregados);
+
     const entregarPaquete = async (paquete) => {
         const confirmar = window.confirm(paquete.categoria === 'servicio_publico' ? `¿Confirmar entrega del servicio público "${paquete.descripcion_visible}"?` : `¿Confirmar entrega del paquete "${paquete.descripcion_visible}"?`);
         if (!confirmar) return;
@@ -60,55 +84,75 @@ export default function PanelPaquetes({ usuarioApp }) {
         obtenerPaquetes();
     };
 
+    const renderPaginacion = ({ total, pagina, setPagina, totalPaginas }) => {
+        if (total === 0) return null;
+        const inicio = (pagina - 1) * ITEMS_POR_PAGINA + 1;
+        const fin = Math.min(pagina * ITEMS_POR_PAGINA, total);
+        return (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                <p className="text-xs text-app-text-secondary">Mostrando {inicio}–{fin} de {total} paquetes</p>
+                <div className="flex items-center gap-2">
+                    <button className="app-btn-ghost text-xs" onClick={() => setPagina((prev) => Math.max(1, prev - 1))} disabled={pagina === 1}>Anterior</button>
+                    <span className="text-xs text-app-text-secondary">Página {pagina} de {totalPaginas}</span>
+                    <button className="app-btn-ghost text-xs" onClick={() => setPagina((prev) => Math.min(totalPaginas, prev + 1))} disabled={pagina === totalPaginas}>Siguiente</button>
+                </div>
+            </div>
+        );
+    };
+
     return (
-        <div className="app-surface-primary rounded-2xl p-5 space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="app-surface-primary rounded-2xl p-5 space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-brand-primary/10 pb-3">
                 <div>
                     <h2 className="text-2xl font-bold">Panel de paquetería 📬</h2>
                     <p className="text-sm text-app-text-secondary">Operación por estado, búsqueda y confirmación de entrega.</p>
                 </div>
-                <div className="app-surface-muted text-sm border border-brand-primary/20">
+                <div className="app-surface-muted text-sm border border-brand-primary/20 p-3 rounded-xl">
                     <p><b>Pendientes:</b> {entregables.length}</p>
                     <p><b>Servicios públicos:</b> {serviciosPendientes}</p>
                 </div >
             </div>
 
-            <div className="flex flex-wrap gap-2">
-                <button className={`app-btn text-xs ${filtroEstado === 'pendiente' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('pendiente')}>Pendientes</button>
-                <button className={`app-btn text-xs ${filtroEstado === 'entregado' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('entregado')}>Entregados</button>
-                <button className={`app-btn text-xs ${filtroEstado === 'todos' ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('todos')}>Todos</button>
-            </div>
+            <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                    <button className={`app-btn text-xs ${filtroEstado === 'pendiente' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('pendiente')}>Pendientes</button>
+                    <button className={`app-btn text-xs ${filtroEstado === 'entregado' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('entregado')}>Entregados</button>
+                    <button className={`app-btn text-xs ${filtroEstado === 'todos' ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('todos')}>Todos</button>
+                </div>
 
-            <div className="grid md:grid-cols-[1fr_auto] gap-2">
-                <input className="app-input" placeholder="Buscar por descripción, torre o apartamento" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-                <button className="app-btn-ghost" onClick={obtenerPaquetes}>Buscar</button>
+                <div className="grid md:grid-cols-[1fr_auto] gap-2">
+                    <input className="app-input" placeholder="Buscar por descripción, torre o apartamento" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+                    <button className="app-btn-ghost" onClick={obtenerPaquetes}>Buscar</button>
+                </div>
             </div>
 
             {loading && <p className="text-sm text-app-text-secondary">Cargando paquetería...</p>}
             {!loading && paquetes.length === 0 && <p className="text-sm text-app-text-secondary">No hay registros para este filtro.</p>}
 
-            <div className="space-y-4">
+            <div className="space-y-5">
                 {(filtroEstado === 'pendiente' || filtroEstado === 'todos') && (
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-state-warning">Recepción pendiente de entrega</h3>
                             <span className="text-xs text-app-text-secondary">{entregables.length}</span>
                         </div>
-                        {entregables.map((p) => (
-                            <div key={p.id} className="app-surface-muted p-3 border border-state-warning/30">
-                                <div className="grid md:grid-cols-[1fr_auto] gap-2 items-start">
-                                    <div>
-                                        <p className="font-medium">{p.descripcion_visible || 'Sin descripción'}</p>
-                                        <p className="text-xs text-app-text-secondary">Torre <b>{p.torre_nombre || '-'}</b> · Apto <b>{p.apartamento_numero || '-'}</b> · Recibido {formatDateTime(p.fecha_recibido)}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>
-                                        <button className="app-btn-primary text-xs" onClick={() => entregarPaquete(p)}>Marcar entregado</button>
-                                    </div>
+                        {entregablesPaginados.map((p) => (
+                            <div key={p.id} className="app-surface-muted p-4 border border-state-warning/30 rounded-xl space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <p className="font-semibold text-base">{p.descripcion_visible || 'Sin descripción'}</p>
+                                    <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <span className="app-badge app-badge-ghost">{formatearUbicacion(p.torre_nombre, p.apartamento_numero)}</span>
+                                </div>
+                                <p className="text-xs text-app-text-secondary">Recibido: {formatDateTime(p.fecha_recibido)}</p>
+                                <div className="flex justify-end">
+                                    <button className="app-btn-primary text-xs" onClick={() => entregarPaquete(p)}>Marcar entregado</button>
                                 </div>
                             </div>
                         ))}
                         {entregables.length === 0 && <p className="text-xs text-app-text-secondary">No hay paquetes pendientes.</p>}
+                        {renderPaginacion({ total: entregables.length, pagina: paginaPendientes, setPagina: setPaginaPendientes, totalPaginas: totalPaginasPendientes })}
                     </div>
                 )}
 
@@ -118,19 +162,19 @@ export default function PanelPaquetes({ usuarioApp }) {
                             <h3 className="text-sm font-semibold text-state-success">Entregas confirmadas</h3>
                             <span className="text-xs text-app-text-secondary">{entregados.length}</span>
                         </div>
-                        {entregados.map((p) => (
-                            <div key={p.id} className="app-surface-muted p-3 border border-state-success/20">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div>
-                                        <p className="font-medium">{p.descripcion_visible || 'Sin descripción'}</p>
-                                        <p className="text-xs text-app-text-secondary">Torre <b>{p.torre_nombre || '-'}</b> · Apto <b>{p.apartamento_numero || '-'}</b></p>
-                                        <p className="text-xs text-app-text-secondary">Recibido {formatDateTime(p.fecha_recibido)} · Entregado {formatDateTime(p.fecha_entrega)}</p>
-                                    </div>
+                        {entregadosPaginados.map((p) => (
+                            <div key={p.id} className="app-surface-muted p-4 border border-state-success/20 rounded-xl space-y-2">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <p className="font-semibold text-base">{p.descripcion_visible || 'Sin descripción'}</p>
                                     <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>
                                 </div>
+                                <span className="app-badge app-badge-ghost text-xs">{formatearUbicacion(p.torre_nombre, p.apartamento_numero)}</span>
+                                <p className="text-xs text-app-text-secondary">Recibido: {formatDateTime(p.fecha_recibido)}</p>
+                                <p className="text-xs text-app-text-secondary">Entregado: {formatDateTime(p.fecha_entrega)}</p>
                             </div>
                         ))}
                         {entregados.length === 0 && <p className="text-xs text-app-text-secondary">No hay entregas en este filtro.</p>}
+                        {renderPaginacion({ total: entregados.length, pagina: paginaEntregados, setPagina: setPaginaEntregados, totalPaginas: totalPaginasEntregados })}
                     </div>
                 )}
             </div>
