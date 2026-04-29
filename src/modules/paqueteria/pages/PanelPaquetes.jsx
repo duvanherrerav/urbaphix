@@ -26,6 +26,7 @@ export default function PanelPaquetes({ usuarioApp }) {
   const [loading, setLoading] = useState(false);
   const [paginaPendientes, setPaginaPendientes] = useState(1);
   const [paginaEntregados, setPaginaEntregados] = useState(1);
+  const [mostrarEntregadosRecientes, setMostrarEntregadosRecientes] = useState(false);
 
   const obtenerPaquetes = async () => {
     if (!usuarioApp?.conjunto_id) return;
@@ -115,10 +116,19 @@ export default function PanelPaquetes({ usuarioApp }) {
           <h2 className="text-lg font-semibold">Panel de paquetería 📬</h2>
           <p className="text-xs text-app-text-secondary">Centro operativo para entrega por estado y ubicación.</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-          <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg"><b>Pendientes:</b> {entregables.length}</div>
-          <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg"><b>Paquetes:</b> {paquetesPendientes}</div>
-          <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg"><b>Serv. públicos:</b> {serviciosPendientes}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs w-full lg:w-auto lg:min-w-[420px]">
+          <div className="rounded-xl border border-state-warning/40 bg-state-warning/10 px-4 py-3 shadow-sm">
+            <p className="text-[11px] uppercase tracking-wide text-state-warning">Pendientes</p>
+            <p className="text-2xl font-bold leading-tight text-app-text-primary">{entregables.length}</p>
+          </div>
+          <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg">
+            <p className="text-[11px] uppercase tracking-wide text-app-text-secondary">Paquetes</p>
+            <p className="text-base font-semibold">{paquetesPendientes}</p>
+          </div>
+          <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg">
+            <p className="text-[11px] uppercase tracking-wide text-app-text-secondary">Serv. públicos</p>
+            <p className="text-base font-semibold">{serviciosPendientes}</p>
+          </div>
         </div>
       </div>
 
@@ -139,21 +149,21 @@ export default function PanelPaquetes({ usuarioApp }) {
       {!loading && paquetes.length === 0 && <p className="text-sm text-app-text-secondary">No hay registros para este filtro.</p>}
 
       {(filtroEstado === 'pendiente' || filtroEstado === 'todos') && (
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-xl border border-state-warning/30 bg-state-warning/5 p-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-state-warning">Recepción pendiente de entrega</h3>
-            <span className="text-xs text-app-text-secondary">{entregables.length}</span>
+            <h3 className="text-base font-semibold text-state-warning">Recepción pendiente de entrega</h3>
+            <span className="app-badge app-badge-ghost text-xs">{entregables.length}</span>
           </div>
           {entregablesPaginados.map((p) => (
-            <div key={p.id} className="app-surface-muted p-3 border border-state-warning/30 rounded-xl space-y-2">
+            <div key={p.id} className="app-surface-primary p-3 border border-state-warning/30 rounded-xl space-y-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="font-semibold text-sm">{p.descripcion_visible || 'Sin descripción'}</p>
+                <p className="font-bold text-base leading-tight">{p.descripcion_visible || 'Sin descripción'}</p>
                 <span className={`app-badge text-xs ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</span>
               </div>
-              <span className="app-badge app-badge-ghost text-xs">{formatearUbicacion(p.torre_nombre, p.apartamento_numero)}</span>
+              <p className="text-sm font-medium text-app-text-primary">{formatearUbicacion(p.torre_nombre, p.apartamento_numero)}</p>
               <p className="text-xs text-app-text-secondary">Recibido: {formatDateTime(p.fecha_recibido)}</p>
               <div className="flex justify-end">
-                <button className="app-btn-primary text-xs" onClick={() => entregarPaquete(p)}>Marcar entregado</button>
+                <button className="app-btn-primary text-sm px-4 py-2" onClick={() => entregarPaquete(p)}>Marcar entregado</button>
               </div>
             </div>
           ))}
@@ -163,23 +173,35 @@ export default function PanelPaquetes({ usuarioApp }) {
       )}
 
       {(filtroEstado === 'pendiente' || filtroEstado === 'todos') && (
-        <div className="space-y-2 border-t border-brand-primary/10 pt-3">
+        <div className="space-y-2 border-t border-brand-primary/10 pt-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-state-success">Entregados recientes</h3>
-            {entregadosRecientes.length >= ENTREGADOS_RECIENTES && (
-              <button className="app-btn-ghost text-xs" onClick={() => setFiltroEstado('entregado')}>Ver historial completo</button>
-            )}
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-app-text-secondary">Entregados recientes</h3>
+            <button className="app-btn-ghost text-xs" onClick={() => setMostrarEntregadosRecientes((prev) => !prev)}>
+              {mostrarEntregadosRecientes ? 'Ocultar' : 'Mostrar'}
+            </button>
           </div>
-          {entregadosRecientes.map((p) => (
-            <div key={p.id} className="app-surface-muted p-3 border border-state-success/20 rounded-xl space-y-1">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="font-medium text-sm">{p.descripcion_visible || 'Sin descripción'}</p>
-                <span className="text-[11px] text-app-text-secondary">{formatDateTime(p.fecha_entrega)}</span>
-              </div>
-              <p className="text-xs text-app-text-secondary">{formatearUbicacion(p.torre_nombre, p.apartamento_numero)}</p>
+          {mostrarEntregadosRecientes && (
+            <>
+              {entregadosRecientes.map((p) => (
+                <div key={p.id} className="bg-app-bg/35 p-2 border border-brand-primary/10 rounded-lg space-y-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="font-medium text-xs">{p.descripcion_visible || 'Sin descripción'}</p>
+                    <span className="text-[11px] text-app-text-secondary">{formatDateTime(p.fecha_entrega)}</span>
+                  </div>
+                  <p className="text-[11px] text-app-text-secondary">{formatearUbicacion(p.torre_nombre, p.apartamento_numero)}</p>
+                </div>
+              ))}
+              {entregadosRecientes.length === 0 && <p className="text-xs text-app-text-secondary">Aún no hay entregas recientes.</p>}
+            </>
+          )}
+          {!mostrarEntregadosRecientes && (
+            <p className="text-[11px] text-app-text-secondary">Vista resumida para mantener enfoque en pendientes.</p>
+          )}
+          {entregadosRecientes.length >= ENTREGADOS_RECIENTES && (
+            <div className="pt-1">
+              <button className="app-btn-ghost text-xs" onClick={() => setFiltroEstado('entregado')}>Ver historial completo</button>
             </div>
-          ))}
-          {entregadosRecientes.length === 0 && <p className="text-xs text-app-text-secondary">Aún no hay entregas recientes.</p>}
+          )}
         </div>
       )}
 

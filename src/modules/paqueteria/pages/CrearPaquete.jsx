@@ -56,10 +56,10 @@ export default function CrearPaquete({ usuarioApp }) {
   };
 
   return (
-    <div className="app-surface-primary rounded-2xl border border-brand-primary/10 p-4 space-y-4">
+    <div className="app-surface-primary/95 rounded-2xl border border-brand-primary/15 p-4 space-y-4 shadow-sm backdrop-blur-sm">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Registrar recepción 📦</h2>
-        <p className="text-xs text-app-text-secondary">Carga rápida por torre y apartamento.</p>
+        <p className="text-xs text-app-text-secondary">Paso 2 del flujo: registra rápidamente después de revisar pendientes.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
@@ -90,7 +90,7 @@ export default function CrearPaquete({ usuarioApp }) {
         </label>
       </div>
 
-      <button onClick={crearPaquete} disabled={loading} className="app-btn-primary w-full text-sm">
+      <button onClick={crearPaquete} disabled={loading} className="app-btn-primary w-full text-sm sticky bottom-0">
         {loading ? 'Guardando...' : (categoria === 'servicio_publico' ? 'Registrar servicio público' : 'Guardar paquete')}
       </button>
     </div>
