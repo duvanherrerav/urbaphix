@@ -68,6 +68,7 @@ export default function PanelPaquetes({ usuarioApp }) {
   const entregables = useMemo(() => paquetes.filter((p) => p.estado === 'pendiente'), [paquetes]);
   const entregados = useMemo(() => paquetes.filter((p) => p.estado === 'entregado'), [paquetes]);
   const serviciosPendientes = useMemo(() => entregables.filter((p) => p.categoria === 'servicio_publico').length, [entregables]);
+  const paquetesPendientes = useMemo(() => entregables.filter((p) => p.categoria !== 'servicio_publico').length, [entregables]);
 
   const paginar = (registros, pagina) => {
     const inicio = (pagina - 1) * ITEMS_POR_PAGINA;
@@ -114,8 +115,9 @@ export default function PanelPaquetes({ usuarioApp }) {
           <h2 className="text-lg font-semibold">Panel de paquetería 📬</h2>
           <p className="text-xs text-app-text-secondary">Centro operativo para entrega por estado y ubicación.</p>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
           <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg"><b>Pendientes:</b> {entregables.length}</div>
+          <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg"><b>Paquetes:</b> {paquetesPendientes}</div>
           <div className="app-surface-muted border border-brand-primary/20 px-3 py-2 rounded-lg"><b>Serv. públicos:</b> {serviciosPendientes}</div>
         </div>
       </div>
