@@ -7,22 +7,34 @@ export default function ReportarIncidente({ user }) {
     descripcion: '',
     nivel: 'bajo',
     tipo: 'seguridad',
-    ubicacion: '',
-    evidenciaRef: '',
-    resolucionRef: '',
-    impactoEconomicoRef: ''
+    ubicacion_texto: '',
+    evidencia_url: '',
+    impacto_economico: ''
   });
   const [loading, setLoading] = useState(false);
 
   const etiquetasNivel = { bajo: '🟢 Bajo', medio: '🟠 Medio', alto: '🔴 Alto' };
 
   const handleSubmit = async () => {
-    if (!form.descripcion.trim()) return toast.error('Describe el incidente');
+    const descripcion = form.descripcion.trim();
+    const ubicacion = form.ubicacion_texto.trim();
+    const tipo = form.tipo.trim();
+    const nivel = form.nivel.trim();
+
+    if (!descripcion) return toast.error('Debes completar “¿Qué ocurrió?”.');
+    if (descripcion.length < 10) return toast.error('La descripción debe tener al menos 10 caracteres.');
+    if (!ubicacion) return toast.error('Debes completar “¿Dónde ocurrió?”.');
+    if (!tipo) return toast.error('Debes seleccionar el tipo de incidente.');
+    if (!nivel) return toast.error('Debes seleccionar el nivel de prioridad.');
 
     setLoading(true);
     const payload = {
-      descripcion: `[${form.tipo}] ${form.ubicacion ? `(${form.ubicacion}) ` : ''}${form.descripcion.trim()}`,
-      nivel: form.nivel
+      descripcion,
+      tipo,
+      ubicacion_texto: ubicacion,
+      nivel,
+      evidencia_url: form.evidencia_url.trim() || null,
+      impacto_economico: form.impacto_economico.trim() || null
     };
 
     const { error } = await crearIncidente(payload, user);
@@ -34,10 +46,9 @@ export default function ReportarIncidente({ user }) {
       descripcion: '',
       nivel: 'bajo',
       tipo: 'seguridad',
-      ubicacion: '',
-      evidenciaRef: '',
-      resolucionRef: '',
-      impactoEconomicoRef: ''
+      ubicacion_texto: '',
+      evidencia_url: '',
+      impacto_economico: ''
     });
   };
 
@@ -66,29 +77,24 @@ export default function ReportarIncidente({ user }) {
           </select>
         </div>
         <div>
-          <label className="text-xs text-app-text-secondary">Ubicación</label>
-          <input className="app-input mt-1" placeholder="Ej: Torre 2 - Lobby" value={form.ubicacion} onChange={e => setForm({ ...form, ubicacion: e.target.value })} />
+          <label className="text-xs text-app-text-secondary">¿Dónde ocurrió?</label>
+          <input className="app-input mt-1" placeholder="Ej: Torre 2 - Lobby" value={form.ubicacion_texto} onChange={e => setForm({ ...form, ubicacion_texto: e.target.value })} />
         </div>
       </div>
 
       <div>
-        <label className="text-xs text-app-text-secondary">Descripción</label>
+        <label className="text-xs text-app-text-secondary">¿Qué ocurrió?</label>
         <textarea className="app-input mt-1 min-h-36" placeholder="Describe qué pasó, quién estuvo involucrado y si hubo evidencia." value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} />
       </div>
 
-      <div className="grid md:grid-cols-3 gap-3">
+      <div className="grid md:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-app-text-secondary">Evidencia (placeholder UI)</label>
-          <textarea className="app-input mt-1 min-h-24" placeholder="Ej: cámara lobby 18:20, foto, testigo..." value={form.evidenciaRef} onChange={e => setForm({ ...form, evidenciaRef: e.target.value })} />
+          <label className="text-xs text-app-text-secondary">Evidencia (opcional)</label>
+          <textarea className="app-input mt-1 min-h-24" placeholder="URL o referencia de evidencia" value={form.evidencia_url} onChange={e => setForm({ ...form, evidencia_url: e.target.value })} />
         </div>
         <div>
-          <label className="text-xs text-app-text-secondary">Resolución (placeholder UI)</label>
-          <textarea className="app-input mt-1 min-h-24" placeholder="Ej: escalar comité, llamado, cierre..." value={form.resolucionRef} onChange={e => setForm({ ...form, resolucionRef: e.target.value })} />
-        </div>
-        <div>
-          <label className="text-xs text-app-text-secondary">Impacto económico (placeholder UI)</label>
-          <input className="app-input mt-1" placeholder="Ej: 250000 COP (estimado)" value={form.impactoEconomicoRef} onChange={e => setForm({ ...form, impactoEconomicoRef: e.target.value })} />
-          <p className="text-[11px] text-app-text-secondary mt-1">Referencia visual para futura lógica administrativa.</p>
+          <label className="text-xs text-app-text-secondary">Impacto económico estimado (opcional)</label>
+          <input className="app-input mt-1" placeholder="Ej: 250000 COP (estimado)" value={form.impacto_economico} onChange={e => setForm({ ...form, impacto_economico: e.target.value })} />
         </div>
       </div>
 
