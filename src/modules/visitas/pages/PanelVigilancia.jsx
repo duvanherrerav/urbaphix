@@ -342,6 +342,18 @@ export default function PanelVigilancia({ usuarioApp }) {
                 </div>
             </div>
 
+            {resumen.pendientes > 0 && vista !== 'pendientes' && (
+                <div className="app-surface-muted p-3 border border-state-warning/40 rounded-xl flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-state-warning font-semibold">Hay {resumen.pendientes} visitas pendientes por validar.</p>
+                    <button
+                        className="app-btn-secondary text-xs"
+                        onClick={() => { setVista('pendientes'); setPagina(1); }}
+                    >
+                        Ver pendientes
+                    </button>
+                </div>
+            )}
+
             <div className="app-surface-muted p-3 grid md:grid-cols-4 gap-2 text-sm">
                 <div className="rounded-lg app-surface-muted px-3 py-2"><b>SLA promedio:</b> {sla.promedioMinutos} min</div>
                 <div className="rounded-lg app-surface-muted px-3 py-2"><b>Demoras &gt;15m:</b> {sla.demoras}</div>
@@ -458,15 +470,6 @@ export default function PanelVigilancia({ usuarioApp }) {
                         </button>
                     </div>
                 </div>
-            )}
-
-            {resumen.pendientes > 0 && vista !== 'pendientes' && (
-                <button
-                    className="fixed bottom-8 right-8 app-btn-secondary text-xs"
-                    onClick={() => { setVista('pendientes'); setPagina(1); }}
-                >
-                    🔔 Ver pendientes ({resumen.pendientes})
-                </button>
             )}
 
             {modalIngreso.open && modalIngreso.visita && (
