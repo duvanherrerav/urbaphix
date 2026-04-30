@@ -11,8 +11,7 @@ import {
   getAccionEstado,
   getEstadoActual,
   getEstadoLabel,
-  getRadicadoAmigable,
-  parseDescripcionIncidente
+  getRadicadoAmigable
 } from '../utils/incidenteUI';
 
 const formatBogota = (value, localEpoch) => {
@@ -37,6 +36,8 @@ export default function ListaIncidentes({ usuarioApp }) {
   const [fechasLocal, setFechasLocal] = useState({});
   const [pagina, setPagina] = useState(1);
   const PAGE_SIZE = 5;
+
+  const getEstadoVisible = (incidente) => incidente.estado || getEstadoActual(estadosLocal, incidente.id);
 
   useEffect(() => {
     const cargar = async () => {
@@ -70,26 +71,32 @@ export default function ListaIncidentes({ usuarioApp }) {
   const lista = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
     const filtered = incidentes.filter((incidente) => {
-      const estadoActual = getEstadoActual(estadosLocal, incidente.id);
-      const parsed = parseDescripcionIncidente(incidente.descripcion);
+      const estadoActual = getEstadoVisible(incidente);
+      const tipo = incidente.tipo || 'seguridad';
+      const tipoLabel = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+      const ubicacion = incidente.ubicacion_texto || null;
+      const descripcion = (incidente.descripcion || '').trim() || 'Sin descripción';
       const matchEstado = filtroEstado === 'todos' ? true : estadoActual === filtroEstado;
       const matchBusqueda = !term
-        || parsed.descripcionLimpia.toLowerCase().includes(term)
-        || parsed.categoriaLabel.toLowerCase().includes(term)
+        || descripcion.toLowerCase().includes(term)
+        || tipoLabel.toLowerCase().includes(term)
+        || (ubicacion || '').toLowerCase().includes(term)
         || (incidente.nivel || '').toLowerCase().includes(term)
         || getEstadoLabel(estadoActual).toLowerCase().includes(term);
       return matchEstado && matchBusqueda;
     });
 
     return filtered.sort((a, b) => {
-      const ea = getEstadoActual(estadosLocal, a.id);
-      const eb = getEstadoActual(estadosLocal, b.id);
+      const ea = getEstadoVisible(a);
+      const eb = getEstadoVisible(b);
       if (ea === 'cerrado' && eb !== 'cerrado') return 1;
       if (ea !== 'cerrado' && eb === 'cerrado') return -1;
       const pa = PRIORIDAD_ORDEN[a.nivel] ?? 99;
       const pb = PRIORIDAD_ORDEN[b.nivel] ?? 99;
       if (pa !== pb) return pa - pb;
-      return 0;
+      const da = new Date(a.created_at || 0).getTime();
+      const db = new Date(b.created_at || 0).getTime();
+      return db - da;
     });
   }, [incidentes, estadosLocal, filtroEstado, busqueda]);
 
@@ -100,8 +107,8 @@ export default function ListaIncidentes({ usuarioApp }) {
   const resumen = {
     total: lista.length,
     alto: lista.filter((incidente) => incidente.nivel === 'alto').length,
-    enGestion: lista.filter((incidente) => getEstadoActual(estadosLocal, incidente.id) === 'en_gestion').length,
-    cerrados: lista.filter((incidente) => getEstadoActual(estadosLocal, incidente.id) === 'cerrado').length
+    enGestion: lista.filter((incidente) => getEstadoVisible(incidente) === 'en_gestion').length,
+    cerrados: lista.filter((incidente) => getEstadoVisible(incidente) === 'cerrado').length
   };
 
   return (
@@ -128,8 +135,16 @@ export default function ListaIncidentes({ usuarioApp }) {
       </div>
 
       {listaPaginada.map((incidente) => {
-        const estadoActual = getEstadoActual(estadosLocal, incidente.id);
-        const parsed = parseDescripcionIncidente(incidente.descripcion);
+        const estadoActual = getEstadoVisible(incidente);
+        const tipo = incidente.tipo || 'seguridad';
+        const tipoLabel = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+        const tipoClass = tipo === 'convivencia'
+          ? 'app-badge-warning'
+          : tipo === 'infraestructura' || tipo === 'acceso'
+            ? 'app-badge-info'
+            : 'app-badge-error';
+        const descripcion = (incidente.descripcion || '').trim() || 'Sin descripción';
+        const ubicacion = incidente.ubicacion_texto || null;
         const accion = getAccionEstado(estadoActual);
 
         return (
@@ -137,18 +152,18 @@ export default function ListaIncidentes({ usuarioApp }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2 flex-1 min-w-[220px]">
                 <div className="flex flex-wrap gap-2 items-center">
-                  <span className={`app-badge ${parsed.categoriaClass}`}>{parsed.categoriaLabel}</span>
+                  <span className={`app-badge ${tipoClass}`}>{tipoLabel}</span>
                   <span className={`app-badge ${NIVEL_BADGE_CLASS[incidente.nivel] || 'app-badge-info'}`}>Prioridad {NIVEL_LABEL[incidente.nivel] || 'Baja'}</span>
                   <span className={`app-badge ${ESTADO_BADGE_CLASS[estadoActual] || 'app-badge-warning'}`}>{getEstadoLabel(estadoActual)}</span>
                 </div>
-                <p className="font-medium leading-relaxed">{parsed.descripcionLimpia}</p>
+                <p className="font-medium leading-relaxed">{descripcion}</p>
               </div>
             </div>
 
             <div className="grid md:grid-cols-3 gap-2 text-sm">
-              <p className="text-app-text-secondary">Radicado: <span className="font-semibold text-app-text-primary">{getRadicadoAmigable(incidente.id)}</span></p>
+              <p className="text-app-text-secondary">Radicado: <span className="inline-flex rounded-md bg-app-bg border border-app-border px-2 py-0.5 font-mono font-bold tracking-wide text-app-text-primary">{getRadicadoAmigable(incidente.id)}</span></p>
               <p className="text-app-text-secondary">Reporte: {formatBogota(incidente.created_at, fechasLocal[incidente.id])}</p>
-              <p className="text-app-text-secondary md:text-right">{parsed.ubicacion ? `Ubicación: ${parsed.ubicacion}` : 'Ubicación no registrada'}</p>
+              <p className="text-app-text-secondary md:text-right">{ubicacion ? `Ubicación: ${ubicacion}` : 'Ubicación no registrada'}</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-2 text-xs">
@@ -172,8 +187,14 @@ export default function ListaIncidentes({ usuarioApp }) {
                 <p className="text-xs text-app-text-secondary mb-2">Siguiente acción</p>
                 <div className="flex flex-wrap gap-2 items-center justify-between">
                   <p className="text-xs text-app-text-secondary">Paso actual: <span className="font-semibold text-app-text-primary">{getEstadoLabel(estadoActual)}</span></p>
-                  <button className="app-btn-primary text-xs" onClick={() => cambiarEstado(incidente, accion.estadoDestino)}>{accion.label}</button>
+                  <p className="text-xs text-app-text-secondary">Acción recomendada: <span className="font-semibold text-app-text-primary">{accion ? accion.label : 'Sin acciones'}</span></p>
+                  {accion && <button className="app-btn-primary text-xs" onClick={() => cambiarEstado(incidente, accion.estadoDestino)}>{accion.label}</button>}
                 </div>
+              </div>
+            )}
+            {usuarioApp?.rol_id === 'admin' && !accion && (
+              <div className="app-surface-primary p-3">
+                <p className="text-xs text-app-text-secondary">Acción recomendada: <span className="font-semibold text-app-text-primary">Sin acciones</span></p>
               </div>
             )}
           </div>
