@@ -43,6 +43,9 @@ export default function ListaIncidentes({ usuarioApp }) {
   const [editingIncidenteId, setEditingIncidenteId] = useState(null);
   const [editForm, setEditForm] = useState({ resolucion: '', impacto_economico: '', evidencia_url: '', estado: 'nuevo' });
   const [savingGestion, setSavingGestion] = useState(false);
+  const [gestionError, setGestionError] = useState('');
+  const [gestionSuccess, setGestionSuccess] = useState('');
+  const [editFieldErrors, setEditFieldErrors] = useState({});
   const PAGE_SIZE = 5;
 
   const getEstadoVisible = (incidente) => incidente.estado || getEstadoActual(estadosLocal, incidente.id);
@@ -77,48 +80,76 @@ export default function ListaIncidentes({ usuarioApp }) {
       evidencia_url: incidente.evidencia_url || '',
       estado: estadoDestino || estadoActual
     });
+    setGestionError('');
+    setGestionSuccess('');
+    setEditFieldErrors({});
   };
 
   const cancelarEdicion = () => {
     setEditingIncidenteId(null);
     setEditForm({ resolucion: '', impacto_economico: '', evidencia_url: '', estado: 'nuevo' });
+    setGestionError('');
+    setEditFieldErrors({});
   };
 
   const guardarGestion = async (incidente) => {
     const estadoActual = getEstadoVisible(incidente);
     const estadoDestino = editForm.estado || estadoActual;
     const resolucion = editForm.resolucion.trim();
+    const evidencia = editForm.evidencia_url.trim();
+    const errores = {};
+
+    if (evidencia && !/^https?:\/\//i.test(evidencia)) {
+      errores.evidencia_url = 'Debe iniciar con http:// o https://';
+    }
 
     if ((estadoDestino === 'resuelto' || estadoDestino === 'cerrado') && !resolucion) {
-      toast.error('La resolución es obligatoria para cerrar o resolver el incidente');
+      errores.resolucion = 'La resolución es obligatoria para esta acción';
+    }
+
+    if (Object.keys(errores).length > 0) {
+      setEditFieldErrors(errores);
+      setGestionError('Revisa los campos obligatorios antes de guardar.');
       return;
     }
+    setEditFieldErrors({});
 
     if (estadoDestino !== estadoActual && !['nuevo', 'en_gestion', 'resuelto', 'cerrado'].includes(estadoDestino)) {
       toast.error('Estado inválido');
       return;
     }
 
+    const accionCritica = estadoDestino === 'resuelto' ? 'marcar como resuelto' : estadoDestino === 'cerrado' ? 'cerrar' : null;
+    if (accionCritica) {
+      const confirmed = window.confirm(`¿Confirmas ${accionCritica} este incidente?`);
+      if (!confirmed) return;
+    }
+
+    setGestionError('');
     setSavingGestion(true);
     const { ok, error } = await actualizarGestionIncidente({
       incidenteId: incidente.id,
       resolucion,
       impacto_economico: editForm.impacto_economico.trim(),
-      evidencia_url: editForm.evidencia_url.trim(),
+      evidencia_url: evidencia,
       estado: estadoDestino
     });
     setSavingGestion(false);
 
-    if (!ok) return toast.error(error);
+    if (!ok) {
+      setGestionError(error || 'No se pudo guardar la gestión del incidente.');
+      return toast.error(error);
+    }
 
     setIncidentes((prev) => prev.map((item) => (item.id === incidente.id ? {
       ...item,
       resolucion: resolucion || null,
       impacto_economico: editForm.impacto_economico.trim() || null,
-      evidencia_url: editForm.evidencia_url.trim() || null,
+      evidencia_url: evidencia || null,
       estado: estadoDestino
     } : item)));
     setEstadosLocal(obtenerEstadosIncidentesLocal());
+    setGestionSuccess(`Cambios guardados para ${getRadicadoAmigable(incidente.id)}.`);
     cancelarEdicion();
     toast.success('Gestión del incidente actualizada');
   };
@@ -206,7 +237,7 @@ export default function ListaIncidentes({ usuarioApp }) {
         const enEdicion = editingIncidenteId === incidente.id;
 
         return (
-          <div key={incidente.id} className={`app-surface-muted p-4 space-y-3 border-l-4 ${incidente.nivel === 'alto' ? 'border-l-state-error' : incidente.nivel === 'medio' ? 'border-l-state-warning' : 'border-l-brand-primary/40'}`}>
+          <div key={incidente.id} className={`app-surface-muted p-4 space-y-3 border-l-4 ${incidente.nivel === 'alto' ? 'border-l-state-error' : incidente.nivel === 'medio' ? 'border-l-state-warning' : 'border-l-brand-primary/40'} ${enEdicion ? 'ring-1 ring-brand-primary/70 bg-app-bg/40' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2 flex-1 min-w-[220px]">
                 <div className="flex flex-wrap gap-2 items-center">
@@ -276,14 +307,18 @@ export default function ListaIncidentes({ usuarioApp }) {
             )}
             {usuarioApp?.rol_id === 'admin' && enEdicion && (
               <div className="app-surface-primary p-3 space-y-2">
+                <div className="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold app-badge-info">Editando incidente</div>
                 <p className="text-xs text-app-text-secondary">Cambiar estado</p>
                 <div className="flex flex-wrap gap-2">
                   {estadoActual === 'nuevo' && <button className={`app-btn-ghost text-xs ${editForm.estado === 'en_gestion' ? 'ring-1 ring-brand-primary' : ''}`} onClick={() => setEditForm((prev) => ({ ...prev, estado: 'en_gestion' }))}>Iniciar gestión</button>}
                   {estadoActual === 'en_gestion' && <button className={`app-btn-ghost text-xs ${editForm.estado === 'resuelto' ? 'ring-1 ring-brand-primary' : ''}`} onClick={() => setEditForm((prev) => ({ ...prev, estado: 'resuelto' }))}>Marcar como resuelto</button>}
                   {estadoActual === 'resuelto' && <button className={`app-btn-ghost text-xs ${editForm.estado === 'cerrado' ? 'ring-1 ring-brand-primary' : ''}`} onClick={() => setEditForm((prev) => ({ ...prev, estado: 'cerrado' }))}>Cerrar incidente</button>}
                 </div>
+                {editFieldErrors.resolucion && <p className="text-xs text-state-error">{editFieldErrors.resolucion}</p>}
+                {editFieldErrors.evidencia_url && <p className="text-xs text-state-error">{editFieldErrors.evidencia_url}</p>}
+                {gestionError && <p className="text-xs text-state-error">{gestionError}</p>}
                 <div className="flex gap-2">
-                  <button className="app-btn-primary text-xs" disabled={savingGestion} onClick={() => guardarGestion(incidente)}>Guardar cambios</button>
+                  <button className="app-btn-primary text-xs" disabled={savingGestion} onClick={() => guardarGestion(incidente)}>{savingGestion ? 'Guardando...' : 'Guardar cambios'}</button>
                   <button className="app-btn-ghost text-xs" disabled={savingGestion} onClick={cancelarEdicion}>Cancelar</button>
                 </div>
               </div>
@@ -292,7 +327,9 @@ export default function ListaIncidentes({ usuarioApp }) {
         );
       })}
 
-      {lista.length === 0 && <p className="text-sm text-app-text-secondary">Sin incidentes para el filtro seleccionado.</p>}
+      {gestionSuccess && <p className="text-xs text-state-success">{gestionSuccess}</p>}
+      {incidentes.length === 0 && <p className="text-sm text-app-text-secondary">No hay incidentes registrados para este conjunto.</p>}
+      {incidentes.length > 0 && lista.length === 0 && <p className="text-sm text-app-text-secondary">No se encontraron incidentes con los filtros aplicados.</p>}
       {
         lista.length > 0 && (
           <div className="flex items-center justify-between pt-2">
