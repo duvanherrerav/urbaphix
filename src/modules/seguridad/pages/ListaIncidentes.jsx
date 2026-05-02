@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
-import { actualizarEstadoIncidente, obtenerEstadosIncidentesLocal, obtenerFechasIncidentesLocal } from '../services/seguridadService';
+import {
+  actualizarGestionIncidente,
+  obtenerEstadosIncidentesLocal,
+  obtenerFechasIncidentesLocal
+} from '../services/seguridadService';
 import {
   ESTADOS_INCIDENCIA,
   ESTADO_BADGE_CLASS,
@@ -36,6 +40,9 @@ export default function ListaIncidentes({ usuarioApp }) {
   const [estadosLocal, setEstadosLocal] = useState({});
   const [fechasLocal, setFechasLocal] = useState({});
   const [pagina, setPagina] = useState(1);
+  const [editingIncidenteId, setEditingIncidenteId] = useState(null);
+  const [editForm, setEditForm] = useState({ resolucion: '', impacto_economico: '', evidencia_url: '', estado: 'nuevo' });
+  const [savingGestion, setSavingGestion] = useState(false);
   const PAGE_SIZE = 5;
 
   const getEstadoVisible = (incidente) => incidente.estado || getEstadoActual(estadosLocal, incidente.id);
@@ -61,12 +68,59 @@ export default function ListaIncidentes({ usuarioApp }) {
     return () => supabase.removeChannel(channel);
   }, [usuarioApp?.conjunto_id]);
 
-  const cambiarEstado = async (incidente, estadoDestino) => {
-    const estadoActual = getEstadoActual(estadosLocal, incidente.id);
-    const { ok, error } = await actualizarEstadoIncidente({ incidenteId: incidente.id, estado: estadoDestino, usuarioId: usuarioApp?.id, estadoActual });
+  const iniciarEdicion = (incidente, estadoDestino = null) => {
+    const estadoActual = getEstadoVisible(incidente);
+    setEditingIncidenteId(incidente.id);
+    setEditForm({
+      resolucion: incidente.resolucion || '',
+      impacto_economico: incidente.impacto_economico || '',
+      evidencia_url: incidente.evidencia_url || '',
+      estado: estadoDestino || estadoActual
+    });
+  };
+
+  const cancelarEdicion = () => {
+    setEditingIncidenteId(null);
+    setEditForm({ resolucion: '', impacto_economico: '', evidencia_url: '', estado: 'nuevo' });
+  };
+
+  const guardarGestion = async (incidente) => {
+    const estadoActual = getEstadoVisible(incidente);
+    const estadoDestino = editForm.estado || estadoActual;
+    const resolucion = editForm.resolucion.trim();
+
+    if ((estadoDestino === 'resuelto' || estadoDestino === 'cerrado') && !resolucion) {
+      toast.error('La resolución es obligatoria para cerrar o resolver el incidente');
+      return;
+    }
+
+    if (estadoDestino !== estadoActual && !['nuevo', 'en_gestion', 'resuelto', 'cerrado'].includes(estadoDestino)) {
+      toast.error('Estado inválido');
+      return;
+    }
+
+    setSavingGestion(true);
+    const { ok, error } = await actualizarGestionIncidente({
+      incidenteId: incidente.id,
+      resolucion,
+      impacto_economico: editForm.impacto_economico.trim(),
+      evidencia_url: editForm.evidencia_url.trim(),
+      estado: estadoDestino
+    });
+    setSavingGestion(false);
+
     if (!ok) return toast.error(error);
+
+    setIncidentes((prev) => prev.map((item) => (item.id === incidente.id ? {
+      ...item,
+      resolucion: resolucion || null,
+      impacto_economico: editForm.impacto_economico.trim() || null,
+      evidencia_url: editForm.evidencia_url.trim() || null,
+      estado: estadoDestino
+    } : item)));
     setEstadosLocal(obtenerEstadosIncidentesLocal());
-    toast.success(`Incidente actualizado a ${getEstadoLabel(estadoDestino)}`);
+    cancelarEdicion();
+    toast.success('Gestión del incidente actualizada');
   };
 
   const lista = useMemo(() => {
@@ -149,6 +203,7 @@ export default function ListaIncidentes({ usuarioApp }) {
         const descripcion = parsedLegacy.descripcionLimpia;
         const ubicacion = incidente.ubicacion_texto || parsedLegacy.ubicacion || null;
         const accion = getAccionEstado(estadoActual);
+        const enEdicion = editingIncidenteId === incidente.id;
 
         return (
           <div key={incidente.id} className={`app-surface-muted p-4 space-y-3 border-l-4 ${incidente.nivel === 'alto' ? 'border-l-state-error' : incidente.nivel === 'medio' ? 'border-l-state-warning' : 'border-l-brand-primary/40'}`}>
@@ -172,32 +227,65 @@ export default function ListaIncidentes({ usuarioApp }) {
             <div className="grid md:grid-cols-3 gap-2 text-xs">
               <div className="app-surface-primary p-2">
                 <p className="text-app-text-secondary">Evidencia</p>
-                <p className="text-app-text-secondary mt-1">{incidente.evidencia_url ? 'Registrada' : 'No registrada'}</p>
-                {incidente.evidencia_url && <a href={incidente.evidencia_url} target="_blank" rel="noreferrer" className="text-brand-secondary">Ver evidencia</a>}
+                {!enEdicion && (
+                  <>
+                    <p className="text-app-text-secondary mt-1">{incidente.evidencia_url ? 'Registrada' : 'No registrada'}</p>
+                    {incidente.evidencia_url && <a href={incidente.evidencia_url} target="_blank" rel="noreferrer" className="text-brand-secondary">Ver evidencia</a>}
+                  </>
+                )}
+                {enEdicion && (
+                  <input className="app-input text-xs mt-1" placeholder="https://..." value={editForm.evidencia_url} onChange={(e) => setEditForm((prev) => ({ ...prev, evidencia_url: e.target.value }))} />
+                )}
               </div>
               <div className="app-surface-primary p-2">
                 <p className="text-app-text-secondary">Resolución</p>
-                <p className="text-app-text-secondary mt-1">{incidente.resolucion || 'No registrada'}</p>
+                {!enEdicion && <p className="text-app-text-secondary mt-1">{incidente.resolucion || 'No registrada'}</p>}
+                {enEdicion && (
+                  <textarea className="app-input text-xs mt-1 min-h-20" placeholder="Detalle de resolución" value={editForm.resolucion} onChange={(e) => setEditForm((prev) => ({ ...prev, resolucion: e.target.value }))} />
+                )}
               </div>
               <div className="app-surface-primary p-2">
                 <p className="text-app-text-secondary">Impacto económico</p>
-                <p className="text-app-text-secondary mt-1">{incidente.impacto_economico || 'No registrado'}</p>
+                {!enEdicion && <p className="text-app-text-secondary mt-1">{incidente.impacto_economico || 'No registrado'}</p>}
+                {enEdicion && (
+                  <input className="app-input text-xs mt-1" placeholder="$ 0" value={editForm.impacto_economico} onChange={(e) => setEditForm((prev) => ({ ...prev, impacto_economico: e.target.value }))} />
+                )}
               </div>
             </div>
 
-            {usuarioApp?.rol_id === 'admin' && accion && (
+            {usuarioApp?.rol_id === 'admin' && !enEdicion && accion && (
               <div className="app-surface-primary p-3">
                 <p className="text-xs text-app-text-secondary mb-2">Siguiente acción</p>
                 <div className="flex flex-wrap gap-2 items-center justify-between">
                   <p className="text-xs text-app-text-secondary">Paso actual: <span className="font-semibold text-app-text-primary">{getEstadoLabel(estadoActual)}</span></p>
                   <p className="text-xs text-app-text-secondary">Acción recomendada: <span className="font-semibold text-app-text-primary">{accion ? accion.label : 'Sin acciones'}</span></p>
-                  {accion && <button className="app-btn-primary text-xs" onClick={() => cambiarEstado(incidente, accion.estadoDestino)}>{accion.label}</button>}
+                  <div className="flex gap-2">
+                    {accion && <button className="app-btn-primary text-xs" onClick={() => iniciarEdicion(incidente, accion.estadoDestino)}>{accion.label}</button>}
+                    <button className="app-btn-ghost text-xs" onClick={() => iniciarEdicion(incidente)}>Editar</button>
+                  </div>
                 </div>
               </div>
             )}
-            {usuarioApp?.rol_id === 'admin' && !accion && (
+            {usuarioApp?.rol_id === 'admin' && !enEdicion && !accion && (
               <div className="app-surface-primary p-3">
-                <p className="text-xs text-app-text-secondary">Acción recomendada: <span className="font-semibold text-app-text-primary">Sin acciones</span></p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-app-text-secondary">Acción recomendada: <span className="font-semibold text-app-text-primary">Sin acciones</span></p>
+                  <button className="app-btn-ghost text-xs" onClick={() => iniciarEdicion(incidente)}>Editar</button>
+                </div>
+              </div>
+            )}
+            {usuarioApp?.rol_id === 'admin' && enEdicion && (
+              <div className="app-surface-primary p-3 space-y-2">
+                <p className="text-xs text-app-text-secondary">Cambiar estado</p>
+                <div className="flex flex-wrap gap-2">
+                  {estadoActual === 'nuevo' && <button className={`app-btn-ghost text-xs ${editForm.estado === 'en_gestion' ? 'ring-1 ring-brand-primary' : ''}`} onClick={() => setEditForm((prev) => ({ ...prev, estado: 'en_gestion' }))}>Iniciar gestión</button>}
+                  {estadoActual === 'en_gestion' && <button className={`app-btn-ghost text-xs ${editForm.estado === 'resuelto' ? 'ring-1 ring-brand-primary' : ''}`} onClick={() => setEditForm((prev) => ({ ...prev, estado: 'resuelto' }))}>Marcar como resuelto</button>}
+                  {estadoActual === 'resuelto' && <button className={`app-btn-ghost text-xs ${editForm.estado === 'cerrado' ? 'ring-1 ring-brand-primary' : ''}`} onClick={() => setEditForm((prev) => ({ ...prev, estado: 'cerrado' }))}>Cerrar incidente</button>}
+                </div>
+                <div className="flex gap-2">
+                  <button className="app-btn-primary text-xs" disabled={savingGestion} onClick={() => guardarGestion(incidente)}>Guardar cambios</button>
+                  <button className="app-btn-ghost text-xs" disabled={savingGestion} onClick={cancelarEdicion}>Cancelar</button>
+                </div>
               </div>
             )}
           </div>
