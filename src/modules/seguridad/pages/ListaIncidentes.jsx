@@ -11,6 +11,7 @@ import {
   getAccionEstado,
   getEstadoActual,
   getEstadoLabel,
+  parseDescripcionIncidente,
   getRadicadoAmigable
 } from '../utils/incidenteUI';
 
@@ -72,10 +73,11 @@ export default function ListaIncidentes({ usuarioApp }) {
     const term = busqueda.trim().toLowerCase();
     const filtered = incidentes.filter((incidente) => {
       const estadoActual = getEstadoVisible(incidente);
-      const tipo = incidente.tipo || 'seguridad';
-      const tipoLabel = tipo.charAt(0).toUpperCase() + tipo.slice(1);
-      const ubicacion = incidente.ubicacion_texto || null;
-      const descripcion = (incidente.descripcion || '').trim() || 'Sin descripción';
+      const parsedLegacy = parseDescripcionIncidente(incidente.descripcion);
+      const tipo = incidente.tipo || parsedLegacy.categoria || null;
+      const tipoLabel = tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : 'Sin tipo';
+      const ubicacion = incidente.ubicacion_texto || parsedLegacy.ubicacion || null;
+      const descripcion = parsedLegacy.descripcionLimpia;
       const matchEstado = filtroEstado === 'todos' ? true : estadoActual === filtroEstado;
       const matchBusqueda = !term
         || descripcion.toLowerCase().includes(term)
@@ -136,15 +138,16 @@ export default function ListaIncidentes({ usuarioApp }) {
 
       {listaPaginada.map((incidente) => {
         const estadoActual = getEstadoVisible(incidente);
-        const tipo = incidente.tipo || 'seguridad';
-        const tipoLabel = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+        const parsedLegacy = parseDescripcionIncidente(incidente.descripcion);
+        const tipo = incidente.tipo || parsedLegacy.categoria || null;
+        const tipoLabel = tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : 'Sin tipo';
         const tipoClass = tipo === 'convivencia'
           ? 'app-badge-warning'
           : tipo === 'infraestructura' || tipo === 'acceso'
             ? 'app-badge-info'
             : 'app-badge-error';
-        const descripcion = (incidente.descripcion || '').trim() || 'Sin descripción';
-        const ubicacion = incidente.ubicacion_texto || null;
+        const descripcion = parsedLegacy.descripcionLimpia;
+        const ubicacion = incidente.ubicacion_texto || parsedLegacy.ubicacion || null;
         const accion = getAccionEstado(estadoActual);
 
         return (
@@ -169,16 +172,16 @@ export default function ListaIncidentes({ usuarioApp }) {
             <div className="grid md:grid-cols-3 gap-2 text-xs">
               <div className="app-surface-primary p-2">
                 <p className="text-app-text-secondary">Evidencia</p>
-                <p className="text-app-text-secondary mt-1">{incidente.evidencia_url ? 'Adjunta' : 'Sin evidencia adjunta'}</p>
+                <p className="text-app-text-secondary mt-1">{incidente.evidencia_url ? 'Registrada' : 'No registrada'}</p>
                 {incidente.evidencia_url && <a href={incidente.evidencia_url} target="_blank" rel="noreferrer" className="text-brand-secondary">Ver evidencia</a>}
               </div>
               <div className="app-surface-primary p-2">
                 <p className="text-app-text-secondary">Resolución</p>
-                <p className="text-app-text-secondary mt-1">{incidente.resolucion || 'Pendiente por documentar'}</p>
+                <p className="text-app-text-secondary mt-1">{incidente.resolucion || 'No registrada'}</p>
               </div>
               <div className="app-surface-primary p-2">
                 <p className="text-app-text-secondary">Impacto económico</p>
-                <p className="text-app-text-secondary mt-1">{incidente.impacto_economico || 'Sin estimación económica'}</p>
+                <p className="text-app-text-secondary mt-1">{incidente.impacto_economico || 'No registrado'}</p>
               </div>
             </div>
 

@@ -81,15 +81,16 @@ export const getRadicadoAmigable = (incidenteId) => {
 export const parseDescripcionIncidente = (descripcion = '') => {
   const contenido = String(descripcion || '').trim();
   const matchCategoria = contenido.match(/^\[([^\]]+)\]\s*(.*)$/i);
-  const categoriaKey = matchCategoria?.[1]?.trim().toLowerCase() || 'seguridad';
+  const categoriaKey = matchCategoria?.[1]?.trim().toLowerCase() || null;
   const afterCategoria = (matchCategoria?.[2] || contenido).trim();
   const matchUbicacion = afterCategoria.match(/^\(([^)]+)\)\s*(.*)$/);
+  const descripcionLimpia = (matchUbicacion?.[2] || afterCategoria || contenido).trim();
 
   return {
     categoria: categoriaKey,
-    categoriaLabel: CATEGORIA_LABELS[categoriaKey] || 'Seguridad',
+    categoriaLabel: CATEGORIA_LABELS[categoriaKey] || 'Sin tipo',
     categoriaClass: CATEGORIA_BADGE_CLASS[categoriaKey] || 'app-badge-info',
     ubicacion: matchUbicacion?.[1]?.trim() || null,
-    descripcionLimpia: (matchUbicacion?.[2] || afterCategoria || contenido).trim() || 'Sin descripción'
+    descripcionLimpia: descripcionLimpia || 'Sin descripción'
   };
 };
