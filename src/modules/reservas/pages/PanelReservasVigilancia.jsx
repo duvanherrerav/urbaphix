@@ -48,7 +48,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         const resp = await listarReservas({
             conjunto_id: usuarioApp.conjunto_id,
             estados: ['aprobada', 'en_curso', 'finalizada', 'no_show'],
-            limit: HISTORIAL_PAGE_SIZE,
+            limit: HISTORIAL_PAGE_SIZE + 1,
             offset
         });
 
@@ -56,8 +56,9 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         if (!resp.ok) return toast.error(resp.error);
 
         const data = resp.data || [];
-        setReservas(data);
-        setHasNextHistorial(data.length === HISTORIAL_PAGE_SIZE);
+        const haySiguiente = data.length > HISTORIAL_PAGE_SIZE;
+        setReservas(haySiguiente ? data.slice(0, HISTORIAL_PAGE_SIZE) : data);
+        setHasNextHistorial(haySiguiente);
     };
 
     useEffect(() => {
