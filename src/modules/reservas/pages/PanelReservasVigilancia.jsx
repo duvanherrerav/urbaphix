@@ -214,7 +214,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                                 >
                                     {cargandoNoShow ? obtenerMensajeCargandoAccion('no_show') : 'No asistió'}
                                 </button>
-                                {!evaluacionNoShow.elegible && <p className="w-full text-xs text-app-text-secondary">Aún no cumple tolerancia de 15 min</p>}
+                                {!evaluacionNoShow.elegible && <p className="w-full text-xs text-app-text-secondary">{evaluacionNoShow.motivo}</p>}
                             </div>
                         )}
 
