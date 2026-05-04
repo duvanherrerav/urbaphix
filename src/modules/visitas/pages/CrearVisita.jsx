@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { QRCodeCanvas } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
+import QRShareCard from '../components/QRShareCard';
 
 export default function CrearVisita({ usuarioApp }) {
   const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
@@ -22,12 +22,15 @@ export default function CrearVisita({ usuarioApp }) {
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [loading, setLoading] = useState(false);
   const [qrPayload, setQrPayload] = useState(null);
+  const [qrMetadata, setQrMetadata] = useState({ visitanteNombre: '', fechaVisita: '' });
   const [residenteId, setResidenteId] = useState(null);
+  const [resumenOpen, setResumenOpen] = useState(false);
   const [historial, setHistorial] = useState([]);
   const [filtroHistorial, setFiltroHistorial] = useState('todos');
   const [busquedaFrecuentes, setBusquedaFrecuentes] = useState('');
   const [paginaFrecuentes, setPaginaFrecuentes] = useState(1);
   const qrWrapRef = useRef(null);
+  const qrSectionRef = useRef(null);
   const toastTiposShownRef = useRef(false);
 
   useEffect(() => {
@@ -139,8 +142,8 @@ export default function CrearVisita({ usuarioApp }) {
     return { ok: true, mensaje: '' };
   }, [form.tipoVehiculo, form.placa]);
   const erroresFormulario = useMemo(() => ({
-    nombre: !form.nombre.trim() ? 'Ingresa el nombre del visitante.' : '',
-    documento: !form.documento.trim() ? 'Ingresa el número de documento.' : '',
+    nombre: !form.nombre.trim() ? 'Ingresa el nombre del visitante' : '',
+    documento: !form.documento.trim() ? 'Ingresa el documento del visitante' : '',
     fecha: !form.fecha ? 'Selecciona la fecha de la visita.' : ''
   }), [form.nombre, form.documento, form.fecha]);
   const visitantesSugeridos = useMemo(() => {
@@ -181,7 +184,7 @@ export default function CrearVisita({ usuarioApp }) {
     }
     if (form.fecha < hoyBogota()) {
       setTouched((prev) => ({ ...prev, fecha: true }));
-      toast.error('No puedes crear una visita para una fecha pasada.');
+      toast.error('La fecha no puede ser anterior a hoy');
       return;
     }
 
@@ -236,26 +239,38 @@ export default function CrearVisita({ usuarioApp }) {
 
     const payload = JSON.stringify({ visita_id: visita.id, qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
-    toast.success('Visita creada. QR listo para compartir ✅');
+    setQrMetadata({ visitanteNombre: nombreLimpio, fechaVisita: form.fecha });
+    toast.success('Visita registrada correctamente');
     setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: hoyBogota(), tipoVehiculo: '', placa: '' }));
     setTouched({ nombre: false, documento: false, fecha: false });
     if (residenteId) cargarHistorial(residenteId);
+    requestAnimationFrame(() => qrWrapRef.current?.focus() || qrSectionRef.current?.focus());
   };
 
   const compartirCodigoQR = async () => {
     if (!qrPayload) return;
-    const texto = `Te comparto tu acceso de visita Urbaphix:\n${qrPayload}`;
+    const texto = `Te comparto tu código de ingreso Urbaphix:\n${qrPayload}`;
 
     try {
       if (navigator.share) {
         await navigator.share({ title: 'QR de visita', text: texto });
-        toast.success('Código QR compartido');
+        toast.success('Código compartido');
         return;
       }
       await navigator.clipboard.writeText(texto);
-      toast.success('Código QR copiado para compartir.');
+      toast.success('Código copiado');
     } catch (error) {
       toast.error(`No se pudo compartir el QR: ${error?.message || 'error inesperado'}`);
+    }
+  };
+
+  const copiarCodigo = async () => {
+    if (!qrPayload) return;
+    try {
+      await navigator.clipboard.writeText(qrPayload);
+      toast.success('Código copiado');
+    } catch (error) {
+      toast.error(`No se pudo copiar el código: ${error?.message || 'error inesperado'}`);
     }
   };
 
@@ -285,6 +300,10 @@ export default function CrearVisita({ usuarioApp }) {
   const setQRDesdeHistorial = (item) => {
     const payload = JSON.stringify({ visita_id: item.id, qr_code: item.qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
+    setQrMetadata({
+      visitanteNombre: normalizarNombre(item.nombre_visitante || ''),
+      fechaVisita: item.fecha_visita || ''
+    });
   };
 
   const reutilizarVisita = (item) => {
@@ -318,10 +337,10 @@ export default function CrearVisita({ usuarioApp }) {
     <div className="app-surface-primary p-6 space-y-5 max-w-2xl">
       <div>
         <h2 className="text-2xl font-bold">Solicitar visita 🚶‍♂️</h2>
-        <p className="text-sm text-app-text-secondary">Registra tu visita y comparte el QR para ingreso en portería.</p>
+        <p className="text-sm text-app-text-secondary">Completa los datos y genera un código para el ingreso en portería.</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-3">
+      <section className="app-surface-muted p-4 space-y-3"><h3 className="font-semibold">Datos del visitante</h3><div className="grid md:grid-cols-2 gap-3">
         <input
           className="app-input"
           placeholder="Nombre visitante"
@@ -376,8 +395,8 @@ export default function CrearVisita({ usuarioApp }) {
           onChange={(e) => setForm({ ...form, fecha: e.target.value })}
           onBlur={() => setTouched((prev) => ({ ...prev, fecha: true }))}
         />
-      </div>
-      {quickFrecuentes.length > 0 && (
+      </div><p className="text-xs text-app-text-secondary">Documento del visitante para control en portería</p></section>
+      <section className="app-surface-muted p-4 space-y-3"><h3 className="font-semibold">Detalles de la visita</h3><p className="text-xs text-app-text-secondary">Selecciona el día en que llegará tu visita</p>{quickFrecuentes.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-app-text-secondary">Accesos rápidos de visitantes frecuentes</p>
           <div className="flex flex-wrap gap-2">
@@ -400,7 +419,9 @@ export default function CrearVisita({ usuarioApp }) {
         <div>{touched.fecha && erroresFormulario.fecha && <p className="text-xs text-state-error">{erroresFormulario.fecha}</p>}</div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-3 items-start">
+      </section>
+
+      <section className="app-surface-muted p-4 space-y-3"><h3 className="font-semibold">Vehículo (opcional)</h3><div className="grid md:grid-cols-2 gap-3 items-start">
         <select
           className="app-input w-full"
           value={form.tipoVehiculo}
@@ -423,33 +444,55 @@ export default function CrearVisita({ usuarioApp }) {
         {form.tipoVehiculo && form.placa && !validacionPlaca.ok && (
           <p className="text-xs text-state-error">{validacionPlaca.mensaje}</p>
         )}
-      </div>
+      </div></section>
 
-      <button
-        onClick={crearVisita}
+      <section className="app-surface-muted p-4"><h3 className="font-semibold mb-3">Acción</h3><button
+        onClick={() => {
+          const nombreLimpio = normalizarNombre(form.nombre);
+          const documentoLimpio = normalizarDocumento(form.documento);
+          if (!nombreLimpio || !documentoLimpio || !form.fecha || !form.tipo_documento) {
+            setTouched({ nombre: true, documento: true, fecha: true });
+            toast('Completa los campos obligatorios ⚠️');
+            return;
+          }
+          if (form.fecha < hoyBogota()) {
+            setTouched((prev) => ({ ...prev, fecha: true }));
+            toast.error('La fecha no puede ser anterior a hoy');
+            return;
+          }
+          if (form.tipoVehiculo && !validacionPlaca.ok) {
+            toast.error(validacionPlaca.mensaje);
+            return;
+          }
+          setResumenOpen(true);
+        }}
         disabled={loading}
         className="btn-primary w-full py-3 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.25)]"
       >
-        {loading ? 'Creando...' : 'Crear visita y generar QR'}
-      </button>
+{loading ? 'Generando...' : 'Generar código de ingreso'}
+      </button></section>
 
-      {qrPayload && (
-        <div ref={qrWrapRef} className="app-surface-muted p-4 space-y-3">
-          <h3 className="font-semibold">QR validable en portería 🔐</h3>
-          <p className="text-xs text-app-text-secondary">Portería puede validar este QR escaneando o pegando el código manual.</p>
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <QRCodeCanvas value={qrPayload} size={180} />
-            <div className="space-y-2">
-              <button className="w-full app-btn-secondary" onClick={compartirCodigoQR}>Compartir código QR</button>
-              <button className="w-full btn-primary" onClick={compartirImagenQR}>Compartir QR</button>
-            </div>
+      {resumenOpen && (
+        <div className="app-surface-muted p-4 space-y-3 border border-brand-primary/30">
+          <h3 className="font-semibold">Resumen de la visita</h3>
+          <p className="text-sm"><b>Nombre:</b> {normalizarNombre(form.nombre)}</p>
+          <p className="text-sm"><b>Documento:</b> {form.tipo_documento} {normalizarDocumento(form.documento)}</p>
+          <p className="text-sm"><b>Fecha:</b> {form.fecha}</p>
+          <p className="text-sm"><b>Vehículo:</b> {form.tipoVehiculo ? `${form.tipoVehiculo} ${form.placa || ''}` : 'Sin vehículo'}</p>
+          <div className="flex gap-2">
+            <button className="btn-primary" onClick={() => { setResumenOpen(false); crearVisita(); }}>Confirmar y generar código</button>
+            <button className="app-btn-secondary" onClick={() => setResumenOpen(false)}>Editar</button>
           </div>
         </div>
       )}
 
+      {qrPayload && (
+        <div ref={qrSectionRef}><QRShareCard qrValue={qrPayload} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
+      )}
+
       <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Visitantes frecuentes</h3>
+          <h3 className="font-semibold">Visitas recientes</h3>
           <span className="text-xs text-app-text-secondary">{historialFiltrado.length} registros</span>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
@@ -485,15 +528,15 @@ export default function CrearVisita({ usuarioApp }) {
               {item.placa && <p className="text-app-text-secondary">Placa: {item.placa}</p>}
               <div className="flex flex-wrap gap-2 mt-2">
                 {normalizarEstado(item.estado) === 'pendiente' && (
-                  <button className="app-btn-ghost text-xs" onClick={() => setQRDesdeHistorial(item)}>Reenviar QR</button>
+                  <button className="app-btn-ghost text-xs" onClick={() => setQRDesdeHistorial(item)}>Reenviar código</button>
                 )}
                 {normalizarEstado(item.estado) === 'salido' && (
-                  <button className="app-btn-ghost text-xs" onClick={() => reutilizarVisita(item)}>Crear nueva visita con estos datos</button>
+                  <button className="app-btn-ghost text-xs" onClick={() => reutilizarVisita(item)}>Usar nuevamente</button>
                 )}
               </div>
             </div>
           ))}
-          {historialBuscado.length === 0 && <p className="text-sm text-app-text-secondary">No hay visitas para este filtro.</p>}
+          {historialBuscado.length === 0 && <p className="text-sm text-app-text-secondary">Aún no has registrado visitas. Cuando crees una visita aparecerá aquí para reutilizarla fácilmente</p>}
         </div>
         {historialBuscado.length > 0 && (
           <div className="flex items-center justify-between text-xs">
