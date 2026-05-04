@@ -13,6 +13,7 @@ import { getReservaResidenteLabel, getReservaTorreAptoLabel } from '../utils/res
 export default function PanelReservasVigilancia({ usuarioApp }) {
     const [reservas, setReservas] = useState([]);
     const [filtroEstado, setFiltroEstado] = useState('operativas');
+    const [expandedReservaId, setExpandedReservaId] = useState(null);
 
     const cargar = async () => {
         if (!usuarioApp?.conjunto_id) return;
@@ -32,14 +33,14 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         return subscribeReservasConjunto(usuarioApp.conjunto_id, () => cargar());
     }, [usuarioApp?.conjunto_id, filtroEstado]);
 
-    const estadoLabel = (estado) => (estado === 'no_show' ? 'No asistió' : estado);
-    const estadoPostReserva = (estado) => {
-        if (estado === 'finalizada') return 'Cierre operativo';
+    const estadoLabel = (estado) => {
+        if (estado === 'aprobada') return 'Lista para ingreso';
+        if (estado === 'en_curso') return 'En uso';
+        if (estado === 'finalizada') return 'Finalizada';
         if (estado === 'no_show') return 'No asistió';
-        if (estado === 'en_curso') return 'En curso';
-        if (estado === 'aprobada') return 'Lista para check-in';
-        return 'Pendiente';
+        return estado;
     };
+
     const resumen = useMemo(() => ({
         operativas: reservas.filter((r) => ['aprobada', 'en_curso'].includes(r.estado)).length,
         finalizadas: reservas.filter((r) => r.estado === 'finalizada').length,
@@ -49,7 +50,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
     const actualizar = async (id, estado, detalle) => {
         const resp = await cambiarEstadoReserva({ reserva_id: id, estado, usuario_id: usuarioApp.id, usuario_rol: usuarioApp.rol_id, detalle });
         if (!resp.ok) return toast.error(resp.error);
-        toast.success(`Reserva ${estadoLabel(estado)}`);
+        toast.success(`Reserva ${estadoLabel(estado).toLowerCase()}`);
         cargar();
     };
 
@@ -58,61 +59,81 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold">Reservas operativas 🛡️</h2>
-                    <p className="text-sm text-app-text-secondary">Control de check-in, check-out y no show desde vigilancia.</p>
+                    <p className="text-sm text-app-text-secondary">Vista de operación para registrar ingresos, salidas y no asistencia.</p>
                 </div>
-                <select className="app-input max-w-56" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
-                    <option value="operativas">Operativas</option>
-                    <option value="historico">Histórico corto</option>
-                </select>
+                <div className="flex items-center gap-2">
+                    <label htmlFor="filtro-reservas-vigilancia" className="text-xs text-app-text-secondary">Vista</label>
+                    <select id="filtro-reservas-vigilancia" className="app-input max-w-56" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                        <option value="operativas">Operativas (atención inmediata)</option>
+                        <option value="historico">Histórico corto (recientes)</option>
+                    </select>
+                </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="app-surface-muted"><span className="text-app-text-secondary">Operativas</span><p className="text-lg font-semibold">{resumen.operativas}</p></div>
-                <div className="app-surface-muted"><span className="text-app-text-secondary">Finalizadas</span><p className="text-lg font-semibold text-state-success">{resumen.finalizadas}</p></div>
-                <div className="app-surface-muted"><span className="text-app-text-secondary">No show</span><p className="text-lg font-semibold text-state-warning">{resumen.noShow}</p></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="app-surface-muted p-2"><span className="text-app-text-secondary">Operativas</span><p className="text-lg font-semibold">{resumen.operativas}</p></div>
+                <div className="app-surface-muted p-2"><span className="text-app-text-secondary">Finalizadas</span><p className="text-lg font-semibold text-state-success">{resumen.finalizadas}</p></div>
+                <div className="app-surface-muted p-2"><span className="text-app-text-secondary">No asistió</span><p className="text-lg font-semibold text-state-warning">{resumen.noShow}</p></div>
             </div>
 
             {reservas.map((r) => {
                 const evaluacionNoShow = evaluarElegibilidadNoShow(r);
+                const detalleExpandido = expandedReservaId === r.id;
+
                 return (
-                    <div key={r.id} className="app-surface-muted p-4 border border-app-border/70 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="font-semibold">{r.recursos_comunes?.nombre || 'Recurso'}</p>
-                            <ReservaStatusBadge estado={r.estado} />
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-2 text-sm">
-                            <p className="text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-                            <p className="text-app-text-secondary md:text-right">{getReservaResidenteLabel(r)} · {getReservaTorreAptoLabel(r)}</p>
-                        </div>
-                        <div className="grid md:grid-cols-3 gap-2 text-xs">
-                            <div className="app-surface-primary p-2">
-                                <p className="text-app-text-secondary">Post-reserva</p>
-                                <p>{estadoPostReserva(r.estado)}</p>
+                    <article key={r.id} className="app-surface-muted p-4 border border-app-border/70 space-y-3 rounded-xl">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <p className="text-lg font-semibold leading-tight">{r.recursos_comunes?.nombre || 'Recurso'}</p>
+                                <p className="text-sm text-app-text-secondary mt-1">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                <p className="text-sm mt-1">{getReservaResidenteLabel(r)}</p>
+                                <p className="text-sm text-app-text-secondary">{getReservaTorreAptoLabel(r)}</p>
                             </div>
-                            <div className="app-surface-primary p-2">
-                                <p className="text-app-text-secondary">Depósito</p>
-                                <p>{r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
-                            </div>
-                            <div className="app-surface-primary p-2">
-                                <p className="text-app-text-secondary">Causal económica</p>
-                                <p>{r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
+                            <div className="flex flex-col items-end gap-2">
+                                <ReservaStatusBadge estado={r.estado} />
+                                <span className="text-xs app-surface-primary px-2 py-1 rounded-md">Estado operativo: {estadoLabel(r.estado)}</span>
                             </div>
                         </div>
 
                         {r.estado === 'aprobada' && (
                             <div className="flex flex-wrap gap-2">
-                                <button className="app-btn-primary text-xs" onClick={() => actualizar(r.id, 'en_curso', 'Check-in por vigilancia')}>Check-in</button>
-                                <button className="app-btn-secondary text-xs disabled:opacity-50" disabled={!evaluacionNoShow.elegible} onClick={() => actualizar(r.id, 'no_show', 'Marcada como no asistió por vigilancia')}>Marcar no asistió</button>
+                                <button className="app-btn-primary text-xs" onClick={() => actualizar(r.id, 'en_curso', 'Check-in por vigilancia')}>Registrar ingreso</button>
+                                <button className="app-btn-secondary text-xs disabled:opacity-50" disabled={!evaluacionNoShow.elegible} onClick={() => actualizar(r.id, 'no_show', 'Marcada como no asistió por vigilancia')}>No asistió</button>
                                 {!evaluacionNoShow.elegible && <p className="w-full text-xs text-app-text-secondary">{evaluacionNoShow.motivo}</p>}
                             </div>
                         )}
 
-                        {r.estado === 'en_curso' && <button className="app-btn-secondary text-xs" onClick={() => actualizar(r.id, 'finalizada', 'Check-out por vigilancia')}>Check-out</button>}
-                    </div>
+                        {r.estado === 'en_curso' && <button className="app-btn-primary text-xs" onClick={() => actualizar(r.id, 'finalizada', 'Check-out por vigilancia')}>Registrar salida</button>}
+
+                        <div className="pt-1">
+                            <button className="text-xs underline text-app-text-secondary hover:text-app-text-primary" onClick={() => setExpandedReservaId(detalleExpandido ? null : r.id)}>
+                                {detalleExpandido ? 'Ocultar detalle' : 'Ver detalle'}
+                            </button>
+                        </div>
+
+                        {detalleExpandido && (
+                            <div className="grid md:grid-cols-2 gap-2 text-xs app-surface-primary p-3 rounded-lg border border-app-border/50">
+                                <div>
+                                    <p className="text-app-text-secondary">Depósito</p>
+                                    <p>{r.deposito_estado || r.metadata?.deposito_estado || 'Sin información registrada'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-app-text-secondary">Causal económica</p>
+                                    <p>{r.causal_economica || r.metadata?.causal_economica || 'Sin información registrada'}</p>
+                                </div>
+                            </div>
+                        )}
+                    </article>
                 );
             })}
 
-            {reservas.length === 0 && <p className="text-sm text-app-text-secondary">No hay reservas en operación.</p>}
+            {reservas.length === 0 && (
+                <p className="text-sm text-app-text-secondary">
+                    {filtroEstado === 'operativas'
+                        ? 'No hay reservas pendientes de atención en este momento.'
+                        : 'No hay reservas recientes para mostrar.'}
+                </p>
+            )}
         </div>
     );
 }
