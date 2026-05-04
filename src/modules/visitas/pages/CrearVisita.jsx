@@ -4,7 +4,16 @@ import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
 import QRShareCard from '../components/QRShareCard';
 
-export default function CrearVisita({ usuarioApp }) {
+
+const formatManualIngresoCode = (qrCode) => {
+  const normalized = String(qrCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!normalized) return '';
+  const base = normalized.slice(-8).padStart(8, '0');
+  return `${base.slice(0, 4)}-${base.slice(4)}`;
+};
+
+
+export default function CrearVisita({ usuarioApp: _usuarioApp }) {
   const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
   const hoyBogota = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
   const fechaHoy = hoyBogota();
@@ -237,8 +246,7 @@ export default function CrearVisita({ usuarioApp }) {
       return;
     }
 
-    const payload = JSON.stringify({ visita_id: visita.id, qr_code, conjunto_id: usuarioApp.conjunto_id });
-    setQrPayload(payload);
+    setQrPayload(qr_code);
     setQrMetadata({ visitanteNombre: nombreLimpio, fechaVisita: form.fecha });
     toast.success('Visita registrada correctamente');
     setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: hoyBogota(), tipoVehiculo: '', placa: '' }));
@@ -249,7 +257,8 @@ export default function CrearVisita({ usuarioApp }) {
 
   const compartirCodigoQR = async () => {
     if (!qrPayload) return;
-    const texto = `Te comparto tu código de ingreso Urbaphix:\n${qrPayload}`;
+    const codigoIngreso = formatManualIngresoCode(qrPayload);
+    const texto = `Urbaphix · Código de ingreso\nCódigo manual: ${codigoIngreso}\nCódigo QR: ${qrPayload}`;
 
     try {
       if (navigator.share) {
@@ -298,8 +307,7 @@ export default function CrearVisita({ usuarioApp }) {
   };
 
   const setQRDesdeHistorial = (item) => {
-    const payload = JSON.stringify({ visita_id: item.id, qr_code: item.qr_code, conjunto_id: usuarioApp.conjunto_id });
-    setQrPayload(payload);
+    setQrPayload(item.qr_code);
     setQrMetadata({
       visitanteNombre: normalizarNombre(item.nombre_visitante || ''),
       fechaVisita: item.fecha_visita || ''
@@ -487,7 +495,7 @@ export default function CrearVisita({ usuarioApp }) {
       )}
 
       {qrPayload && (
-        <div ref={qrSectionRef}><QRShareCard qrValue={qrPayload} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
+        <div ref={qrSectionRef}><QRShareCard qrValue={qrPayload} manualCode={formatManualIngresoCode(qrPayload)} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
       )}
 
       <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20">
