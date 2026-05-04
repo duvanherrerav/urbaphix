@@ -22,6 +22,7 @@ export default function CrearVisita({ usuarioApp }) {
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [loading, setLoading] = useState(false);
   const [qrPayload, setQrPayload] = useState(null);
+  const [qrMetadata, setQrMetadata] = useState({ visitanteNombre: '', fechaVisita: '' });
   const [residenteId, setResidenteId] = useState(null);
   const [resumenOpen, setResumenOpen] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -238,6 +239,7 @@ export default function CrearVisita({ usuarioApp }) {
 
     const payload = JSON.stringify({ visita_id: visita.id, qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
+    setQrMetadata({ visitanteNombre: nombreLimpio, fechaVisita: form.fecha });
     toast.success('Visita registrada correctamente');
     setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: hoyBogota(), tipoVehiculo: '', placa: '' }));
     setTouched({ nombre: false, documento: false, fecha: false });
@@ -298,6 +300,10 @@ export default function CrearVisita({ usuarioApp }) {
   const setQRDesdeHistorial = (item) => {
     const payload = JSON.stringify({ visita_id: item.id, qr_code: item.qr_code, conjunto_id: usuarioApp.conjunto_id });
     setQrPayload(payload);
+    setQrMetadata({
+      visitanteNombre: normalizarNombre(item.nombre_visitante || ''),
+      fechaVisita: item.fecha_visita || ''
+    });
   };
 
   const reutilizarVisita = (item) => {
@@ -481,7 +487,7 @@ export default function CrearVisita({ usuarioApp }) {
       )}
 
       {qrPayload && (
-        <div ref={qrSectionRef}><QRShareCard qrValue={qrPayload} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={normalizarNombre(form.nombre)} fechaVisita={form.fecha} qrWrapRef={qrWrapRef} /></div>
+        <div ref={qrSectionRef}><QRShareCard qrValue={qrPayload} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
       )}
 
       <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20">
