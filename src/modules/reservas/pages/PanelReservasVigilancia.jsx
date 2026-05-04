@@ -10,27 +10,68 @@ import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota } from '../utils/dateTimeBogota';
 import { getReservaResidenteLabel, getReservaTorreAptoLabel } from '../utils/reservaFormatters';
 
+const HISTORIAL_PAGE_SIZE = 10;
+
 export default function PanelReservasVigilancia({ usuarioApp }) {
     const [reservas, setReservas] = useState([]);
     const [filtroEstado, setFiltroEstado] = useState('operativas');
     const [expandedReservaId, setExpandedReservaId] = useState(null);
+    const [paginaHistorial, setPaginaHistorial] = useState(1);
+    const [loadingOperativas, setLoadingOperativas] = useState(false);
+    const [loadingHistorial, setLoadingHistorial] = useState(false);
+    const [hasNextHistorial, setHasNextHistorial] = useState(false);
 
-    const cargar = async () => {
+    const cargarOperativas = async () => {
         if (!usuarioApp?.conjunto_id) return;
+        setLoadingOperativas(true);
 
-        const estados = filtroEstado === 'operativas'
-            ? ['aprobada', 'en_curso']
-            : ['aprobada', 'en_curso', 'finalizada', 'no_show'];
+        const resp = await listarReservas({
+            conjunto_id: usuarioApp.conjunto_id,
+            estados: ['aprobada', 'en_curso'],
+            limit: 80
+        });
 
-        const resp = await listarReservas({ conjunto_id: usuarioApp.conjunto_id, estados, limit: 250 });
+        setLoadingOperativas(false);
         if (!resp.ok) return toast.error(resp.error);
+
         setReservas(resp.data || []);
+        setHasNextHistorial(false);
     };
 
-    useEffect(() => { cargar(); }, [usuarioApp?.conjunto_id, filtroEstado]);
+    const cargarHistorico = async (pagina) => {
+        if (!usuarioApp?.conjunto_id) return;
+        setLoadingHistorial(true);
+
+        const offset = (pagina - 1) * HISTORIAL_PAGE_SIZE;
+        const resp = await listarReservas({
+            conjunto_id: usuarioApp.conjunto_id,
+            estados: ['aprobada', 'en_curso', 'finalizada', 'no_show'],
+            limit: HISTORIAL_PAGE_SIZE,
+            offset
+        });
+
+        setLoadingHistorial(false);
+        if (!resp.ok) return toast.error(resp.error);
+
+        const data = resp.data || [];
+        setReservas(data);
+        setHasNextHistorial(data.length === HISTORIAL_PAGE_SIZE);
+    };
+
     useEffect(() => {
-        if (!usuarioApp?.conjunto_id) return undefined;
-        return subscribeReservasConjunto(usuarioApp.conjunto_id, () => cargar());
+        if (!usuarioApp?.conjunto_id) return;
+
+        if (filtroEstado === 'operativas') {
+            cargarOperativas();
+            return;
+        }
+
+        cargarHistorico(paginaHistorial);
+    }, [usuarioApp?.conjunto_id, filtroEstado, paginaHistorial]);
+
+    useEffect(() => {
+        if (!usuarioApp?.conjunto_id || filtroEstado !== 'operativas') return undefined;
+        return subscribeReservasConjunto(usuarioApp.conjunto_id, () => cargarOperativas());
     }, [usuarioApp?.conjunto_id, filtroEstado]);
 
     const estadoLabel = (estado) => {
@@ -51,8 +92,24 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         const resp = await cambiarEstadoReserva({ reserva_id: id, estado, usuario_id: usuarioApp.id, usuario_rol: usuarioApp.rol_id, detalle });
         if (!resp.ok) return toast.error(resp.error);
         toast.success(`Reserva ${estadoLabel(estado).toLowerCase()}`);
-        cargar();
+
+        if (filtroEstado === 'operativas') {
+            cargarOperativas();
+            return;
+        }
+
+        cargarHistorico(paginaHistorial);
     };
+
+    const cambiarVista = (vista) => {
+        setFiltroEstado(vista);
+        setExpandedReservaId(null);
+        setPaginaHistorial(1);
+        setHasNextHistorial(false);
+    };
+
+    const mostrarSinMasResultados = filtroEstado === 'historico' && paginaHistorial > 1 && !loadingHistorial && reservas.length === 0;
+    const cargandoActual = filtroEstado === 'operativas' ? loadingOperativas : loadingHistorial;
 
     return (
         <div className="app-surface-primary rounded-2xl p-5 shadow space-y-5">
@@ -63,7 +120,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                 </div>
                 <div className="flex items-center gap-2">
                     <label htmlFor="filtro-reservas-vigilancia" className="text-xs text-app-text-secondary">Vista</label>
-                    <select id="filtro-reservas-vigilancia" className="app-input max-w-56" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                    <select id="filtro-reservas-vigilancia" className="app-input max-w-56" value={filtroEstado} onChange={(e) => cambiarVista(e.target.value)}>
                         <option value="operativas">Operativas (atención inmediata)</option>
                         <option value="historico">Histórico corto (recientes)</option>
                     </select>
@@ -76,7 +133,9 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                 <div className="app-surface-muted p-2"><span className="text-app-text-secondary">No asistió</span><p className="text-lg font-semibold text-state-warning">{resumen.noShow}</p></div>
             </div>
 
-            {reservas.map((r) => {
+            {cargandoActual && <p className="text-sm text-app-text-secondary">Cargando reservas...</p>}
+
+            {!cargandoActual && reservas.map((r) => {
                 const evaluacionNoShow = evaluarElegibilidadNoShow(r);
                 const detalleExpandido = expandedReservaId === r.id;
 
@@ -127,12 +186,36 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                 );
             })}
 
-            {reservas.length === 0 && (
+            {!cargandoActual && reservas.length === 0 && (
                 <p className="text-sm text-app-text-secondary">
                     {filtroEstado === 'operativas'
                         ? 'No hay reservas pendientes de atención en este momento.'
-                        : 'No hay reservas recientes para mostrar.'}
+                        : mostrarSinMasResultados
+                            ? 'No hay más reservas para mostrar.'
+                            : 'No hay reservas recientes para mostrar.'}
                 </p>
+            )}
+
+            {filtroEstado === 'historico' && (
+                <div className="pt-2 border-t border-app-border/50 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-app-text-secondary">Página {paginaHistorial}</p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            className="app-btn-secondary text-xs disabled:opacity-50"
+                            onClick={() => setPaginaHistorial((prev) => Math.max(1, prev - 1))}
+                            disabled={loadingHistorial || paginaHistorial === 1}
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            className="app-btn-secondary text-xs disabled:opacity-50"
+                            onClick={() => setPaginaHistorial((prev) => prev + 1)}
+                            disabled={loadingHistorial || !hasNextHistorial}
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -578,14 +578,18 @@ export const listarReservas = async ({
     estados = [],
     fecha_desde = null,
     fecha_hasta = null,
-    limit = 150
+    limit = 150,
+    offset = 0
 }) => {
+    const offsetSafe = Number.isFinite(Number(offset)) ? Math.max(0, Number(offset)) : 0;
+    const limitSafe = Number.isFinite(Number(limit)) ? Math.max(1, Number(limit)) : 150;
+
     let q = supabase
         .from('reservas_zonas')
         .select(BASE_RESERVA_SELECT)
         .eq('conjunto_id', conjunto_id)
         .order('fecha_inicio', { ascending: false })
-        .limit(limit);
+        .range(offsetSafe, offsetSafe + limitSafe - 1);
 
     if (residente_id) q = q.eq('residente_id', residente_id);
     if (estados.length) q = q.in('estado', estados);
