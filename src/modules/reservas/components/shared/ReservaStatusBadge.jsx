@@ -10,7 +10,7 @@ const STATUS_STYLES = {
     no_show: 'app-badge-warning'
 };
 
-export default function ReservaStatusBadge({ estado, className = '' }) {
+export default function ReservaStatusBadge({ estado, className = '', labelOverride }) {
     const styles = STATUS_STYLES[estado] || 'app-badge-info';
     const isNoShow = estado === 'no_show';
 
@@ -19,7 +19,7 @@ export default function ReservaStatusBadge({ estado, className = '' }) {
             title={isNoShow ? 'El residente no realizó check-in dentro del tiempo permitido' : undefined}
             className={`${styles} ${className}`}
         >
-            {getReservaEstadoLabel(estado)}
+            {labelOverride || getReservaEstadoLabel(estado)}
         </span>
     );
 }

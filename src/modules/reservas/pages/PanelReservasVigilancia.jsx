@@ -21,6 +21,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
     const [loadingHistorial, setLoadingHistorial] = useState(false);
     const [hasNextHistorial, setHasNextHistorial] = useState(false);
     const [accionesLoading, setAccionesLoading] = useState({});
+    const [highlightReservaId, setHighlightReservaId] = useState(null);
 
     const cargarOperativas = async () => {
         if (!usuarioApp?.conjunto_id) return;
@@ -116,6 +117,8 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
             return;
         }
         toast.success(obtenerMensajeExitoAccion(estado));
+        setHighlightReservaId(id);
+        setTimeout(() => setHighlightReservaId((prev) => (prev === id ? null : prev)), 1200);
 
         if (filtroEstado === 'operativas') {
             cargarOperativas();
@@ -134,6 +137,8 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
 
     const mostrarSinMasResultados = filtroEstado === 'historico' && paginaHistorial > 1 && !loadingHistorial && reservas.length === 0;
     const cargandoActual = filtroEstado === 'operativas' ? loadingOperativas : loadingHistorial;
+    const inicioRangoHistorial = ((paginaHistorial - 1) * HISTORIAL_PAGE_SIZE) + 1;
+    const finRangoHistorial = inicioRangoHistorial + Math.max(reservas.length - 1, 0);
 
     return (
         <div className="app-surface-primary rounded-2xl p-5 shadow space-y-5">
@@ -167,7 +172,14 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                 const cargandoNoShow = Boolean(accionesLoading[`${r.id}-no_show`]);
 
                 return (
-                    <article key={r.id} className="app-surface-muted p-4 border border-app-border/70 space-y-3 rounded-xl">
+                    <article
+                        key={r.id}
+                        className={`app-surface-muted p-4 border space-y-3 rounded-xl transition-all duration-300 ${
+                            highlightReservaId === r.id
+                                ? 'border-state-info shadow-[0_0_0_2px_rgba(59,130,246,0.25)]'
+                                : 'border-app-border/70'
+                        }`}
+                    >
                         <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
                                 <p className="text-lg font-semibold leading-tight">{r.recursos_comunes?.nombre || 'Recurso'}</p>
@@ -176,22 +188,23 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                                 <p className="text-sm text-app-text-secondary">{getReservaTorreAptoLabel(r)}</p>
                             </div>
                             <div className="flex flex-col items-end gap-2">
-                                <ReservaStatusBadge estado={r.estado} />
-                                <span className="text-xs app-surface-primary px-2 py-1 rounded-md">Estado operativo: {estadoLabel(r.estado)}</span>
+                                <ReservaStatusBadge estado={r.estado} labelOverride={estadoLabel(r.estado)} />
                             </div>
                         </div>
 
                         {r.estado === 'aprobada' && (
                             <div className="flex flex-wrap gap-2">
                                 <button
-                                    className="app-btn-primary text-xs disabled:opacity-50"
+                                    title="Registrar entrada del residente"
+                                    className="app-btn-primary text-xs disabled:opacity-50 min-w-[12.5rem] justify-center"
                                     onClick={() => actualizar(r.id, 'en_curso', 'Check-in por vigilancia')}
                                     disabled={cargandoIngreso}
                                 >
                                     {cargandoIngreso ? obtenerMensajeCargandoAccion('en_curso') : 'Registrar ingreso'}
                                 </button>
                                 <button
-                                    className="app-btn-secondary text-xs disabled:opacity-50"
+                                    title={evaluacionNoShow.elegible ? 'Marcar que el residente no llegó' : 'Disponible después de 15 minutos de la hora de inicio'}
+                                    className="app-btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed min-w-[12.5rem] justify-center"
                                     disabled={!evaluacionNoShow.elegible || cargandoNoShow}
                                     onClick={() => {
                                         const confirmar = window.confirm('¿Confirmas marcar esta reserva como No asistió? Esta acción afecta el historial operativo.');
@@ -207,7 +220,8 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
 
                         {r.estado === 'en_curso' && (
                             <button
-                                className="app-btn-primary text-xs disabled:opacity-50"
+                                title="Finalizar uso de la reserva"
+                                className="app-btn-primary text-xs disabled:opacity-50 min-w-[12.5rem] justify-center"
                                 onClick={() => {
                                     const confirmar = window.confirm('¿Confirmas registrar la salida y finalizar esta reserva?');
                                     if (!confirmar) return;
@@ -220,8 +234,8 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                         )}
 
                         <div className="pt-1">
-                            <button className="text-xs text-app-text-secondary hover:text-app-text-primary hover:underline transition-colors" onClick={() => setExpandedReservaId(detalleExpandido ? null : r.id)}>
-                                {detalleExpandido ? 'Ocultar detalle' : 'Ver detalle'}
+                            <button className="text-xs text-app-text-secondary hover:text-app-text-primary transition-all duration-200" onClick={() => setExpandedReservaId(detalleExpandido ? null : r.id)}>
+                                {detalleExpandido ? '▼ Ocultar detalle' : '▶ Ver detalle'}
                             </button>
                         </div>
 
@@ -247,13 +261,18 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
                         ? 'No hay reservas pendientes de atención en este momento.'
                         : mostrarSinMasResultados
                             ? 'No hay más reservas para mostrar.'
-                            : 'No hay reservas recientes para mostrar.'}
+                            : 'No hay reservas en el historial para este rango.'}
                 </p>
             )}
 
             {filtroEstado === 'historico' && (
                 <div className="pt-2 border-t border-app-border/50 flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-app-text-secondary">Página {paginaHistorial}</p>
+                    <div>
+                        <p className="text-xs text-app-text-secondary">Página {paginaHistorial}</p>
+                        <p className="text-xs text-app-text-secondary">
+                            {reservas.length > 0 ? `Mostrando ${inicioRangoHistorial}–${finRangoHistorial} resultados` : 'Mostrando 0 resultados'}
+                        </p>
+                    </div>
                     <div className="flex items-center gap-2">
                         <button
                             className="app-btn-secondary text-xs disabled:opacity-50"
