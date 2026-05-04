@@ -275,8 +275,10 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
 
   const copiarCodigo = async () => {
     if (!qrPayload) return;
+    const codigoIngreso = formatManualIngresoCode(qrPayload);
+    const texto = `Urbaphix · Código de ingreso\nCódigo manual: ${codigoIngreso}\nCódigo QR: ${qrPayload}`;
     try {
-      await navigator.clipboard.writeText(qrPayload);
+      await navigator.clipboard.writeText(texto);
       toast.success('Código copiado');
     } catch (error) {
       toast.error(`No se pudo copiar el código: ${error?.message || 'error inesperado'}`);
