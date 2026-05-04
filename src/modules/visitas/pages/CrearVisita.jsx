@@ -244,7 +244,7 @@ export default function CrearVisita({ usuarioApp }) {
     setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: hoyBogota(), tipoVehiculo: '', placa: '' }));
     setTouched({ nombre: false, documento: false, fecha: false });
     if (residenteId) cargarHistorial(residenteId);
-    requestAnimationFrame(() => qrSectionRef.current?.focus());
+    requestAnimationFrame(() => qrWrapRef.current?.focus() || qrSectionRef.current?.focus());
   };
 
   const compartirCodigoQR = async () => {
