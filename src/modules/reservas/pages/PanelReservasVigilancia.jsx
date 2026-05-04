@@ -20,6 +20,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
     const [loadingOperativas, setLoadingOperativas] = useState(false);
     const [loadingHistorial, setLoadingHistorial] = useState(false);
     const [hasNextHistorial, setHasNextHistorial] = useState(false);
+    const [accionesLoading, setAccionesLoading] = useState({});
 
     const cargarOperativas = async () => {
         if (!usuarioApp?.conjunto_id) return;
@@ -88,10 +89,33 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         noShow: reservas.filter((r) => r.estado === 'no_show').length
     }), [reservas]);
 
+    const obtenerMensajeCargandoAccion = (estado) => {
+        if (estado === 'en_curso') return 'Registrando ingreso...';
+        if (estado === 'finalizada') return 'Registrando salida...';
+        if (estado === 'no_show') return 'Marcando no asistencia...';
+        return 'Actualizando reserva...';
+    };
+
+    const obtenerMensajeExitoAccion = (estado) => {
+        if (estado === 'en_curso') return 'Ingreso registrado correctamente.';
+        if (estado === 'finalizada') return 'Salida registrada correctamente.';
+        if (estado === 'no_show') return 'Reserva marcada como No asistió.';
+        return 'Reserva actualizada correctamente.';
+    };
+
     const actualizar = async (id, estado, detalle) => {
+        const accionKey = `${id}-${estado}`;
+        if (accionesLoading[accionKey]) return;
+
+        setAccionesLoading((prev) => ({ ...prev, [accionKey]: true }));
         const resp = await cambiarEstadoReserva({ reserva_id: id, estado, usuario_id: usuarioApp.id, usuario_rol: usuarioApp.rol_id, detalle });
-        if (!resp.ok) return toast.error(resp.error);
-        toast.success(`Reserva ${estadoLabel(estado).toLowerCase()}`);
+        setAccionesLoading((prev) => ({ ...prev, [accionKey]: false }));
+
+        if (!resp.ok) {
+            toast.error('No se pudo actualizar la reserva. Intenta nuevamente.');
+            return;
+        }
+        toast.success(obtenerMensajeExitoAccion(estado));
 
         if (filtroEstado === 'operativas') {
             cargarOperativas();
@@ -135,9 +159,12 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
 
             {cargandoActual && <p className="text-sm text-app-text-secondary">Cargando reservas...</p>}
 
-            {!cargandoActual && reservas.map((r) => {
+            {reservas.map((r) => {
                 const evaluacionNoShow = evaluarElegibilidadNoShow(r);
                 const detalleExpandido = expandedReservaId === r.id;
+                const cargandoIngreso = Boolean(accionesLoading[`${r.id}-en_curso`]);
+                const cargandoSalida = Boolean(accionesLoading[`${r.id}-finalizada`]);
+                const cargandoNoShow = Boolean(accionesLoading[`${r.id}-no_show`]);
 
                 return (
                     <article key={r.id} className="app-surface-muted p-4 border border-app-border/70 space-y-3 rounded-xl">
@@ -156,16 +183,44 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
 
                         {r.estado === 'aprobada' && (
                             <div className="flex flex-wrap gap-2">
-                                <button className="app-btn-primary text-xs" onClick={() => actualizar(r.id, 'en_curso', 'Check-in por vigilancia')}>Registrar ingreso</button>
-                                <button className="app-btn-secondary text-xs disabled:opacity-50" disabled={!evaluacionNoShow.elegible} onClick={() => actualizar(r.id, 'no_show', 'Marcada como no asistió por vigilancia')}>No asistió</button>
+                                <button
+                                    className="app-btn-primary text-xs disabled:opacity-50"
+                                    onClick={() => actualizar(r.id, 'en_curso', 'Check-in por vigilancia')}
+                                    disabled={cargandoIngreso}
+                                >
+                                    {cargandoIngreso ? obtenerMensajeCargandoAccion('en_curso') : 'Registrar ingreso'}
+                                </button>
+                                <button
+                                    className="app-btn-secondary text-xs disabled:opacity-50"
+                                    disabled={!evaluacionNoShow.elegible || cargandoNoShow}
+                                    onClick={() => {
+                                        const confirmar = window.confirm('¿Confirmas marcar esta reserva como No asistió? Esta acción afecta el historial operativo.');
+                                        if (!confirmar) return;
+                                        actualizar(r.id, 'no_show', 'Marcada como no asistió por vigilancia');
+                                    }}
+                                >
+                                    {cargandoNoShow ? obtenerMensajeCargandoAccion('no_show') : 'No asistió'}
+                                </button>
                                 {!evaluacionNoShow.elegible && <p className="w-full text-xs text-app-text-secondary">{evaluacionNoShow.motivo}</p>}
                             </div>
                         )}
 
-                        {r.estado === 'en_curso' && <button className="app-btn-primary text-xs" onClick={() => actualizar(r.id, 'finalizada', 'Check-out por vigilancia')}>Registrar salida</button>}
+                        {r.estado === 'en_curso' && (
+                            <button
+                                className="app-btn-primary text-xs disabled:opacity-50"
+                                onClick={() => {
+                                    const confirmar = window.confirm('¿Confirmas registrar la salida y finalizar esta reserva?');
+                                    if (!confirmar) return;
+                                    actualizar(r.id, 'finalizada', 'Check-out por vigilancia');
+                                }}
+                                disabled={cargandoSalida}
+                            >
+                                {cargandoSalida ? obtenerMensajeCargandoAccion('finalizada') : 'Registrar salida'}
+                            </button>
+                        )}
 
                         <div className="pt-1">
-                            <button className="text-xs underline text-app-text-secondary hover:text-app-text-primary" onClick={() => setExpandedReservaId(detalleExpandido ? null : r.id)}>
+                            <button className="text-xs text-app-text-secondary hover:text-app-text-primary hover:underline transition-colors" onClick={() => setExpandedReservaId(detalleExpandido ? null : r.id)}>
                                 {detalleExpandido ? 'Ocultar detalle' : 'Ver detalle'}
                             </button>
                         </div>
