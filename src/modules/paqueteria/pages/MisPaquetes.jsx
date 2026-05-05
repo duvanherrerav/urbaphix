@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { parsearCategoriaDesdeDescripcion } from '../services/paquetesService';
+import PaqueteCard from '../components/PaqueteCard';
+import PaquetesResumen from '../components/PaquetesResumen';
+import PaquetesFiltros from '../components/PaquetesFiltros';
 
 export default function MisPaquetes({ usuarioApp }) {
   const PAGE_SIZE = 8;
@@ -111,71 +114,59 @@ export default function MisPaquetes({ usuarioApp }) {
     [paquetesFiltrados, paginaActual]
   );
 
+  const rangoInicio = paquetesFiltrados.length ? ((paginaActual - 1) * PAGE_SIZE) + 1 : 0;
+  const rangoFin = Math.min(paginaActual * PAGE_SIZE, paquetesFiltrados.length);
+
   return (
-    <div className="space-y-4">
-      <div className="app-surface-primary p-5">
-        <h2 className="text-2xl font-bold text-app-text-primary">Mis paquetes 📦</h2>
-        <p className="text-sm text-app-text-secondary mt-1">Seguimiento de entregas con estado, fechas y categoría de servicio.</p>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-          <div className="app-surface-muted"><span className="text-app-text-secondary">Total</span><p className="text-lg font-semibold">{resumen.total}</p></div>
-          <div className="app-surface-muted"><span className="text-app-text-secondary">Pendientes</span><p className="text-lg font-semibold text-state-warning">{resumen.pendientes}</p></div>
-          <div className="app-surface-muted"><span className="text-app-text-secondary">Entregados</span><p className="text-lg font-semibold text-state-success">{resumen.entregados}</p></div>
-          <div className="app-surface-muted"><span className="text-app-text-secondary">Servicios</span><p className="text-lg font-semibold text-brand-secondary">{resumen.servicios}</p></div>
-        </div>
-      </div>
+    <div className="space-y-4 lg:space-y-5">
+      <header className="app-surface-primary border border-brand-primary/10 rounded-xl p-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-app-text-primary">Mis paquetes</h2>
+        <p className="text-sm text-app-text-secondary mt-1">Consulta el estado de tus paquetes y servicios registrados en portería.</p>
+      </header>
 
-      <div className="app-surface-primary p-4 space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={`app-btn text-xs ${filtroEstado === 'todos' ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => { setFiltroEstado('todos'); setPagina(1); }}>Todos ({resumen.total})</button>
-          <button type="button" className={`app-btn text-xs ${filtroEstado === 'pendiente' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => { setFiltroEstado('pendiente'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
-          <button type="button" className={`app-btn text-xs ${filtroEstado === 'entregado' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => { setFiltroEstado('entregado'); setPagina(1); }}>Entregados ({resumen.entregados})</button>
-        </div>
+      <PaquetesResumen resumen={resumen} />
 
-        <input
-          className="app-input"
-          placeholder="Buscar por descripción"
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setPagina(1);
-          }}
-        />
-      </div>
+      <PaquetesFiltros
+        filtroEstado={filtroEstado}
+        setFiltroEstado={setFiltroEstado}
+        resumen={resumen}
+        busqueda={busqueda}
+        setBusqueda={setBusqueda}
+        onResetPagina={() => setPagina(1)}
+      />
 
       {loading && <p className="text-sm text-app-text-secondary">Cargando paquetes...</p>}
-      {!loading && paquetesFiltrados.length === 0 && <div className="app-surface-primary p-4 text-sm text-app-text-secondary">No hay paquetes para este filtro.</div>}
 
-      <div className="space-y-3">
-        {paquetesPaginados.map((p) => (
-          <div key={p.id} className="app-surface-primary p-4 relative overflow-hidden">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-app-text-secondary">{p.categoria === 'servicio_publico' ? 'Servicio público' : 'Paquete'}</p>
-                <p className="font-semibold text-app-text-primary mt-1">{p.descripcion_visible || 'Sin descripción'}</p>
-              </div>
-              <span className={`app-badge ${p.categoria === 'servicio_publico' ? 'app-badge-info' : 'app-badge-success'}`}>
-                {p.categoria === 'servicio_publico' ? 'Servicio' : 'Envío'}
-              </span>
-            </div>
+      {!loading && paquetesNormalizados.length === 0 && (
+        <div className="app-surface-primary border border-brand-primary/10 rounded-xl p-5 text-sm">
+          <p className="font-semibold text-app-text-primary">Aún no tienes paquetes registrados</p>
+          <p className="text-app-text-secondary mt-1">Cuando portería registre un paquete o servicio para tu apartamento, aparecerá aquí.</p>
+        </div>
+      )}
 
-            <div className="mt-3 grid md:grid-cols-3 gap-2 text-sm">
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-primary/40 to-transparent" />
-              <div className="app-surface-muted"><span className="text-app-text-secondary block">Estado</span><span className={`${p.estado === 'pendiente' ? 'text-state-warning' : 'text-state-success'} font-semibold capitalize`}>{p.estado}</span></div>
-              <div className="app-surface-muted"><span className="text-app-text-secondary block">Recibido</span><span>{p.fecha_recibido ? new Date(p.fecha_recibido).toLocaleDateString() : '-'}</span></div>
-              <div className="app-surface-muted"><span className="text-app-text-secondary block">Entregado</span><span>{p.fecha_entrega ? new Date(p.fecha_entrega).toLocaleDateString() : 'Pendiente'}</span></div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {!loading && paquetesNormalizados.length > 0 && paquetesFiltrados.length === 0 && (
+        <div className="app-surface-primary border border-brand-primary/10 rounded-xl p-4 text-sm text-app-text-secondary">
+          No encontramos paquetes con estos filtros.
+        </div>
+      )}
 
       {!loading && paquetesFiltrados.length > 0 && (
-        <div className="app-surface-muted p-3 flex items-center justify-between text-xs">
-          <span className="text-app-text-secondary">Página {paginaActual} de {totalPaginas} · {paquetesFiltrados.length} resultados</span>
-          <div className="flex gap-2">
-            <button className="app-btn-ghost text-xs" disabled={paginaActual === 1} onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>
-            <button className="app-btn-ghost text-xs" disabled={paginaActual === totalPaginas} onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}>Siguiente</button>
+        <>
+          <section className="space-y-3">
+            {paquetesPaginados.map((p) => (
+              <PaqueteCard key={p.id} paquete={p} />
+            ))}
+          </section>
+
+          <div className="app-surface-muted border border-brand-primary/10 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-app-text-secondary">Mostrando {rangoInicio}–{rangoFin} de {paquetesFiltrados.length} paquetes</span>
+            <div className="flex items-center gap-2">
+              <span className="text-app-text-secondary">Página {paginaActual} de {totalPaginas}</span>
+              <button className="app-btn-ghost text-xs" disabled={paginaActual === 1} onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>
+              <button className="app-btn-ghost text-xs" disabled={paginaActual === totalPaginas} onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}>Siguiente</button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
