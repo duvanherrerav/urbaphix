@@ -373,9 +373,9 @@ export default function CrearVisita() {
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-4 overflow-x-hidden">
-      <header className="app-surface-primary p-3.5 md:p-4">
-        <h2 className="text-xl md:text-2xl font-bold">Solicitar visita</h2>
-        <p className="text-sm text-app-text-secondary">Genera un código de ingreso para portería.</p>
+      <header className="app-surface-primary p-3 md:p-3.5">
+        <h2 className="text-xl md:text-[1.65rem] font-bold leading-tight">Solicitar visita</h2>
+        <p className="mt-1 text-sm text-app-text-secondary">Genera un código para portería.</p>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)] xl:grid-cols-[minmax(0,1.14fr)_minmax(340px,0.86fr)] lg:items-start">
@@ -486,7 +486,7 @@ export default function CrearVisita() {
         )}
       </div></section>
 
-      <section className="app-surface-muted"><h3 className="font-semibold mb-2">Acción</h3><button
+      <section className="app-surface-muted space-y-2"><h3 className="font-semibold">Acción</h3><button
         onClick={() => {
           const nombreLimpio = normalizarNombre(form.nombre);
           const documentoLimpio = normalizarDocumento(form.documento);
@@ -507,13 +507,17 @@ export default function CrearVisita() {
           setResumenOpen(true);
         }}
         disabled={loading}
-        className="btn-primary w-full py-2.5 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.22)]"
+        className="btn-primary w-full py-2.5 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.22)] disabled:cursor-not-allowed disabled:opacity-80"
       >
-{loading ? 'Generando...' : 'Generar código'}
+<span className="inline-flex min-w-[10.5rem] items-center justify-center">{loading ? 'Generando...' : 'Generar código'}</span>
       </button></section>
 
-      {qrPayload && (
-        <div ref={qrSectionRef} className="min-w-0">
+      <div
+        ref={qrSectionRef}
+        className={`min-w-0 transition-all duration-300 ease-out ${qrPayload ? 'mt-1 opacity-100 translate-y-0' : 'pointer-events-none max-h-0 opacity-0 -translate-y-1'}`}
+        aria-hidden={!qrPayload}
+      >
+        {qrPayload && (
           <QRShareCard
             qrValue={qrPayload}
             manualCode={formatManualIngresoCode(qrPayload)}
@@ -524,8 +528,8 @@ export default function CrearVisita() {
             fechaVisita={qrMetadata.fechaVisita}
             qrWrapRef={qrWrapRef}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       {resumenOpen && (
         <div className="app-surface-muted space-y-2.5 border border-brand-primary/30">
@@ -544,7 +548,7 @@ export default function CrearVisita() {
       )}
       </div>
 
-      <aside className="min-w-0 space-y-2.5 rounded-2xl border border-app-border/45 bg-app-bg/35 p-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.12)] lg:sticky lg:top-4 lg:self-start">
+      <aside className="min-w-0 space-y-2 rounded-2xl border border-app-border/25 bg-app-bg/30 p-2.5 shadow-[0_3px_10px_rgba(15,23,42,0.1)] lg:sticky lg:top-4 lg:self-start">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-app-text-secondary">Historial de visitas</h3>
@@ -569,10 +573,10 @@ export default function CrearVisita() {
         />
         <div className="space-y-1.5">
           {historialPaginado.map((item) => (
-            <div key={item.id} className="rounded-xl border border-app-border/45 bg-app-bg-alt/55 p-2.5 text-sm">
+            <div key={item.id} className="rounded-xl border border-app-border/20 bg-app-bg-alt/45 p-2.5 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{item.nombre_visitante || 'Visitante registrado'}</p>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${claseEstado(item.estado)}`}>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${claseEstado(item.estado)}`}>
                   {estadoHumano(item.estado).titulo}
                 </span>
               </div>
@@ -598,7 +602,7 @@ export default function CrearVisita() {
             </div>
           ))}
           {historialBuscado.length === 0 && (
-            <div className="rounded-xl border border-app-border/45 bg-app-bg-alt/55 p-2.5 space-y-1">
+            <div className="rounded-xl border border-app-border/20 bg-app-bg-alt/45 p-2.5 space-y-1">
               <p className="text-sm font-medium">Aún no has registrado visitas</p>
               <p className="text-sm text-app-text-secondary">Cuando generes un código de ingreso, aparecerá aquí para que puedas reenviarlo o reutilizar datos.</p>
             </div>
