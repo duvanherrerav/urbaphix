@@ -158,6 +158,12 @@ export default function CrearVisita() {
     init();
   }, []);
 
+  useEffect(() => {
+    if (!qrPayload || !qrSectionRef.current) return;
+    qrSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    requestAnimationFrame(() => qrWrapRef.current?.focus() || qrSectionRef.current?.focus());
+  }, [qrPayload]);
+
   const validacionPlaca = useMemo(() => {
     if (!form.tipoVehiculo) return { ok: true, mensaje: '' };
     const placa = String(form.placa || '').toUpperCase();
@@ -273,7 +279,6 @@ export default function CrearVisita() {
     setForm((prev) => ({ nombre: '', tipo_documento: prev.tipo_documento, documento: '', fecha: hoyBogota(), tipoVehiculo: '', placa: '' }));
     setTouched({ nombre: false, documento: false, fecha: false });
     if (residenteId) cargarHistorial(residenteId);
-    requestAnimationFrame(() => qrWrapRef.current?.focus() || qrSectionRef.current?.focus());
   };
 
   const compartirCodigoQR = async () => {
@@ -367,15 +372,15 @@ export default function CrearVisita() {
   const finRango = historialBuscado.length === 0 ? 0 : Math.min(paginaFrecuenteActual * PAGE_SIZE, historialBuscado.length);
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-5 overflow-x-hidden">
-      <header className="app-surface-primary p-4 md:p-5">
-        <h2 className="text-2xl font-bold">Solicitar visita 🚶‍♂️</h2>
-        <p className="text-sm text-app-text-secondary">Completa los datos y genera un código para portería.</p>
+    <div className="w-full max-w-6xl mx-auto space-y-4 overflow-x-hidden">
+      <header className="app-surface-primary p-3.5 md:p-4">
+        <h2 className="text-xl md:text-2xl font-bold">Solicitar visita</h2>
+        <p className="text-sm text-app-text-secondary">Genera un código de ingreso para portería.</p>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)] lg:items-start">
-      <div className="min-w-0 space-y-4 lg:self-start">
-      <section className="app-surface-muted space-y-3"><h3 className="font-semibold">Datos del visitante</h3><div className="grid md:grid-cols-2 gap-3">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)] xl:grid-cols-[minmax(0,1.14fr)_minmax(340px,0.86fr)] lg:items-start">
+      <div className="min-w-0 space-y-3 lg:self-start">
+      <section className="app-surface-muted space-y-2.5"><h3 className="font-semibold">Datos del visitante</h3><div className="grid md:grid-cols-2 gap-2.5">
         <input
           className="app-input"
           placeholder="Nombre visitante"
@@ -430,11 +435,11 @@ export default function CrearVisita() {
           onChange={(e) => setForm({ ...form, fecha: e.target.value })}
           onBlur={() => setTouched((prev) => ({ ...prev, fecha: true }))}
         />
-      </div><p className="text-xs text-app-text-secondary">Documento del visitante para control en portería</p></section>
-      <section className="app-surface-muted space-y-3"><h3 className="font-semibold">Detalles de la visita</h3><p className="text-xs text-app-text-secondary">Selecciona el día en que llegará tu visita</p>{quickFrecuentes.length > 0 && (
-        <div className="space-y-2">
+      </div><p className="text-xs text-app-text-secondary">Documento para control en portería</p></section>
+      <section className="app-surface-muted space-y-2.5"><h3 className="font-semibold">Detalles de la visita</h3><p className="text-xs text-app-text-secondary">Selecciona el día de llegada.</p>{quickFrecuentes.length > 0 && (
+        <div className="space-y-1.5">
           <p className="text-xs font-medium text-app-text-secondary">Accesos rápidos de visitantes frecuentes</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {quickFrecuentes.map((item) => (
               <button
                 key={`quick-${item.id}`}
@@ -448,7 +453,7 @@ export default function CrearVisita() {
           </div>
         </div>
       )}
-      <div className="grid md:grid-cols-3 gap-2">
+      <div className="grid md:grid-cols-3 gap-1.5">
         <div>{touched.nombre && erroresFormulario.nombre && <p className="text-xs text-state-error">{erroresFormulario.nombre}</p>}</div>
         <div>{touched.documento && erroresFormulario.documento && <p className="text-xs text-state-error">{erroresFormulario.documento}</p>}</div>
         <div>{touched.fecha && erroresFormulario.fecha && <p className="text-xs text-state-error">{erroresFormulario.fecha}</p>}</div>
@@ -456,7 +461,7 @@ export default function CrearVisita() {
 
       </section>
 
-      <section className="app-surface-muted space-y-3"><h3 className="font-semibold">Vehículo (opcional)</h3><div className="grid md:grid-cols-2 gap-3 items-start">
+      <section className="app-surface-muted space-y-2.5"><h3 className="font-semibold">Vehículo (opcional)</h3><div className="grid md:grid-cols-2 gap-2.5 items-start">
         <select
           className="app-input w-full"
           value={form.tipoVehiculo}
@@ -481,7 +486,7 @@ export default function CrearVisita() {
         )}
       </div></section>
 
-      <section className="app-surface-muted"><h3 className="font-semibold mb-3">Acción</h3><button
+      <section className="app-surface-muted"><h3 className="font-semibold mb-2">Acción</h3><button
         onClick={() => {
           const nombreLimpio = normalizarNombre(form.nombre);
           const documentoLimpio = normalizarDocumento(form.documento);
@@ -502,7 +507,7 @@ export default function CrearVisita() {
           setResumenOpen(true);
         }}
         disabled={loading}
-        className="btn-primary w-full py-3 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.25)]"
+        className="btn-primary w-full py-2.5 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.22)]"
       >
 {loading ? 'Generando...' : 'Generar código'}
       </button></section>
@@ -523,7 +528,7 @@ export default function CrearVisita() {
       )}
 
       {resumenOpen && (
-        <div className="app-surface-muted space-y-3 border border-brand-primary/30">
+        <div className="app-surface-muted space-y-2.5 border border-brand-primary/30">
           <h3 className="font-semibold">Resumen de la visita</h3>
           <p className="text-sm"><b>Nombre:</b> {normalizarNombre(form.nombre)}</p>
           <p className="text-sm"><b>Documento:</b> {form.tipo_documento} {normalizarDocumento(form.documento)}</p>
@@ -539,7 +544,7 @@ export default function CrearVisita() {
       )}
       </div>
 
-      <aside className="min-w-0 space-y-3 rounded-2xl border border-app-border/70 bg-app-bg/45 p-3 shadow-sm lg:sticky lg:top-4 lg:self-start">
+      <aside className="min-w-0 space-y-2.5 rounded-2xl border border-app-border/45 bg-app-bg/35 p-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.12)] lg:sticky lg:top-4 lg:self-start">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-app-text-secondary">Historial de visitas</h3>
@@ -562,9 +567,9 @@ export default function CrearVisita() {
             setPaginaFrecuentes(1);
           }}
         />
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {historialPaginado.map((item) => (
-            <div key={item.id} className="rounded-xl border border-app-border/70 bg-app-bg-alt/65 p-3 text-sm">
+            <div key={item.id} className="rounded-xl border border-app-border/45 bg-app-bg-alt/55 p-2.5 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{item.nombre_visitante || 'Visitante registrado'}</p>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${claseEstado(item.estado)}`}>
@@ -579,7 +584,7 @@ export default function CrearVisita() {
                   {item.placa ? ` · Placa ${item.placa}` : ''}
                 </p>
               )}
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {normalizarEstado(item.estado) === 'pendiente' && (
                   <button className="app-btn-ghost text-xs" onClick={() => setQRDesdeHistorial(item)}>Reenviar código</button>
                 )}
@@ -593,7 +598,7 @@ export default function CrearVisita() {
             </div>
           ))}
           {historialBuscado.length === 0 && (
-            <div className="rounded-xl border border-app-border/70 bg-app-bg-alt/65 p-3 space-y-1">
+            <div className="rounded-xl border border-app-border/45 bg-app-bg-alt/55 p-2.5 space-y-1">
               <p className="text-sm font-medium">Aún no has registrado visitas</p>
               <p className="text-sm text-app-text-secondary">Cuando generes un código de ingreso, aparecerá aquí para que puedas reenviarlo o reutilizar datos.</p>
             </div>
