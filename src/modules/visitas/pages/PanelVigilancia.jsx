@@ -88,6 +88,13 @@ const esVisitaDeHoy = (visita) => {
     const hoyBogota = toDateOnly();
     return obtenerFechaVisitaKey(visita) === hoyBogota;
 };
+const normalizeManualIngresoCode = (value) => String(value || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+const formatManualIngresoCode = (qrCode) => {
+    const compact = normalizeManualIngresoCode(qrCode);
+    if (!compact) return '';
+    const base = compact.slice(-8).padStart(8, '0');
+    return `${base.slice(0, 4)}-${base.slice(4)}`;
+};
 
 const parseQRCode = (text) => {
     const raw = String(text || '').trim();
@@ -239,21 +246,33 @@ export default function PanelVigilancia({ usuarioApp }) {
     }, [usuarioApp?.conjunto_id]);
 
     const finalizarIngresoConQR = async (rawValue) => {
-        const parsed = parseQRCode(rawValue);
-        if (!parsed || !modalIngreso.visita) {
-            toast.error('QR inválido');
+        const visitaObjetivo = modalIngreso.visita;
+        if (!visitaObjetivo) {
+            toast.error('No hay visita seleccionada');
             return;
         }
 
-        const { visita_id, qr_code } = parsed;
-        const visitaObjetivo = modalIngreso.visita;
+        const parsed = parseQRCode(rawValue);
+        const manualIngresado = formatManualIngresoCode(rawValue);
+        const manualVisita = formatManualIngresoCode(visitaObjetivo.qr_code);
+        const coincideManual = Boolean(manualIngresado && manualVisita && manualIngresado === manualVisita);
+        const qrPlanoIngresado = normalizeManualIngresoCode(rawValue);
+        const qrPlanoVisita = normalizeManualIngresoCode(visitaObjetivo.qr_code);
+        const coincideQrPlano = Boolean(qrPlanoIngresado && qrPlanoVisita && qrPlanoIngresado === qrPlanoVisita);
+        const qrCoincidente = parsed?.qr_code || (coincideQrPlano ? visitaObjetivo.qr_code : null);
+        const visitaIdCoincidente = parsed?.visita_id || null;
 
-        if (visita_id && visita_id !== visitaObjetivo.id) {
+        if (!parsed && !coincideManual && !coincideQrPlano) {
+            toast.error('Código inválido');
+            return;
+        }
+
+        if (visitaIdCoincidente && visitaIdCoincidente !== visitaObjetivo.id) {
             toast.error('El QR no corresponde a esta visita');
             return;
         }
 
-        if (qr_code && visitaObjetivo.qr_code && qr_code !== visitaObjetivo.qr_code) {
+        if (qrCoincidente && visitaObjetivo.qr_code && qrCoincidente !== visitaObjetivo.qr_code && !coincideManual && !coincideQrPlano) {
             toast.error('QR no coincide con la visita seleccionada');
             return;
         }

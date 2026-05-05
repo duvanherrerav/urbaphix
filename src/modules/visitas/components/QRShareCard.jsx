@@ -1,6 +1,6 @@
 import { QRCodeCanvas } from 'qrcode.react';
 
-export default function QRShareCard({ qrValue, onShare, onCopy, onDownload, visitanteNombre, fechaVisita, qrWrapRef }) {
+export default function QRShareCard({ qrValue, manualCode, onShare, onCopy, onDownload, visitanteNombre, fechaVisita, qrWrapRef }) {
   return (
     <div ref={qrWrapRef} className="app-surface-muted p-4 space-y-3" tabIndex={-1}>
       <h3 className="font-semibold">Código para ingreso en portería 🔐</h3>
@@ -8,6 +8,7 @@ export default function QRShareCard({ qrValue, onShare, onCopy, onDownload, visi
       <div className="text-xs text-app-text-secondary space-y-1">
         {visitanteNombre && <p><b>Visitante:</b> {visitanteNombre}</p>}
         {fechaVisita && <p><b>Fecha:</b> {fechaVisita}</p>}
+        {manualCode && <p><b>Código de ingreso:</b> {manualCode}</p>}
       </div>
       <div className="flex flex-col md:flex-row md:items-center gap-4">
         <QRCodeCanvas value={qrValue} size={180} />
