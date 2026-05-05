@@ -13,7 +13,7 @@ const formatManualIngresoCode = (qrCode) => {
 };
 
 
-export default function CrearVisita({ usuarioApp: _usuarioApp }) {
+export default function CrearVisita() {
   const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
   const estadoHumano = (estado) => {
     const value = normalizarEstado(estado);
@@ -370,11 +370,11 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
     <div className="w-full max-w-6xl mx-auto space-y-5 overflow-x-hidden">
       <header className="app-surface-primary p-4 md:p-5">
         <h2 className="text-2xl font-bold">Solicitar visita 🚶‍♂️</h2>
-        <p className="text-sm text-app-text-secondary">Completa los datos y genera un código para el ingreso en portería.</p>
+        <p className="text-sm text-app-text-secondary">Completa los datos y genera un código para portería.</p>
       </header>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] xl:items-start">
-      <div className="min-w-0 space-y-4">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)] lg:items-start">
+      <div className="min-w-0 space-y-4 lg:self-start">
       <section className="app-surface-muted space-y-3"><h3 className="font-semibold">Datos del visitante</h3><div className="grid md:grid-cols-2 gap-3">
         <input
           className="app-input"
@@ -504,8 +504,23 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
         disabled={loading}
         className="btn-primary w-full py-3 text-sm shadow-[0_10px_24px_rgba(37,99,235,0.25)]"
       >
-{loading ? 'Generando...' : 'Generar código de ingreso'}
+{loading ? 'Generando...' : 'Generar código'}
       </button></section>
+
+      {qrPayload && (
+        <div ref={qrSectionRef} className="min-w-0">
+          <QRShareCard
+            qrValue={qrPayload}
+            manualCode={formatManualIngresoCode(qrPayload)}
+            onShare={compartirCodigoQR}
+            onCopy={copiarCodigo}
+            onDownload={compartirImagenQR}
+            visitanteNombre={qrMetadata.visitanteNombre}
+            fechaVisita={qrMetadata.fechaVisita}
+            qrWrapRef={qrWrapRef}
+          />
+        </div>
+      )}
 
       {resumenOpen && (
         <div className="app-surface-muted space-y-3 border border-brand-primary/30">
@@ -513,23 +528,21 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
           <p className="text-sm"><b>Nombre:</b> {normalizarNombre(form.nombre)}</p>
           <p className="text-sm"><b>Documento:</b> {form.tipo_documento} {normalizarDocumento(form.documento)}</p>
           <p className="text-sm"><b>Fecha:</b> {form.fecha}</p>
-          <p className="text-sm"><b>Vehículo:</b> {form.tipoVehiculo ? `${form.tipoVehiculo} ${form.placa || ''}` : 'Sin vehículo'}</p>
+          {form.tipoVehiculo && (
+            <p className="text-sm"><b>Vehículo:</b> {`${form.tipoVehiculo} ${form.placa || ''}`}</p>
+          )}
           <div className="flex gap-2">
             <button className="btn-primary" onClick={() => { setResumenOpen(false); crearVisita(); }}>Confirmar y generar código</button>
             <button className="app-btn-secondary" onClick={() => setResumenOpen(false)}>Editar</button>
           </div>
         </div>
       )}
-
-      {qrPayload && (
-        <div ref={qrSectionRef} className="min-w-0"><QRShareCard qrValue={qrPayload} manualCode={formatManualIngresoCode(qrPayload)} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
-      )}
       </div>
 
-      <aside className="app-surface-muted min-w-0 space-y-3 bg-app-bg/60 border border-brand-primary/20 xl:sticky xl:top-4 xl:self-start">
+      <aside className="min-w-0 space-y-3 rounded-2xl border border-app-border/70 bg-app-bg/45 p-3 shadow-sm lg:sticky lg:top-4 lg:self-start">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="font-semibold">Historial de visitas</h3>
+            <h3 className="text-sm font-semibold text-app-text-secondary">Historial de visitas</h3>
             <p className="text-xs text-app-text-secondary">Mostrando {inicioRango}-{finRango} de {historialBuscado.length} visitas</p>
           </div>
           <span className="text-xs text-app-text-secondary">{historialFiltrado.length} en total</span>
@@ -541,8 +554,8 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'salido' ? 'bg-green-600 text-white' : 'bg-[#22C55E26] text-state-success'}`} onClick={() => { setFiltroHistorial('salido'); setPaginaFrecuentes(1); }}>Completadas</button>
         </div>
         <input
-          className="app-input"
-          placeholder="Filtrar por nombre del visitante"
+          className="app-input py-2 text-sm"
+          placeholder="Filtrar por nombre"
           value={busquedaFrecuentes}
           onChange={(e) => {
             setBusquedaFrecuentes(e.target.value);
@@ -551,7 +564,7 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
         />
         <div className="space-y-2">
           {historialPaginado.map((item) => (
-            <div key={item.id} className="app-surface-primary p-3 text-sm">
+            <div key={item.id} className="rounded-xl border border-app-border/70 bg-app-bg-alt/65 p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{item.nombre_visitante || 'Visitante registrado'}</p>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${claseEstado(item.estado)}`}>
@@ -560,13 +573,11 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
               </div>
               <p className="text-app-text-secondary">Fecha de visita: {fechaLegible(item.fecha_visita)}</p>
               <p className="text-xs text-app-text-secondary">{estadoHumano(item.estado).descripcion}</p>
-              {item.tipo_vehiculo ? (
+              {item.tipo_vehiculo && (
                 <p className="text-app-text-secondary">
                   Vehículo: {item.tipo_vehiculo}
                   {item.placa ? ` · Placa ${item.placa}` : ''}
                 </p>
-              ) : (
-                <p className="text-app-text-secondary">Sin vehículo</p>
               )}
               <div className="flex flex-wrap gap-2 mt-2">
                 {normalizarEstado(item.estado) === 'pendiente' && (
@@ -582,7 +593,7 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
             </div>
           ))}
           {historialBuscado.length === 0 && (
-            <div className="app-surface-primary p-3 space-y-1">
+            <div className="rounded-xl border border-app-border/70 bg-app-bg-alt/65 p-3 space-y-1">
               <p className="text-sm font-medium">Aún no has registrado visitas</p>
               <p className="text-sm text-app-text-secondary">Cuando generes un código de ingreso, aparecerá aquí para que puedas reenviarlo o reutilizar datos.</p>
             </div>
