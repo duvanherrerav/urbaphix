@@ -15,6 +15,27 @@ const formatManualIngresoCode = (qrCode) => {
 
 export default function CrearVisita({ usuarioApp: _usuarioApp }) {
   const normalizarEstado = (estado) => String(estado || '').trim().toLowerCase();
+  const estadoHumano = (estado) => {
+    const value = normalizarEstado(estado);
+    if (value === 'pendiente') return { titulo: 'Pendiente de ingreso', descripcion: 'Tu visitante aún no ha ingresado.' };
+    if (value === 'ingresado') return { titulo: 'En portería / En curso', descripcion: 'Tu visitante ya registró ingreso.' };
+    if (value === 'salido') return { titulo: 'Visita finalizada', descripcion: 'La visita ya registró salida.' };
+    if (value === 'cancelado') return { titulo: 'Cancelada', descripcion: 'Esta visita fue cancelada.' };
+    return { titulo: 'Estado no disponible', descripcion: 'Aún no tenemos más detalles de esta visita.' };
+  };
+  const claseEstado = (estado) => {
+    const value = normalizarEstado(estado);
+    if (value === 'salido') return 'bg-[#22C55E26] text-state-success';
+    if (value === 'ingresado') return 'bg-[#38BDF826] text-state-info';
+    if (value === 'cancelado') return 'bg-[#EF444426] text-state-error';
+    return 'bg-[#F59E0B1F] text-state-warning';
+  };
+  const fechaLegible = (fecha) => {
+    if (!fecha) return 'Fecha por confirmar';
+    const parsed = new Date(`${fecha}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return 'Fecha por confirmar';
+    return parsed.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  };
   const hoyBogota = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
   const fechaHoy = hoyBogota();
   const normalizarDocumento = (value) => String(value || '').replace(/\s+/g, '').toUpperCase();
@@ -342,14 +363,18 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
   const paginaFrecuenteActual = Math.min(paginaFrecuentes, totalPaginasFrecuentes);
   const historialPaginado = historialBuscado.slice((paginaFrecuenteActual - 1) * PAGE_SIZE, paginaFrecuenteActual * PAGE_SIZE);
   const quickFrecuentes = useMemo(() => visitantesSugeridos.slice(0, 5), [visitantesSugeridos]);
+  const inicioRango = historialBuscado.length === 0 ? 0 : ((paginaFrecuenteActual - 1) * PAGE_SIZE) + 1;
+  const finRango = historialBuscado.length === 0 ? 0 : Math.min(paginaFrecuenteActual * PAGE_SIZE, historialBuscado.length);
 
   return (
-    <div className="app-surface-primary p-6 space-y-5 max-w-2xl">
+    <div className="app-surface-primary p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
       <div>
         <h2 className="text-2xl font-bold">Solicitar visita 🚶‍♂️</h2>
         <p className="text-sm text-app-text-secondary">Completa los datos y genera un código para el ingreso en portería.</p>
       </div>
 
+      <div className="grid xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] gap-5 items-start">
+      <div className="space-y-5">
       <section className="app-surface-muted p-4 space-y-3"><h3 className="font-semibold">Datos del visitante</h3><div className="grid md:grid-cols-2 gap-3">
         <input
           className="app-input"
@@ -499,11 +524,15 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
       {qrPayload && (
         <div ref={qrSectionRef}><QRShareCard qrValue={qrPayload} manualCode={formatManualIngresoCode(qrPayload)} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
       )}
+      </div>
 
-      <div className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Visitas recientes</h3>
-          <span className="text-xs text-app-text-secondary">{historialFiltrado.length} registros</span>
+      <aside className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20 xl:sticky xl:top-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="font-semibold">Historial de visitas</h3>
+            <p className="text-xs text-app-text-secondary">Mostrando {inicioRango}-{finRango} de {historialBuscado.length} visitas</p>
+          </div>
+          <span className="text-xs text-app-text-secondary">{historialFiltrado.length} en total</span>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <button className={`px-3 py-1 rounded-full ${filtroHistorial === 'todos' ? 'bg-brand-primary text-app-text-primary' : 'bg-app-bg'}`} onClick={() => { setFiltroHistorial('todos'); setPaginaFrecuentes(1); }}>Todos</button>
@@ -520,33 +549,44 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
             setPaginaFrecuentes(1);
           }}
         />
-        <div className="space-y-2 max-h-72 overflow-auto pr-1">
+        <div className="space-y-2">
           {historialPaginado.map((item) => (
             <div key={item.id} className="app-surface-primary p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium">{item.nombre_visitante} · {item.documento}</p>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${normalizarEstado(item.estado) === 'salido'
-                  ? 'bg-[#22C55E26] text-state-success'
-                  : normalizarEstado(item.estado) === 'ingresado'
-                    ? 'bg-[#38BDF826] text-state-info'
-                    : 'bg-[#F59E0B1F] text-state-warning'
-                  }`}>
-                  {normalizarEstado(item.estado) === 'salido' ? 'Completada' : normalizarEstado(item.estado) === 'ingresado' ? 'En curso' : 'Pendiente'}
+                <p className="font-medium">{item.nombre_visitante || 'Visitante registrado'}</p>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${claseEstado(item.estado)}`}>
+                  {estadoHumano(item.estado).titulo}
                 </span>
               </div>
-              <p className="text-app-text-secondary">Fecha visita: {item.fecha_visita}</p>
-              {item.placa && <p className="text-app-text-secondary">Placa: {item.placa}</p>}
+              <p className="text-app-text-secondary">Fecha de visita: {fechaLegible(item.fecha_visita)}</p>
+              <p className="text-xs text-app-text-secondary">{estadoHumano(item.estado).descripcion}</p>
+              {item.tipo_vehiculo ? (
+                <p className="text-app-text-secondary">
+                  Vehículo: {item.tipo_vehiculo}
+                  {item.placa ? ` · Placa ${item.placa}` : ''}
+                </p>
+              ) : (
+                <p className="text-app-text-secondary">Sin vehículo</p>
+              )}
               <div className="flex flex-wrap gap-2 mt-2">
                 {normalizarEstado(item.estado) === 'pendiente' && (
                   <button className="app-btn-ghost text-xs" onClick={() => setQRDesdeHistorial(item)}>Reenviar código</button>
                 )}
-                {normalizarEstado(item.estado) === 'salido' && (
+                {(normalizarEstado(item.estado) === 'salido' || normalizarEstado(item.estado) === 'cancelado') && (
                   <button className="app-btn-ghost text-xs" onClick={() => reutilizarVisita(item)}>Usar nuevamente</button>
+                )}
+                {normalizarEstado(item.estado) === 'ingresado' && (
+                  <button className="app-btn-ghost text-xs" onClick={() => setQRDesdeHistorial(item)}>Ver detalle</button>
                 )}
               </div>
             </div>
           ))}
-          {historialBuscado.length === 0 && <p className="text-sm text-app-text-secondary">Aún no has registrado visitas. Cuando crees una visita aparecerá aquí para reutilizarla fácilmente</p>}
+          {historialBuscado.length === 0 && (
+            <div className="app-surface-primary p-3 space-y-1">
+              <p className="text-sm font-medium">Aún no has registrado visitas</p>
+              <p className="text-sm text-app-text-secondary">Cuando generes un código de ingreso, aparecerá aquí para que puedas reenviarlo o reutilizar datos.</p>
+            </div>
+          )}
         </div>
         {historialBuscado.length > 0 && (
           <div className="flex items-center justify-between text-xs">
@@ -569,6 +609,7 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
             </div>
           </div>
         )}
+      </aside>
       </div>
     </div>
   );
