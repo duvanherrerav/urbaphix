@@ -11,8 +11,16 @@ const formatFechaCO = (value) => {
 
 const mapEstado = (estado) => {
   const key = String(estado || '').toLowerCase();
-  if (key === 'entregado') return { label: 'Entregado', className: 'text-state-success' };
-  return { label: 'Pendiente de entrega', className: 'text-state-warning' };
+
+  if (key === 'pendiente') {
+    return { label: 'Pendiente de entrega', className: 'text-state-warning' };
+  }
+
+  if (key === 'entregado') {
+    return { label: 'Entregado', className: 'text-state-success' };
+  }
+
+  return { label: 'Estado no disponible', className: 'text-app-text-secondary' };
 };
 
 export default function PaqueteCard({ paquete }) {
