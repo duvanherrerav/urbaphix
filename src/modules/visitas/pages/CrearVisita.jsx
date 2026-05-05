@@ -367,15 +367,15 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
   const finRango = historialBuscado.length === 0 ? 0 : Math.min(paginaFrecuenteActual * PAGE_SIZE, historialBuscado.length);
 
   return (
-    <div className="app-surface-primary p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
-      <div>
+    <div className="w-full max-w-6xl mx-auto space-y-5 overflow-x-hidden">
+      <header className="app-surface-primary p-4 md:p-5">
         <h2 className="text-2xl font-bold">Solicitar visita 🚶‍♂️</h2>
         <p className="text-sm text-app-text-secondary">Completa los datos y genera un código para el ingreso en portería.</p>
-      </div>
+      </header>
 
-      <div className="grid xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] gap-5 items-start">
-      <div className="space-y-5">
-      <section className="app-surface-muted p-4 space-y-3"><h3 className="font-semibold">Datos del visitante</h3><div className="grid md:grid-cols-2 gap-3">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] xl:items-start">
+      <div className="min-w-0 space-y-4">
+      <section className="app-surface-muted space-y-3"><h3 className="font-semibold">Datos del visitante</h3><div className="grid md:grid-cols-2 gap-3">
         <input
           className="app-input"
           placeholder="Nombre visitante"
@@ -431,7 +431,7 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
           onBlur={() => setTouched((prev) => ({ ...prev, fecha: true }))}
         />
       </div><p className="text-xs text-app-text-secondary">Documento del visitante para control en portería</p></section>
-      <section className="app-surface-muted p-4 space-y-3"><h3 className="font-semibold">Detalles de la visita</h3><p className="text-xs text-app-text-secondary">Selecciona el día en que llegará tu visita</p>{quickFrecuentes.length > 0 && (
+      <section className="app-surface-muted space-y-3"><h3 className="font-semibold">Detalles de la visita</h3><p className="text-xs text-app-text-secondary">Selecciona el día en que llegará tu visita</p>{quickFrecuentes.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-app-text-secondary">Accesos rápidos de visitantes frecuentes</p>
           <div className="flex flex-wrap gap-2">
@@ -456,7 +456,7 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
 
       </section>
 
-      <section className="app-surface-muted p-4 space-y-3"><h3 className="font-semibold">Vehículo (opcional)</h3><div className="grid md:grid-cols-2 gap-3 items-start">
+      <section className="app-surface-muted space-y-3"><h3 className="font-semibold">Vehículo (opcional)</h3><div className="grid md:grid-cols-2 gap-3 items-start">
         <select
           className="app-input w-full"
           value={form.tipoVehiculo}
@@ -481,7 +481,7 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
         )}
       </div></section>
 
-      <section className="app-surface-muted p-4"><h3 className="font-semibold mb-3">Acción</h3><button
+      <section className="app-surface-muted"><h3 className="font-semibold mb-3">Acción</h3><button
         onClick={() => {
           const nombreLimpio = normalizarNombre(form.nombre);
           const documentoLimpio = normalizarDocumento(form.documento);
@@ -508,7 +508,7 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
       </button></section>
 
       {resumenOpen && (
-        <div className="app-surface-muted p-4 space-y-3 border border-brand-primary/30">
+        <div className="app-surface-muted space-y-3 border border-brand-primary/30">
           <h3 className="font-semibold">Resumen de la visita</h3>
           <p className="text-sm"><b>Nombre:</b> {normalizarNombre(form.nombre)}</p>
           <p className="text-sm"><b>Documento:</b> {form.tipo_documento} {normalizarDocumento(form.documento)}</p>
@@ -522,11 +522,11 @@ export default function CrearVisita({ usuarioApp: _usuarioApp }) {
       )}
 
       {qrPayload && (
-        <div ref={qrSectionRef}><QRShareCard qrValue={qrPayload} manualCode={formatManualIngresoCode(qrPayload)} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
+        <div ref={qrSectionRef} className="min-w-0"><QRShareCard qrValue={qrPayload} manualCode={formatManualIngresoCode(qrPayload)} onShare={compartirCodigoQR} onCopy={copiarCodigo} onDownload={compartirImagenQR} visitanteNombre={qrMetadata.visitanteNombre} fechaVisita={qrMetadata.fechaVisita} qrWrapRef={qrWrapRef} /></div>
       )}
       </div>
 
-      <aside className="app-surface-muted p-4 space-y-3 bg-app-bg/60 border border-brand-primary/20 xl:sticky xl:top-4">
+      <aside className="app-surface-muted min-w-0 space-y-3 bg-app-bg/60 border border-brand-primary/20 xl:sticky xl:top-4 xl:self-start">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="font-semibold">Historial de visitas</h3>
