@@ -92,8 +92,8 @@ const normalizeManualIngresoCode = (value) => String(value || '').replace(/[^a-z
 const formatManualIngresoCode = (qrCode) => {
     const compact = normalizeManualIngresoCode(qrCode);
     if (!compact) return '';
-    const base = compact.slice(0, 8);
-    return base.length > 4 ? `${base.slice(0, 4)}-${base.slice(4)}` : base;
+    const base = compact.slice(-8).padStart(8, '0');
+    return `${base.slice(0, 4)}-${base.slice(4)}`;
 };
 
 const parseQRCode = (text) => {
