@@ -1,12 +1,15 @@
-import { estaPagoEnRevision, estaPagoPagado, estaPagoRechazado, puedeSubirComprobante } from '../../utils/pagosEstados';
+import { ESTADOS_PAGO, estaPagoEnRevision, estaPagoPagado, estaPagoRechazado, getDiasMoraPago, obtenerEstadoFinancieroReal, puedeSubirComprobante } from '../../utils/pagosEstados';
 import ComprobanteUploader from './ComprobanteUploader';
 
 export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoChange, onSubirComprobante }) {
   const tieneComprobante = Boolean(pago?.comprobante_url);
   const estaPagado = estaPagoPagado(pago?.estado);
   const estaEnRevision = estaPagoEnRevision(pago?.estado);
+  const estadoReal = obtenerEstadoFinancieroReal(pago);
   const estaRechazado = estaPagoRechazado(pago?.estado);
-  const puedeSubir = puedeSubirComprobante(pago?.estado);
+  const estaVencido = estadoReal === ESTADOS_PAGO.VENCIDO;
+  const diasMora = getDiasMoraPago(pago);
+  const puedeSubir = puedeSubirComprobante(pago);
   const motivoRechazo = String(pago?.motivo_rechazo || '').trim();
 
   if (estaPagado) {
@@ -22,15 +25,17 @@ export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoCh
   }
 
   return (
-    <div className={`space-y-2 rounded-xl border bg-app-bg/55 p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] ${estaRechazado ? 'border-state-error/40' : 'border-app-border/80'}`}>
+    <div className={`space-y-2 rounded-xl border bg-app-bg/55 p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] ${estaVencido || estaRechazado ? 'border-state-error/40' : 'border-app-border/80'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className={`text-xs font-semibold ${estaRechazado ? 'text-state-error' : 'text-app-text-primary'}`}>
-            {estaRechazado ? 'Comprobante rechazado' : estaEnRevision ? 'Comprobante en revisión' : tieneComprobante ? 'Comprobante adjunto' : 'Adjunta tu comprobante'}
+          <p className={`text-xs font-semibold ${estaVencido || estaRechazado ? 'text-state-error' : 'text-app-text-primary'}`}>
+            {estaVencido ? 'Pago vencido' : estaRechazado ? 'Comprobante rechazado' : estaEnRevision ? 'Comprobante en revisión' : tieneComprobante ? 'Comprobante adjunto' : 'Adjunta tu comprobante'}
           </p>
           <p className="mt-0.5 text-[11px] leading-snug text-app-text-secondary">
-            {estaRechazado
-              ? 'Tu comprobante fue rechazado. Revisa la observación y sube un nuevo soporte.'
+            {estaVencido
+              ? `Este cobro presenta mora administrativa. ${diasMora} día(s) de mora.`
+              : estaRechazado
+                ? 'Tu comprobante fue rechazado. Revisa la observación y sube un nuevo soporte.'
               : estaEnRevision
                 ? 'Soporte enviado para validación administrativa.'
                 : tieneComprobante
@@ -45,6 +50,12 @@ export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoCh
           </button>
         )}
       </div>
+
+      {estaVencido && (
+        <p className="rounded-lg border border-state-error/25 bg-state-error/10 px-3 py-1.5 text-[11px] leading-snug text-state-error">
+          Este cobro presenta mora administrativa. No incluye intereses ni multas automáticas.
+        </p>
+      )}
 
       {estaRechazado && motivoRechazo && (
         <p className="rounded-lg border border-state-error/25 bg-state-error/10 px-3 py-1.5 text-[11px] leading-snug text-app-text-secondary">

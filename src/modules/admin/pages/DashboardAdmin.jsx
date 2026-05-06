@@ -36,13 +36,16 @@ export default function DashboardAdmin({ usuarioApp }) {
 
     return {
       pendientesCantidad: porEstado[ESTADOS_PAGO.PENDIENTE].cantidad,
+      vencidosCantidad: porEstado[ESTADOS_PAGO.VENCIDO].cantidad,
       enRevisionCantidad: porEstado[ESTADOS_PAGO.EN_REVISION].cantidad,
       rechazadosCantidad: porEstado[ESTADOS_PAGO.RECHAZADO].cantidad,
       pendienteMonto: porEstado[ESTADOS_PAGO.PENDIENTE].total,
+      vencidoMonto: porEstado[ESTADOS_PAGO.VENCIDO].total,
       enRevisionMonto: porEstado[ESTADOS_PAGO.EN_REVISION].total,
       pagadoMonto: porEstado[ESTADOS_PAGO.PAGADO].total,
       rechazadoMonto: porEstado[ESTADOS_PAGO.RECHAZADO].total,
       carteraMonto: porEstado[ESTADOS_PAGO.PENDIENTE].total
+        + porEstado[ESTADOS_PAGO.VENCIDO].total
         + porEstado[ESTADOS_PAGO.EN_REVISION].total
         + porEstado[ESTADOS_PAGO.RECHAZADO].total
     };
@@ -51,6 +54,8 @@ export default function DashboardAdmin({ usuarioApp }) {
   const atencionInmediata = useMemo(() => {
     const porEstado = getResumenEstadosPago(pagos);
     const pagosPendientes = porEstado[ESTADOS_PAGO.PENDIENTE].cantidad;
+    const pagosVencidos = porEstado[ESTADOS_PAGO.VENCIDO].cantidad;
+    const carteraVencidaTotal = porEstado[ESTADOS_PAGO.VENCIDO].total;
     const pagosEnRevision = porEstado[ESTADOS_PAGO.EN_REVISION].cantidad;
     const pagosRechazados = porEstado[ESTADOS_PAGO.RECHAZADO].cantidad;
     const incidentesAltos = incidentes.filter((i) => i.nivel === 'alto').length;
@@ -58,7 +63,7 @@ export default function DashboardAdmin({ usuarioApp }) {
     const proximaReserva = [...reservas]
       .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())[0] || null;
 
-    return { pagosPendientes, pagosEnRevision, pagosRechazados, incidentesAltos, reservasPendientes, proximaReserva };
+    return { pagosPendientes, pagosVencidos, carteraVencidaTotal, pagosEnRevision, pagosRechazados, incidentesAltos, reservasPendientes, proximaReserva };
   }, [pagos, incidentes, reservas]);
 
   function parseFechaVisita(value) {
@@ -166,7 +171,7 @@ export default function DashboardAdmin({ usuarioApp }) {
   async function obtenerPagos() {
     const { data, error } = await supabase
       .from('pagos')
-      .select('valor, estado, created_at')
+      .select('valor, estado, created_at, fecha_vencimiento, dias_mora')
       .eq('conjunto_id', usuarioApp.conjunto_id);
 
     if (error) return;
@@ -349,6 +354,7 @@ export default function DashboardAdmin({ usuarioApp }) {
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-success font-medium">Recaudado</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p></div>
             <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-warning font-medium">Pendiente sin soporte</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p></div>
+            <div className="rounded-xl border border-state-error/45 bg-state-error/10 p-3"><p className="text-state-error font-medium">Vencido</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.vencidoMonto.toLocaleString('es-CO')}</p></div>
             <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-info font-medium">En validación</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.enRevisionMonto.toLocaleString('es-CO')}</p></div>
             <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-error font-medium">Rechazado no aprobado</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.rechazadoMonto.toLocaleString('es-CO')}</p></div>
           </div>
@@ -357,11 +363,16 @@ export default function DashboardAdmin({ usuarioApp }) {
 
       <div className="app-surface-primary p-4">
         <h3 className="font-semibold text-app-text-primary mb-3">🚨 Atención inmediata</h3>
-        <div className="grid md:grid-cols-5 gap-3 text-sm">
+        <div className="grid md:grid-cols-6 gap-3 text-sm">
           <div className="rounded-xl border border-app-border bg-app-bg p-3">
             <p className="text-app-text-secondary">Pagos pendientes</p>
             <p className="text-2xl font-bold text-state-warning">{atencionInmediata.pagosPendientes}</p>
             <p className="text-xs text-app-text-secondary mt-1">Deuda activa sin soporte.</p>
+          </div>
+          <div className="rounded-xl border border-state-error/45 bg-state-error/10 p-3">
+            <p className="text-app-text-secondary">Pagos vencidos</p>
+            <p className="text-2xl font-bold text-state-error">{atencionInmediata.pagosVencidos}</p>
+            <p className="text-xs text-app-text-secondary mt-1">Cartera vencida: ${atencionInmediata.carteraVencidaTotal.toLocaleString('es-CO')}.</p>
           </div>
           <div className="rounded-xl border border-app-border bg-app-bg p-3">
             <p className="text-app-text-secondary">Comprobantes en revisión</p>
@@ -414,7 +425,7 @@ export default function DashboardAdmin({ usuarioApp }) {
         </div>
         <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">💰 Flujo financiero</h3>
-          <p className="text-sm text-app-text-secondary mb-2">Comparativo visual de recaudo, deuda sin soporte, valores en validación y rechazos.</p>
+          <p className="text-sm text-app-text-secondary mb-2">Comparativo visual de recaudo, deuda corriente, cartera vencida, valores en validación y rechazos.</p>
           <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
             <div className="rounded-lg border border-app-border bg-app-bg p-2">
               <p className="font-semibold text-app-text-primary">Recaudado</p>
@@ -423,6 +434,10 @@ export default function DashboardAdmin({ usuarioApp }) {
             <div className="rounded-lg border border-app-border bg-app-bg p-2">
               <p className="font-semibold text-app-text-primary">Pendiente</p>
               <p className="text-base font-bold text-state-warning">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="rounded-lg border border-state-error/40 bg-state-error/10 p-2">
+              <p className="font-semibold text-app-text-primary">Vencido</p>
+              <p className="text-base font-bold text-state-error">${resumenFinanciero.vencidoMonto.toLocaleString('es-CO')}</p>
             </div>
             <div className="rounded-lg border border-app-border bg-app-bg p-2">
               <p className="font-semibold text-app-text-primary">En revisión</p>

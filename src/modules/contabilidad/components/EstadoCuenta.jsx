@@ -4,11 +4,12 @@ import jsPDF from 'jspdf';
 import AppDatePicker from '../../../components/ui/AppDatePicker';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
-import { ESTADOS_PAGO, getEstadoPagoKey, getEstadoPagoUi, getResumenEstadosPago } from '../utils/pagosEstados';
+import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getResumenEstadosPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 const FILTROS_ESTADO = [
   { value: 'todos', label: 'Todos' },
   { value: ESTADOS_PAGO.PENDIENTE, label: 'Pendiente de pago' },
+  { value: ESTADOS_PAGO.VENCIDO, label: 'Pago vencido' },
   { value: ESTADOS_PAGO.EN_REVISION, label: 'Comprobante en revisión' },
   { value: ESTADOS_PAGO.PAGADO, label: 'Pago aprobado' },
   { value: ESTADOS_PAGO.RECHAZADO, label: 'Comprobante rechazado' }
@@ -26,6 +27,12 @@ const RESUMEN_ESTADOS = [
     title: 'Pendiente sin soporte',
     borderClass: 'border-state-warning/35',
     textClass: 'text-state-warning'
+  },
+  {
+    key: ESTADOS_PAGO.VENCIDO,
+    title: 'Cartera vencida',
+    borderClass: 'border-state-error/45',
+    textClass: 'text-state-error'
   },
   {
     key: ESTADOS_PAGO.EN_REVISION,
@@ -63,15 +70,11 @@ export default function EstadoCuenta({ usuarioApp }) {
 
     let query = supabase
       .from('pagos')
-      .select('id, valor, estado, created_at, concepto, tipo_pago')
+      .select('id, valor, estado, created_at, concepto, tipo_pago, fecha_vencimiento, fecha_pago, dias_mora')
       .eq('conjunto_id', usuarioApp.conjunto_id)
       .gte('created_at', `${fechaDesde}T00:00:00`)
       .lte('created_at', `${fechaHasta}T23:59:59`)
       .order('created_at', { ascending: false });
-
-    if (filtroEstado !== 'todos') {
-      query = query.eq('estado', filtroEstado);
-    }
 
     const { data, error } = await query;
     setLoading(false);
@@ -82,7 +85,10 @@ export default function EstadoCuenta({ usuarioApp }) {
       return;
     }
 
-    const pagos = data || [];
+    const pagosBase = data || [];
+    const pagos = filtroEstado === 'todos'
+      ? pagosBase
+      : pagosBase.filter((pago) => obtenerEstadoFinancieroReal(pago) === filtroEstado);
     const porEstado = getResumenEstadosPago(pagos);
     const totalMovimientos = pagos.length;
     const totalValorPeriodo = pagos.reduce((acc, p) => acc + Number(p.valor || 0), 0);
@@ -100,10 +106,11 @@ export default function EstadoCuenta({ usuarioApp }) {
       fechaHasta,
       filtroEstado,
       totalPendiente: porEstado[ESTADOS_PAGO.PENDIENTE].total,
+      totalVencido: porEstado[ESTADOS_PAGO.VENCIDO].total,
       totalEnRevision: porEstado[ESTADOS_PAGO.EN_REVISION].total,
       totalPagado: porEstado[ESTADOS_PAGO.PAGADO].total,
       totalRechazado: porEstado[ESTADOS_PAGO.RECHAZADO].total,
-      totalCartera: porEstado[ESTADOS_PAGO.PENDIENTE].total + porEstado[ESTADOS_PAGO.EN_REVISION].total + porEstado[ESTADOS_PAGO.RECHAZADO].total,
+      totalCartera: porEstado[ESTADOS_PAGO.PENDIENTE].total + porEstado[ESTADOS_PAGO.VENCIDO].total + porEstado[ESTADOS_PAGO.EN_REVISION].total + porEstado[ESTADOS_PAGO.RECHAZADO].total,
       totalMovimientos,
       totalValorPeriodo,
       pagos,
@@ -147,12 +154,13 @@ export default function EstadoCuenta({ usuarioApp }) {
     let y = drawHeader();
     drawMetricCard(12, y, 'Recaudado', `$${estado.totalPagado.toLocaleString('es-CO')}`);
     drawMetricCard(60, y, 'Pendiente', `$${estado.totalPendiente.toLocaleString('es-CO')}`);
-    drawMetricCard(108, y, 'En revision', `$${estado.totalEnRevision.toLocaleString('es-CO')}`);
-    drawMetricCard(156, y, 'Rechazado', `$${estado.totalRechazado.toLocaleString('es-CO')}`);
+    drawMetricCard(108, y, 'Vencido', `$${estado.totalVencido.toLocaleString('es-CO')}`);
+    drawMetricCard(156, y, 'En revision', `$${estado.totalEnRevision.toLocaleString('es-CO')}`);
     y += 28;
-    drawMetricCard(12, y, 'Cartera total', `$${estado.totalCartera.toLocaleString('es-CO')}`);
-    drawMetricCard(60, y, 'Movimientos', `${estado.totalMovimientos}`);
-    drawMetricCard(108, y, 'Valor total', `$${estado.totalValorPeriodo.toLocaleString('es-CO')}`);
+    drawMetricCard(12, y, 'Rechazado', `$${estado.totalRechazado.toLocaleString('es-CO')}`);
+    drawMetricCard(60, y, 'Cartera total', `$${estado.totalCartera.toLocaleString('es-CO')}`);
+    drawMetricCard(108, y, 'Movimientos', `${estado.totalMovimientos}`);
+    drawMetricCard(156, y, 'Valor total', `$${estado.totalValorPeriodo.toLocaleString('es-CO')}`);
     y += 28;
 
     doc.setFontSize(11);
@@ -206,7 +214,7 @@ export default function EstadoCuenta({ usuarioApp }) {
         y += 5;
       }
 
-      const estadoUi = getEstadoPagoUi(p.estado);
+      const estadoUi = getEstadoPagoUi(p);
       const cols = [
         formatFechaBogota(p.created_at),
         estadoUi.label,
@@ -228,10 +236,14 @@ export default function EstadoCuenta({ usuarioApp }) {
   };
 
   const renderEstadoBadge = (pago) => {
-    const estadoKey = getEstadoPagoKey(pago.estado);
-    const estadoUi = getEstadoPagoUi(estadoKey);
+    const estadoUi = getEstadoPagoUi(pago);
+    const diasMora = getDiasMoraPago(pago);
 
-    return <span className={`app-badge ${estadoUi.badge}`}>{estadoUi.label}</span>;
+    return (
+      <span className={`app-badge ${estadoUi.badge}`}>
+        {estadoUi.label}{obtenerEstadoFinancieroReal(pago) === ESTADOS_PAGO.VENCIDO ? ` · ${diasMora}d mora` : ''}
+      </span>
+    );
   };
 
   const movimientos = estado?.pagos || [];

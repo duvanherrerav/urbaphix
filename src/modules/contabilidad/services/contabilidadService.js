@@ -32,6 +32,9 @@ export const crearPago = async (data, user) => {
 
     // 🔥 crear pago
     const tipoPago = String(data?.tipo_pago || 'administracion').trim().toLowerCase();
+    const fechaCreacion = new Date();
+    const fechaVencimiento = new Date(fechaCreacion);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 10);
 
     const { data: pago, error } = await supabase
       .from('pagos')
@@ -41,7 +44,9 @@ export const crearPago = async (data, user) => {
         concepto: String(data.concepto).trim(),
         tipo_pago: tipoPago,
         valor: valorNumerico,
-        estado: 'pendiente'
+        estado: 'pendiente',
+        fecha_vencimiento: fechaVencimiento.toISOString(),
+        dias_mora: 0
       }])
       .select()
       .single();

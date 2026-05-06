@@ -3,7 +3,7 @@ import { supabase } from '../../../services/supabaseClient';
 import PagoCard from '../components/residente/PagoCard';
 import PagoEmptyState from '../components/residente/PagoEmptyState';
 import PagosResumenCards from '../components/residente/PagosResumenCards';
-import { ESTADOS_PAGO, getEstadoPagoUi } from '../utils/pagosEstados';
+import { ESTADOS_PAGO, esPagoDeudaActiva, getEstadoPagoUi, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 const ordenarPagosDesc = (rows = []) =>
   [...rows].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
@@ -152,9 +152,10 @@ export default function MisPagos({ usuarioApp }) {
   };
 
   const resumen = useMemo(() => ({
-    pendientes: pagos.filter((p) => p.estado === ESTADOS_PAGO.PENDIENTE).length,
-    pagados: pagos.filter((p) => p.estado === ESTADOS_PAGO.PAGADO).length,
-    pendienteValor: pagos.filter((p) => p.estado === ESTADOS_PAGO.PENDIENTE).reduce((a, p) => a + Number(p.valor || 0), 0)
+    pendientes: pagos.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PENDIENTE).length,
+    vencidos: pagos.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.VENCIDO).length,
+    pagados: pagos.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PAGADO).length,
+    pendienteValor: pagos.filter((p) => esPagoDeudaActiva(p)).reduce((a, p) => a + Number(p.valor || 0), 0)
   }), [pagos]);
 
   return (
@@ -199,7 +200,7 @@ export default function MisPagos({ usuarioApp }) {
               <PagoCard
                 key={p.id}
                 pago={p}
-                estadoProceso={getEstadoPagoUi(p.estado)}
+                estadoProceso={getEstadoPagoUi(p)}
                 configPago={configPago}
                 onPagar={pagar}
                 onArchivoChange={(e) => setArchivo(e.target.files[0])}

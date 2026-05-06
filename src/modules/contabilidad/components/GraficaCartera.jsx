@@ -27,6 +27,14 @@ const CARTERA_SEGMENTOS = [
     textClass: 'text-state-warning'
   },
   {
+    key: ESTADOS_PAGO.VENCIDO,
+    label: 'Vencido 🚨',
+    title: 'Vencido',
+    color: '#DC2626',
+    borderColor: '#991B1B',
+    textClass: 'text-state-error'
+  },
+  {
     key: ESTADOS_PAGO.EN_REVISION,
     label: 'En revisión 🔎',
     title: 'En revisión',

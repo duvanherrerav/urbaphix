@@ -269,7 +269,7 @@ Tablas detectadas en `public`:
 ---
 
 ## 10. pagos
-**Descripción:** pagos administrativos u otros conceptos.
+**Descripción:** pagos administrativos u otros conceptos. La cartera real PH deriva visualmente un pago como `vencido` cuando `estado IN ('pendiente', 'rechazado')` y `fecha_vencimiento < now()`; no existe job automático para esta normalización.
 
 ### Campos
 - `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
@@ -277,8 +277,10 @@ Tablas detectadas en `public`:
 - `residente_id` (uuid, nullable)
 - `concepto` (text, nullable)
 - `valor` (numeric, nullable)
-- `fecha_pago` (date, nullable)
-- `estado` (text, nullable, check: `pendiente|en_revision|pagado|rechazado`; constraint agregado `NOT VALID` para no bloquear registros históricos existentes)
+- `fecha_pago` (timestamp with time zone, nullable)
+- `fecha_vencimiento` (timestamp with time zone, nullable)
+- `dias_mora` (integer, nullable, default: `0`)
+- `estado` (text, nullable, check: `pendiente|vencido|en_revision|pagado|rechazado`; constraint agregado `NOT VALID` para no bloquear registros históricos existentes)
 - `comprobante_url` (text, nullable)
 - `motivo_rechazo` (text, nullable)
 - `fecha_rechazo` (timestamp with time zone, nullable)

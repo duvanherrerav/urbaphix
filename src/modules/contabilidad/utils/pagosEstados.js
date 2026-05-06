@@ -1,5 +1,6 @@
 export const ESTADOS_PAGO = Object.freeze({
   PENDIENTE: 'pendiente',
+  VENCIDO: 'vencido',
   EN_REVISION: 'en_revision',
   PAGADO: 'pagado',
   RECHAZADO: 'rechazado'
@@ -12,6 +13,11 @@ const ESTADO_PAGO_UI = Object.freeze({
     key: ESTADOS_PAGO.PENDIENTE,
     label: 'Pendiente de pago',
     badge: 'app-badge-warning'
+  },
+  [ESTADOS_PAGO.VENCIDO]: {
+    key: ESTADOS_PAGO.VENCIDO,
+    label: 'Pago vencido',
+    badge: 'app-badge-error'
   },
   [ESTADOS_PAGO.EN_REVISION]: {
     key: ESTADOS_PAGO.EN_REVISION,
@@ -32,6 +38,7 @@ const ESTADO_PAGO_UI = Object.freeze({
 
 const STEPPER_BY_ESTADO = Object.freeze({
   [ESTADOS_PAGO.PENDIENTE]: ['generado'],
+  [ESTADOS_PAGO.VENCIDO]: ['generado', 'comprobante'],
   [ESTADOS_PAGO.EN_REVISION]: ['generado', 'comprobante'],
   [ESTADOS_PAGO.PAGADO]: ['generado', 'comprobante', 'aprobado'],
   [ESTADOS_PAGO.RECHAZADO]: ['generado', 'comprobante']
@@ -48,20 +55,69 @@ export function getEstadoPagoKey(estado) {
   return ESTADOS_PAGO_VALIDOS.includes(key) ? key : ESTADOS_PAGO.PENDIENTE;
 }
 
-export function getEstadoPagoUi(estado) {
-  return ESTADO_PAGO_UI[getEstadoPagoKey(estado)];
+export function calcularDiasMora(fechaVencimiento, fechaReferencia = new Date()) {
+  if (!fechaVencimiento) return 0;
+
+  const vencimiento = new Date(fechaVencimiento);
+  const referencia = fechaReferencia instanceof Date ? fechaReferencia : new Date(fechaReferencia);
+
+  if (Number.isNaN(vencimiento.getTime()) || Number.isNaN(referencia.getTime())) return 0;
+
+  const inicioVencimiento = new Date(vencimiento.getFullYear(), vencimiento.getMonth(), vencimiento.getDate()).getTime();
+  const inicioReferencia = new Date(referencia.getFullYear(), referencia.getMonth(), referencia.getDate()).getTime();
+  const diferencia = inicioReferencia - inicioVencimiento;
+
+  return Math.max(0, Math.floor(diferencia / 86400000));
 }
 
-export function getPagoStepperSteps(estado) {
-  const estadoKey = getEstadoPagoKey(estado);
+export function esPagoVencido(pago, fechaReferencia = new Date()) {
+  if (!pago || typeof pago !== 'object') return false;
+
+  const estadoKey = getEstadoPagoKey(pago.estado);
+  const esEstadoMorable = estadoKey === ESTADOS_PAGO.PENDIENTE || estadoKey === ESTADOS_PAGO.RECHAZADO || estadoKey === ESTADOS_PAGO.VENCIDO;
+  const fechaVencimiento = pago.fecha_vencimiento;
+  if (!esEstadoMorable || !fechaVencimiento) return false;
+
+  const vencimiento = new Date(fechaVencimiento);
+  const referencia = fechaReferencia instanceof Date ? fechaReferencia : new Date(fechaReferencia);
+
+  return !Number.isNaN(vencimiento.getTime())
+    && !Number.isNaN(referencia.getTime())
+    && vencimiento.getTime() < referencia.getTime();
+}
+
+export function obtenerEstadoFinancieroReal(pago, fechaReferencia = new Date()) {
+  if (!pago || typeof pago !== 'object') return getEstadoPagoKey(pago);
+  const estadoKey = getEstadoPagoKey(pago.estado);
+
+  if (estadoKey === ESTADOS_PAGO.PAGADO || estadoKey === ESTADOS_PAGO.EN_REVISION) {
+    return estadoKey;
+  }
+
+  return esPagoVencido(pago, fechaReferencia) ? ESTADOS_PAGO.VENCIDO : estadoKey;
+}
+
+export function getEstadoPagoUi(estadoOrPago) {
+  const estadoKey = typeof estadoOrPago === 'object'
+    ? obtenerEstadoFinancieroReal(estadoOrPago)
+    : getEstadoPagoKey(estadoOrPago);
+  return ESTADO_PAGO_UI[estadoKey];
+}
+
+export function getPagoStepperSteps(pagoOrEstado) {
+  const estadoKey = typeof pagoOrEstado === 'object'
+    ? obtenerEstadoFinancieroReal(pagoOrEstado)
+    : getEstadoPagoKey(pagoOrEstado);
   const activeSteps = STEPPER_BY_ESTADO[estadoKey] || STEPPER_BY_ESTADO[ESTADOS_PAGO.PENDIENTE];
   const isRejected = estadoKey === ESTADOS_PAGO.RECHAZADO;
+  const isOverdue = estadoKey === ESTADOS_PAGO.VENCIDO;
 
   return BASE_STEPPER_STEPS.map((step) => ({
     ...step,
     label: isRejected && step.key === 'comprobante' ? 'Rechazado' : step.label,
     active: activeSteps.includes(step.key),
-    rejected: isRejected && (step.key === 'comprobante' || step.key === 'aprobado')
+    rejected: isRejected && (step.key === 'comprobante' || step.key === 'aprobado'),
+    overdue: isOverdue && step.key === 'comprobante'
   }));
 }
 
@@ -69,9 +125,11 @@ export function estaPagoRechazado(estado) {
   return getEstadoPagoKey(estado) === ESTADOS_PAGO.RECHAZADO;
 }
 
-export function puedeSubirComprobante(estado) {
-  const estadoKey = getEstadoPagoKey(estado);
-  return estadoKey === ESTADOS_PAGO.PENDIENTE || estadoKey === ESTADOS_PAGO.RECHAZADO;
+export function puedeSubirComprobante(estadoOrPago) {
+  const estadoKey = typeof estadoOrPago === 'object'
+    ? getEstadoPagoKey(estadoOrPago?.estado)
+    : getEstadoPagoKey(estadoOrPago);
+  return estadoKey === ESTADOS_PAGO.PENDIENTE || estadoKey === ESTADOS_PAGO.RECHAZADO || estadoKey === ESTADOS_PAGO.VENCIDO;
 }
 
 export function estaPagoPagado(estado) {
@@ -82,9 +140,13 @@ export function estaPagoEnRevision(estado) {
   return getEstadoPagoKey(estado) === ESTADOS_PAGO.EN_REVISION;
 }
 
+export function estaPagoVencido(pago) {
+  return obtenerEstadoFinancieroReal(pago) === ESTADOS_PAGO.VENCIDO;
+}
 
-const ESTADOS_PAGO_FINANCIEROS = Object.freeze([
+export const ESTADOS_PAGO_FINANCIEROS = Object.freeze([
   ESTADOS_PAGO.PENDIENTE,
+  ESTADOS_PAGO.VENCIDO,
   ESTADOS_PAGO.EN_REVISION,
   ESTADOS_PAGO.PAGADO,
   ESTADOS_PAGO.RECHAZADO
@@ -94,6 +156,13 @@ export function getValorPago(pago) {
   return Number(pago?.valor || 0);
 }
 
+export function getDiasMoraPago(pago) {
+  if (!pago || typeof pago !== 'object') return 0;
+  const diasCalculados = calcularDiasMora(pago.fecha_vencimiento);
+  const diasPersistidos = Number(pago.dias_mora || 0);
+  return Math.max(diasCalculados, Number.isFinite(diasPersistidos) ? diasPersistidos : 0);
+}
+
 export function getResumenEstadosPago(pagos = []) {
   const resumen = ESTADOS_PAGO_FINANCIEROS.reduce((acc, estado) => ({
     ...acc,
@@ -101,7 +170,7 @@ export function getResumenEstadosPago(pagos = []) {
   }), {});
 
   pagos.forEach((pago) => {
-    const estadoKey = getEstadoPagoKey(pago?.estado);
+    const estadoKey = obtenerEstadoFinancieroReal(pago);
     const valor = getValorPago(pago);
 
     resumen[estadoKey].cantidad += 1;
@@ -111,11 +180,16 @@ export function getResumenEstadosPago(pagos = []) {
   return resumen;
 }
 
-export function esPagoDeudaActiva(estado) {
-  const estadoKey = getEstadoPagoKey(estado);
-  return estadoKey === ESTADOS_PAGO.PENDIENTE || estadoKey === ESTADOS_PAGO.RECHAZADO;
+export function esPagoDeudaActiva(pagoOrEstado) {
+  const estadoKey = typeof pagoOrEstado === 'object'
+    ? obtenerEstadoFinancieroReal(pagoOrEstado)
+    : getEstadoPagoKey(pagoOrEstado);
+  return estadoKey === ESTADOS_PAGO.PENDIENTE || estadoKey === ESTADOS_PAGO.RECHAZADO || estadoKey === ESTADOS_PAGO.VENCIDO;
 }
 
-export function esPagoCartera(estado) {
-  return getEstadoPagoKey(estado) !== ESTADOS_PAGO.PAGADO;
+export function esPagoCartera(pagoOrEstado) {
+  const estadoKey = typeof pagoOrEstado === 'object'
+    ? obtenerEstadoFinancieroReal(pagoOrEstado)
+    : getEstadoPagoKey(pagoOrEstado);
+  return estadoKey !== ESTADOS_PAGO.PAGADO;
 }
