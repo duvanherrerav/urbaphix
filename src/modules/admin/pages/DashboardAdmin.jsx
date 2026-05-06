@@ -8,6 +8,7 @@ import KPIsAdmin from '../components/KPIsAdmin';
 import DashboardResumen from '../components/DashboardResumen';
 import CarteraResumen from '../../contabilidad/components/CarteraResumen';
 import GraficaCartera from '../../contabilidad/components/GraficaCartera';
+import { ESTADOS_PAGO, getResumenEstadosPago } from '../../contabilidad/utils/pagosEstados';
 
 const ESTADOS_VISITA_VALIDOS = ['pendiente', 'ingresado', 'salido'];
 
@@ -31,27 +32,33 @@ export default function DashboardAdmin({ usuarioApp }) {
   });
 
   const resumenFinanciero = useMemo(() => {
-    const pendientes = pagos.filter((p) => p.estado === 'pendiente');
-    const pagados = pagos.filter((p) => p.estado === 'pagado');
-
-    const pendienteMonto = pendientes.reduce((acc, p) => acc + Number(p.valor || 0), 0);
-    const pagadoMonto = pagados.reduce((acc, p) => acc + Number(p.valor || 0), 0);
+    const porEstado = getResumenEstadosPago(pagos);
 
     return {
-      pendientesCantidad: pendientes.length,
-      pendienteMonto,
-      pagadoMonto
+      pendientesCantidad: porEstado[ESTADOS_PAGO.PENDIENTE].cantidad,
+      enRevisionCantidad: porEstado[ESTADOS_PAGO.EN_REVISION].cantidad,
+      rechazadosCantidad: porEstado[ESTADOS_PAGO.RECHAZADO].cantidad,
+      pendienteMonto: porEstado[ESTADOS_PAGO.PENDIENTE].total,
+      enRevisionMonto: porEstado[ESTADOS_PAGO.EN_REVISION].total,
+      pagadoMonto: porEstado[ESTADOS_PAGO.PAGADO].total,
+      rechazadoMonto: porEstado[ESTADOS_PAGO.RECHAZADO].total,
+      carteraMonto: porEstado[ESTADOS_PAGO.PENDIENTE].total
+        + porEstado[ESTADOS_PAGO.EN_REVISION].total
+        + porEstado[ESTADOS_PAGO.RECHAZADO].total
     };
   }, [pagos]);
 
   const atencionInmediata = useMemo(() => {
-    const pagosPendientes = pagos.filter((p) => p.estado === 'pendiente').length;
+    const porEstado = getResumenEstadosPago(pagos);
+    const pagosPendientes = porEstado[ESTADOS_PAGO.PENDIENTE].cantidad;
+    const pagosEnRevision = porEstado[ESTADOS_PAGO.EN_REVISION].cantidad;
+    const pagosRechazados = porEstado[ESTADOS_PAGO.RECHAZADO].cantidad;
     const incidentesAltos = incidentes.filter((i) => i.nivel === 'alto').length;
     const reservasPendientes = reservas.filter((r) => r.estado === 'pendiente').length;
     const proximaReserva = [...reservas]
       .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())[0] || null;
 
-    return { pagosPendientes, incidentesAltos, reservasPendientes, proximaReserva };
+    return { pagosPendientes, pagosEnRevision, pagosRechazados, incidentesAltos, reservasPendientes, proximaReserva };
   }, [pagos, incidentes, reservas]);
 
   function parseFechaVisita(value) {
@@ -72,7 +79,6 @@ export default function DashboardAdmin({ usuarioApp }) {
   }
 
   const visitasRecientes = useMemo(() => {
-    // eslint-disable-next-line react-hooks/purity
     const limite = Date.now() - VISITAS_RANGO_HORAS * 60 * 60 * 1000;
 
     return visitasBase
@@ -81,6 +87,7 @@ export default function DashboardAdmin({ usuarioApp }) {
         && ESTADOS_VISITA_VALIDOS.includes(visita?.estado)
       ))
       .sort((a, b) => obtenerTimestampVisita(b) - obtenerTimestampVisita(a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visitasBase]);
 
   const stats = useMemo(() => {
@@ -214,6 +221,7 @@ export default function DashboardAdmin({ usuarioApp }) {
       supabase.removeChannel(channel);
     };
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioApp]);
 
   useEffect(() => {
@@ -302,10 +310,11 @@ export default function DashboardAdmin({ usuarioApp }) {
             <h2 className="text-2xl font-bold">👋 Hola {usuarioApp?.nombre || 'Admin'}</h2>
             <p className="text-sm text-app-text-secondary mt-1">Resumen operativo de los últimos 3 días con foco financiero y de visitas.</p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-xs min-w-[280px]">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs min-w-[280px]">
             <div className="app-surface-muted p-3"><p className="text-app-text-secondary">Activas</p><p className="text-lg font-semibold">{stats.ingresados}</p></div>
             <div className="app-surface-muted p-3"><p className="text-app-text-secondary">Paquetes</p><p className="text-lg font-semibold">{kpis.paquetesPendientes}</p></div>
             <div className="app-surface-muted p-3"><p className="text-app-text-secondary">Pendientes</p><p className="text-lg font-semibold">{resumenFinanciero.pendientesCantidad}</p></div>
+            <div className="app-surface-muted p-3"><p className="text-app-text-secondary">En revisión</p><p className="text-lg font-semibold">{resumenFinanciero.enRevisionCantidad}</p></div>
           </div>
         </div>
       </div>
@@ -339,18 +348,30 @@ export default function DashboardAdmin({ usuarioApp }) {
           <h3 className="font-semibold text-app-text-primary mb-3">💼 Pulso financiero</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-success font-medium">Recaudado</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pagadoMonto.toLocaleString('es-CO')}</p></div>
-            <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-warning font-medium">Pendiente</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p></div>
+            <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-warning font-medium">Pendiente sin soporte</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p></div>
+            <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-info font-medium">En validación</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.enRevisionMonto.toLocaleString('es-CO')}</p></div>
+            <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-error font-medium">Rechazado no aprobado</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.rechazadoMonto.toLocaleString('es-CO')}</p></div>
           </div>
         </div>
       </div>
 
       <div className="app-surface-primary p-4">
         <h3 className="font-semibold text-app-text-primary mb-3">🚨 Atención inmediata</h3>
-        <div className="grid md:grid-cols-3 gap-3 text-sm">
+        <div className="grid md:grid-cols-5 gap-3 text-sm">
           <div className="rounded-xl border border-app-border bg-app-bg p-3">
             <p className="text-app-text-secondary">Pagos pendientes</p>
             <p className="text-2xl font-bold text-state-warning">{atencionInmediata.pagosPendientes}</p>
-            <p className="text-xs text-app-text-secondary mt-1">Priorizar gestión de cartera y recordatorios.</p>
+            <p className="text-xs text-app-text-secondary mt-1">Deuda activa sin soporte.</p>
+          </div>
+          <div className="rounded-xl border border-app-border bg-app-bg p-3">
+            <p className="text-app-text-secondary">Comprobantes en revisión</p>
+            <p className="text-2xl font-bold text-state-info">{atencionInmediata.pagosEnRevision}</p>
+            <p className="text-xs text-app-text-secondary mt-1">Valor en validación; no cuenta como recaudo.</p>
+          </div>
+          <div className="rounded-xl border border-app-border bg-app-bg p-3">
+            <p className="text-app-text-secondary">Comprobantes rechazados</p>
+            <p className="text-2xl font-bold text-state-error">{atencionInmediata.pagosRechazados}</p>
+            <p className="text-xs text-app-text-secondary mt-1">Sigue como deuda no aprobada.</p>
           </div>
           <div className="rounded-xl border border-app-border bg-app-bg p-3">
             <p className="text-app-text-secondary">Incidentes nivel alto</p>
@@ -393,7 +414,7 @@ export default function DashboardAdmin({ usuarioApp }) {
         </div>
         <div className="app-surface-primary p-4 flex flex-col">
           <h3 className="text-app-text-primary text-lg font-bold mb-1">💰 Flujo financiero</h3>
-          <p className="text-sm text-app-text-secondary mb-2">Comparativo visual de recaudo y valores pendientes.</p>
+          <p className="text-sm text-app-text-secondary mb-2">Comparativo visual de recaudo, deuda sin soporte, valores en validación y rechazos.</p>
           <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
             <div className="rounded-lg border border-app-border bg-app-bg p-2">
               <p className="font-semibold text-app-text-primary">Recaudado</p>
@@ -402,6 +423,14 @@ export default function DashboardAdmin({ usuarioApp }) {
             <div className="rounded-lg border border-app-border bg-app-bg p-2">
               <p className="font-semibold text-app-text-primary">Pendiente</p>
               <p className="text-base font-bold text-state-warning">${resumenFinanciero.pendienteMonto.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="rounded-lg border border-app-border bg-app-bg p-2">
+              <p className="font-semibold text-app-text-primary">En revisión</p>
+              <p className="text-base font-bold text-state-info">${resumenFinanciero.enRevisionMonto.toLocaleString('es-CO')}</p>
+            </div>
+            <div className="rounded-lg border border-app-border bg-app-bg p-2">
+              <p className="font-semibold text-app-text-primary">Rechazado</p>
+              <p className="text-base font-bold text-state-error">${resumenFinanciero.rechazadoMonto.toLocaleString('es-CO')}</p>
             </div>
           </div>
           <div className="h-[300px]">

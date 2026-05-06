@@ -7,6 +7,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { ESTADOS_PAGO, getEstadoPagoKey, getValorPago } from '../utils/pagosEstados';
 
 ChartJS.register(
   BarElement,
@@ -16,36 +17,49 @@ ChartJS.register(
   Legend
 );
 
-export default function GraficaFinanciera({ pagos }) {
+const DATASETS_ESTADOS = [
+  {
+    key: ESTADOS_PAGO.PAGADO,
+    label: 'Recaudado 💰',
+    backgroundColor: 'rgba(16, 185, 129, 0.85)'
+  },
+  {
+    key: ESTADOS_PAGO.PENDIENTE,
+    label: 'Pendiente ⏳',
+    backgroundColor: 'rgba(245, 158, 11, 0.85)'
+  },
+  {
+    key: ESTADOS_PAGO.EN_REVISION,
+    label: 'En revisión 🔎',
+    backgroundColor: 'rgba(56, 189, 248, 0.85)'
+  },
+  {
+    key: ESTADOS_PAGO.RECHAZADO,
+    label: 'Rechazado ⚠️',
+    backgroundColor: 'rgba(239, 68, 68, 0.85)'
+  }
+];
 
-  // 🔥 AGRUPAR DATA
+export default function GraficaFinanciera({ pagos }) {
   const agrupado = {};
 
-  pagos.forEach(p => {
+  pagos.forEach((p) => {
     const fecha = p.created_at.split('T')[0];
+    const estadoKey = getEstadoPagoKey(p.estado);
 
     if (!agrupado[fecha]) {
-      agrupado[fecha] = {
-        pagado: 0,
-        pendiente: 0
-      };
+      agrupado[fecha] = DATASETS_ESTADOS.reduce((acc, dataset) => ({
+        ...acc,
+        [dataset.key]: 0
+      }), {});
     }
 
-    if (p.estado === 'pagado') {
-      agrupado[fecha].pagado += p.valor;
-    } else {
-      agrupado[fecha].pendiente += p.valor;
-    }
+    agrupado[fecha][estadoKey] += getValorPago(p);
   });
 
-  // 🔥 ORDENAR
   const fechas = Object.keys(agrupado).sort();
 
-  const dataPagado = fechas.map(f => agrupado[f].pagado);
-  const dataPendiente = fechas.map(f => agrupado[f].pendiente);
-
-  // 🔥 FORMATEO BONITO
-  const labels = fechas.map(f => {
+  const labels = fechas.map((f) => {
     const date = new Date(f);
     return date.toLocaleDateString('es-CO', {
       day: '2-digit',
@@ -55,22 +69,13 @@ export default function GraficaFinanciera({ pagos }) {
 
   const data = {
     labels,
-    datasets: [
-      {
-        label: 'Pagado 💰',
-        data: dataPagado,
-        backgroundColor: 'rgba(16, 185, 129, 0.85)',
-        borderRadius: 8,
-        maxBarThickness: 34
-      },
-      {
-        label: 'Pendiente ⏳',
-        data: dataPendiente,
-        backgroundColor: 'rgba(245, 158, 11, 0.85)',
-        borderRadius: 8,
-        maxBarThickness: 34
-      }
-    ]
+    datasets: DATASETS_ESTADOS.map((dataset) => ({
+      label: dataset.label,
+      data: fechas.map((f) => agrupado[f][dataset.key]),
+      backgroundColor: dataset.backgroundColor,
+      borderRadius: 8,
+      maxBarThickness: 34
+    }))
   };
 
   const options = {
@@ -100,7 +105,7 @@ export default function GraficaFinanciera({ pagos }) {
       x: {
         grid: {
           display: false
-          },
+        },
         ticks: {
           color: '#E5E7EB',
           font: { size: 11, weight: '600' }

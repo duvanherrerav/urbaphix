@@ -81,3 +81,41 @@ export function estaPagoPagado(estado) {
 export function estaPagoEnRevision(estado) {
   return getEstadoPagoKey(estado) === ESTADOS_PAGO.EN_REVISION;
 }
+
+
+const ESTADOS_PAGO_FINANCIEROS = Object.freeze([
+  ESTADOS_PAGO.PENDIENTE,
+  ESTADOS_PAGO.EN_REVISION,
+  ESTADOS_PAGO.PAGADO,
+  ESTADOS_PAGO.RECHAZADO
+]);
+
+export function getValorPago(pago) {
+  return Number(pago?.valor || 0);
+}
+
+export function getResumenEstadosPago(pagos = []) {
+  const resumen = ESTADOS_PAGO_FINANCIEROS.reduce((acc, estado) => ({
+    ...acc,
+    [estado]: { cantidad: 0, total: 0 }
+  }), {});
+
+  pagos.forEach((pago) => {
+    const estadoKey = getEstadoPagoKey(pago?.estado);
+    const valor = getValorPago(pago);
+
+    resumen[estadoKey].cantidad += 1;
+    resumen[estadoKey].total += valor;
+  });
+
+  return resumen;
+}
+
+export function esPagoDeudaActiva(estado) {
+  const estadoKey = getEstadoPagoKey(estado);
+  return estadoKey === ESTADOS_PAGO.PENDIENTE || estadoKey === ESTADOS_PAGO.RECHAZADO;
+}
+
+export function esPagoCartera(estado) {
+  return getEstadoPagoKey(estado) !== ESTADOS_PAGO.PAGADO;
+}
