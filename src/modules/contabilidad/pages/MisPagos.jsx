@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
-import { formatFechaBogota } from '../../../utils/dateFormatters';
+import PagoCard from '../components/residente/PagoCard';
+import PagoEmptyState from '../components/residente/PagoEmptyState';
+import PagosResumenCards from '../components/residente/PagosResumenCards';
+
 const getEstadoProcesoPago = (pago) => {
-  if (pago?.estado === 'pagado') return { key: 'pagado', label: 'Aprobado', badge: 'app-badge-success' };
-  if (pago?.estado === 'rechazado') return { key: 'rechazado', label: 'Rechazado', badge: 'app-badge-error' };
-  if (pago?.comprobante_url) return { key: 'en_revision', label: 'En revisión', badge: 'app-badge-info' };
+  if (pago?.estado === 'pagado') return { key: 'pagado', label: 'Pago aprobado', badge: 'app-badge-success' };
+  if (pago?.comprobante_url) return { key: 'en_revision', label: 'Comprobante en revisión', badge: 'app-badge-info' };
   return { key: 'pendiente', label: 'Pendiente de pago', badge: 'app-badge-warning' };
 };
 
@@ -145,83 +147,56 @@ export default function MisPagos({ usuarioApp }) {
 
   return (
     <div className="space-y-4">
-      <div className="app-surface-primary p-5">
-        <h2 className="text-2xl font-bold">Mis pagos 💰</h2>
-        <p className="text-sm text-app-text-secondary mt-1">Estado de cobros, valor por pagar y acciones por comprobante.</p>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-          <div className="app-surface-muted"><span className="text-app-text-secondary">Pendientes</span><p className="text-lg font-semibold text-state-warning">{resumen.pendientes}</p></div>
-          <div className="app-surface-muted"><span className="text-app-text-secondary">Pagados</span><p className="text-lg font-semibold text-state-success">{resumen.pagados}</p></div>
-          <div className="app-surface-muted"><span className="text-app-text-secondary">Saldo pendiente</span><p className="text-lg font-semibold">${resumen.pendienteValor.toLocaleString('es-CO')}</p></div>
-        </div>
-      </div>
-
-      {loading && <p className="text-app-text-secondary">Cargando pagos...</p>}
-      {!loading && pagos.length === 0 && <div className="app-surface-primary p-4 text-center text-app-text-secondary">No tienes pagos registrados.</div>}
-
-      <div className="space-y-3">
-        {pagos.map((p) => (
-          <div key={p.id} className="app-surface-primary p-4">
-            {(() => {
-              const estadoProceso = getEstadoProcesoPago(p);
-              const timeline = [
-                { key: 'pendiente', label: 'Generado' },
-                { key: 'en_revision', label: 'Comprobante enviado' },
-                { key: 'pagado', label: 'Aprobado' }
-              ];
-              const statusOrder = { pendiente: 0, en_revision: 1, pagado: 2, rechazado: 1 };
-              return (
-                <>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <span className={`app-badge ${estadoProceso.badge}`}>{estadoProceso.label}</span>
-                    {p.estado === 'rechazado' && <span className="text-xs text-state-error">Actualiza comprobante para revalidación</span>}
-                  </div>
-                  <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
-                    {timeline.map((step, idx) => {
-                      const current = statusOrder[estadoProceso.key] ?? 0;
-                      const isActive = idx <= current;
-                      return (
-                        <div key={step.key} className={`rounded-lg px-2 py-1 text-center ${isActive ? 'bg-brand-primary/20 text-app-text-primary' : 'bg-app-bg text-app-text-secondary'}`}>
-                          {step.label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              );
-            })()}
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-              <div className="space-y-1">
-                <p className="font-semibold text-app-text-primary">{p.concepto}</p>
-                <p className="text-xs text-app-text-secondary">Generado: {formatFechaBogota(p.created_at)}</p>
-                {p.comprobante_url && <a href={p.comprobante_url} target="_blank" rel="noreferrer" className="text-xs text-brand-secondary">Ver comprobante 📄</a>}
-              </div>
-
-              <div className="lg:w-80 space-y-3">
-                <div className="app-surface-muted flex items-center justify-between">
-                  <span className="text-xs text-app-text-secondary">Valor</span>
-                  <span className="font-bold text-lg">${Number(p.valor || 0).toLocaleString('es-CO')}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`app-badge ${getEstadoProcesoPago(p).badge}`}>{getEstadoProcesoPago(p).label}</span>
-                  {p.estado === 'pendiente' && <button onClick={pagar} className="app-btn-primary text-xs">Pagar</button>}
-                </div>
-                {(p.estado === 'pendiente' || p.estado === 'rechazado') && (
-                  <div className="app-surface-muted space-y-2 border border-brand-primary/20 p-2">
-                    <p className="text-xs text-app-text-secondary">
-                      Comprobante: {p.comprobante_url ? 'enviado, pendiente revisión' : 'pendiente por adjuntar'}
-                    </p>
-                    <input type="file" onChange={(e) => setArchivo(e.target.files[0])} className="text-xs" />
-                    <button onClick={() => subirComprobante(p.id)} className="app-btn-secondary text-xs w-full">
-                      {p.comprobante_url ? 'Reemplazar comprobante' : 'Subir comprobante'}
-                    </button>
-                  </div>
-                )}
-                {configPago?.tipo === 'manual' && <p className="text-xs text-app-text-secondary app-surface-muted">💡 Pago manual habilitado para este conjunto.</p>}
-              </div>
-            </div >
+      <header className="app-surface-primary p-5">
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-brand-secondary">Módulo financiero</p>
+            <h2 className="mt-1 text-2xl font-black text-app-text-primary">Mis pagos 💰</h2>
+            <p className="mt-1 max-w-2xl text-sm text-app-text-secondary">Consulta tus cobros, revisa el saldo pendiente y adjunta comprobantes para validación de la administración.</p>
           </div>
-        ))}
-      </div >
-    </div >
+          <div className="rounded-2xl border border-brand-primary/25 bg-brand-primary/10 px-3 py-2 text-xs text-app-text-secondary">
+            Información actualizada en tiempo real
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <PagosResumenCards resumen={resumen} />
+        </div>
+      </header>
+
+      {loading && (
+        <div className="app-surface-primary p-5 text-sm text-app-text-secondary">
+          Cargando pagos...
+        </div>
+      )}
+
+      {!loading && pagos.length === 0 && <PagoEmptyState />}
+
+      {!loading && pagos.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div>
+              <h3 className="text-sm font-bold text-app-text-primary">Cobros registrados</h3>
+              <p className="text-xs text-app-text-secondary">Ordenados del más reciente al más antiguo.</p>
+            </div>
+            <span className="app-badge app-badge-info text-[11px]">{pagos.length} cobro(s)</span>
+          </div>
+
+          <div className="grid gap-3">
+            {pagos.map((p) => (
+              <PagoCard
+                key={p.id}
+                pago={p}
+                estadoProceso={getEstadoProcesoPago(p)}
+                configPago={configPago}
+                onPagar={pagar}
+                onArchivoChange={(e) => setArchivo(e.target.files[0])}
+                onSubirComprobante={() => subirComprobante(p.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
