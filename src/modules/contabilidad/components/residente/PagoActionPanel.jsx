@@ -2,7 +2,8 @@ export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoCh
   const tieneComprobante = Boolean(pago?.comprobante_url);
   const estaPagado = pago?.estado === 'pagado';
   const estaPendiente = pago?.estado === 'pendiente';
-  const puedeSubir = estaPendiente;
+  const estaRechazado = pago?.estado === 'rechazado';
+  const puedeSubir = estaPendiente || estaRechazado;
 
   if (estaPagado) {
     return (
