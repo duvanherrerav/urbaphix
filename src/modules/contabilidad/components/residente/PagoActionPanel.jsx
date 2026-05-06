@@ -1,3 +1,5 @@
+import ComprobanteUploader from './ComprobanteUploader';
+
 export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoChange, onSubirComprobante }) {
   const tieneComprobante = Boolean(pago?.comprobante_url);
   const estaPagado = pago?.estado === 'pagado';
@@ -41,26 +43,20 @@ export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoCh
       {(tieneComprobante || puedeSubir) && (
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           {puedeSubir && (
-            <label className="flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-brand-primary/30 bg-app-bg-alt/70 px-3 py-1.5 text-xs text-app-text-secondary transition-colors hover:border-brand-secondary/70 hover:bg-[#38BDF812]">
-              <span className="truncate">{tieneComprobante ? 'Seleccionar nuevo soporte' : 'Seleccionar comprobante'}</span>
-              <span className="shrink-0 font-semibold text-brand-secondary">Buscar archivo</span>
-              <input type="file" onChange={onArchivoChange} className="sr-only" />
-            </label>
+            <ComprobanteUploader
+              tieneComprobante={tieneComprobante}
+              onArchivoChange={onArchivoChange}
+              onSubirComprobante={onSubirComprobante}
+            />
           )}
 
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            {tieneComprobante && (
+          {tieneComprobante && (
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <a href={pago.comprobante_url} target="_blank" rel="noreferrer" className="text-xs font-medium text-brand-secondary transition-colors hover:text-brand-primary">
                 Ver comprobante 📄
               </a>
-            )}
-
-            {puedeSubir && (
-              <button type="button" onClick={onSubirComprobante} className="app-btn-secondary px-3 py-1.5 text-xs">
-                {tieneComprobante ? 'Reemplazar' : 'Subir'}
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
