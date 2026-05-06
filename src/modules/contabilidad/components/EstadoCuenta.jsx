@@ -4,6 +4,42 @@ import jsPDF from 'jspdf';
 import AppDatePicker from '../../../components/ui/AppDatePicker';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
+import { ESTADOS_PAGO, getEstadoPagoKey, getEstadoPagoUi, getResumenEstadosPago } from '../utils/pagosEstados';
+
+const FILTROS_ESTADO = [
+  { value: 'todos', label: 'Todos' },
+  { value: ESTADOS_PAGO.PENDIENTE, label: 'Pendiente de pago' },
+  { value: ESTADOS_PAGO.EN_REVISION, label: 'Comprobante en revisión' },
+  { value: ESTADOS_PAGO.PAGADO, label: 'Pago aprobado' },
+  { value: ESTADOS_PAGO.RECHAZADO, label: 'Comprobante rechazado' }
+];
+
+const RESUMEN_ESTADOS = [
+  {
+    key: ESTADOS_PAGO.PAGADO,
+    title: 'Recaudado',
+    borderClass: 'border-state-success/35',
+    textClass: 'text-state-success'
+  },
+  {
+    key: ESTADOS_PAGO.PENDIENTE,
+    title: 'Pendiente sin soporte',
+    borderClass: 'border-state-warning/35',
+    textClass: 'text-state-warning'
+  },
+  {
+    key: ESTADOS_PAGO.EN_REVISION,
+    title: 'En validación',
+    borderClass: 'border-state-info/35',
+    textClass: 'text-state-info'
+  },
+  {
+    key: ESTADOS_PAGO.RECHAZADO,
+    title: 'Rechazado no aprobado',
+    borderClass: 'border-state-error/35',
+    textClass: 'text-state-error'
+  }
+];
 
 export default function EstadoCuenta({ usuarioApp }) {
   const MOVIMIENTOS_PREVIEW_LIMIT = 5;
@@ -47,12 +83,7 @@ export default function EstadoCuenta({ usuarioApp }) {
     }
 
     const pagos = data || [];
-    const totalPendiente = pagos
-      .filter((p) => p.estado === 'pendiente')
-      .reduce((acc, p) => acc + Number(p.valor || 0), 0);
-    const totalPagado = pagos
-      .filter((p) => p.estado === 'pagado')
-      .reduce((acc, p) => acc + Number(p.valor || 0), 0);
+    const porEstado = getResumenEstadosPago(pagos);
     const totalMovimientos = pagos.length;
     const totalValorPeriodo = pagos.reduce((acc, p) => acc + Number(p.valor || 0), 0);
 
@@ -68,11 +99,15 @@ export default function EstadoCuenta({ usuarioApp }) {
       fechaDesde,
       fechaHasta,
       filtroEstado,
-      totalPendiente,
-      totalPagado,
+      totalPendiente: porEstado[ESTADOS_PAGO.PENDIENTE].total,
+      totalEnRevision: porEstado[ESTADOS_PAGO.EN_REVISION].total,
+      totalPagado: porEstado[ESTADOS_PAGO.PAGADO].total,
+      totalRechazado: porEstado[ESTADOS_PAGO.RECHAZADO].total,
+      totalCartera: porEstado[ESTADOS_PAGO.PENDIENTE].total + porEstado[ESTADOS_PAGO.EN_REVISION].total + porEstado[ESTADOS_PAGO.RECHAZADO].total,
       totalMovimientos,
       totalValorPeriodo,
       pagos,
+      porEstado,
       porTipo
     });
   };
@@ -112,8 +147,12 @@ export default function EstadoCuenta({ usuarioApp }) {
     let y = drawHeader();
     drawMetricCard(12, y, 'Recaudado', `$${estado.totalPagado.toLocaleString('es-CO')}`);
     drawMetricCard(60, y, 'Pendiente', `$${estado.totalPendiente.toLocaleString('es-CO')}`);
-    drawMetricCard(108, y, 'Total movimientos', `${estado.totalMovimientos}`);
-    drawMetricCard(156, y, 'Valor total', `$${estado.totalValorPeriodo.toLocaleString('es-CO')}`);
+    drawMetricCard(108, y, 'En revision', `$${estado.totalEnRevision.toLocaleString('es-CO')}`);
+    drawMetricCard(156, y, 'Rechazado', `$${estado.totalRechazado.toLocaleString('es-CO')}`);
+    y += 28;
+    drawMetricCard(12, y, 'Cartera total', `$${estado.totalCartera.toLocaleString('es-CO')}`);
+    drawMetricCard(60, y, 'Movimientos', `${estado.totalMovimientos}`);
+    drawMetricCard(108, y, 'Valor total', `$${estado.totalValorPeriodo.toLocaleString('es-CO')}`);
     y += 28;
 
     doc.setFontSize(11);
@@ -141,7 +180,7 @@ export default function EstadoCuenta({ usuarioApp }) {
     y += 6;
 
     const tableX = 12;
-    const tableWidths = [32, 30, 94, 30];
+    const tableWidths = [32, 46, 78, 30];
     const headers = ['Fecha', 'Estado', 'Concepto', 'Valor'];
     doc.setFillColor(226, 232, 240);
     doc.rect(tableX, y - 4, tableWidths.reduce((acc, w) => acc + w, 0), 7, 'F');
@@ -167,10 +206,11 @@ export default function EstadoCuenta({ usuarioApp }) {
         y += 5;
       }
 
+      const estadoUi = getEstadoPagoUi(p.estado);
       const cols = [
         formatFechaBogota(p.created_at),
-        getTipoPagoLabel(p.estado),
-        (p.concepto || '-').slice(0, 46),
+        estadoUi.label,
+        (p.concepto || '-').slice(0, 38),
         `$${Number(p.valor || 0).toLocaleString('es-CO')}`
       ];
 
@@ -185,6 +225,13 @@ export default function EstadoCuenta({ usuarioApp }) {
     });
 
     doc.save(`reporte_pagos_${estado.fechaDesde}_${estado.fechaHasta}.pdf`);
+  };
+
+  const renderEstadoBadge = (pago) => {
+    const estadoKey = getEstadoPagoKey(pago.estado);
+    const estadoUi = getEstadoPagoUi(estadoKey);
+
+    return <span className={`app-badge ${estadoUi.badge}`}>{estadoUi.label}</span>;
   };
 
   const movimientos = estado?.pagos || [];
@@ -204,9 +251,9 @@ export default function EstadoCuenta({ usuarioApp }) {
 
       <div className="app-surface-muted p-3 grid md:grid-cols-4 gap-3">
         <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="app-input">
-          <option value="todos">Todos</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="pagado">Pagado</option>
+          {FILTROS_ESTADO.map((filtro) => (
+            <option key={filtro.value} value={filtro.value}>{filtro.label}</option>
+          ))}
         </select>
 
         <AppDatePicker value={fechaDesde} max={fechaHasta} onChange={setFechaDesde} />
@@ -222,13 +269,18 @@ export default function EstadoCuenta({ usuarioApp }) {
           <div>
             <p className="text-xs uppercase tracking-wide text-app-text-secondary mb-2">Resumen del periodo seleccionado</p>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-state-success/35 bg-app-bg px-4 py-3">
-                <p className="text-xs text-app-text-secondary">Recaudado</p>
-                <p className="text-2xl font-bold text-state-success">${estado.totalPagado.toLocaleString('es-CO')}</p>
-              </div>
-              <div className="rounded-xl border border-state-warning/35 bg-app-bg px-4 py-3">
-                <p className="text-xs text-app-text-secondary">Pendiente</p>
-                <p className="text-2xl font-bold text-state-warning">${estado.totalPendiente.toLocaleString('es-CO')}</p>
+              {RESUMEN_ESTADOS.map((item) => (
+                <div key={item.key} className={`rounded-xl border ${item.borderClass} bg-app-bg px-4 py-3`}>
+                  <p className="text-xs text-app-text-secondary">{item.title}</p>
+                  <p className={`text-2xl font-bold ${item.textClass}`}>
+                    ${estado.porEstado[item.key].total.toLocaleString('es-CO')}
+                  </p>
+                  <p className="text-[11px] text-app-text-secondary">{estado.porEstado[item.key].cantidad} movimientos</p>
+                </div>
+              ))}
+              <div className="rounded-xl border border-brand-secondary/35 bg-app-bg px-4 py-3">
+                <p className="text-xs text-app-text-secondary">Cartera no aprobada</p>
+                <p className="text-2xl font-bold">${estado.totalCartera.toLocaleString('es-CO')}</p>
               </div>
               <div className="rounded-xl border border-brand-secondary/35 bg-app-bg px-4 py-3">
                 <p className="text-xs text-app-text-secondary">Total movimientos</p>
@@ -270,9 +322,7 @@ export default function EstadoCuenta({ usuarioApp }) {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">${Number(p.valor || 0).toLocaleString('es-CO')}</p>
-                      <span className={`app-badge capitalize ${p.estado === 'pendiente' ? 'app-badge-warning' : p.estado === 'pagado' ? 'app-badge-success' : 'app-badge-error'}`}>
-                        {p.estado}
-                      </span>
+                      {renderEstadoBadge(p)}
                     </div>
                   </div>
                 </article>
@@ -320,9 +370,7 @@ export default function EstadoCuenta({ usuarioApp }) {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">${Number(p.valor || 0).toLocaleString('es-CO')}</p>
-                      <span className={`app-badge capitalize ${p.estado === 'pendiente' ? 'app-badge-warning' : p.estado === 'pagado' ? 'app-badge-success' : 'app-badge-error'}`}>
-                        {p.estado}
-                      </span>
+                      {renderEstadoBadge(p)}
                     </div>
                   </div>
                 </article>

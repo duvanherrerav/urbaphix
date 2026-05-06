@@ -5,29 +5,55 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import { ESTADOS_PAGO, getResumenEstadosPago } from '../utils/pagosEstados';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+const CARTERA_SEGMENTOS = [
+  {
+    key: ESTADOS_PAGO.PAGADO,
+    label: 'Pagado 💰',
+    title: 'Pagado',
+    color: '#10B981',
+    borderColor: '#059669',
+    textClass: 'text-state-success'
+  },
+  {
+    key: ESTADOS_PAGO.PENDIENTE,
+    label: 'Pendiente ⏳',
+    title: 'Pendiente',
+    color: '#F59E0B',
+    borderColor: '#D97706',
+    textClass: 'text-state-warning'
+  },
+  {
+    key: ESTADOS_PAGO.EN_REVISION,
+    label: 'En revisión 🔎',
+    title: 'En revisión',
+    color: '#38BDF8',
+    borderColor: '#0284C7',
+    textClass: 'text-state-info'
+  },
+  {
+    key: ESTADOS_PAGO.RECHAZADO,
+    label: 'Rechazado ⚠️',
+    title: 'Rechazado',
+    color: '#EF4444',
+    borderColor: '#DC2626',
+    textClass: 'text-state-error'
+  }
+];
+
 export default function GraficaCartera({ pagos }) {
-
-  let totalPagado = 0;
-  let totalPendiente = 0;
-
-  pagos.forEach(p => {
-    if (p.estado === 'pagado') {
-      totalPagado += p.valor;
-    } else {
-      totalPendiente += p.valor;
-    }
-  });
+  const resumen = getResumenEstadosPago(pagos);
 
   const data = {
-    labels: ['Pagado 💰', 'Pendiente ⏳'],
+    labels: CARTERA_SEGMENTOS.map((segmento) => segmento.label),
     datasets: [
       {
-        data: [totalPagado, totalPendiente],
-        backgroundColor: ['#10B981', '#F59E0B'],
-        borderColor: ['#059669', '#D97706'],
+        data: CARTERA_SEGMENTOS.map((segmento) => resumen[segmento.key].total),
+        backgroundColor: CARTERA_SEGMENTOS.map((segmento) => segmento.color),
+        borderColor: CARTERA_SEGMENTOS.map((segmento) => segmento.borderColor),
         borderWidth: 1
       }
     ]
@@ -66,14 +92,14 @@ export default function GraficaCartera({ pagos }) {
         <Doughnut data={data} options={options} />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <div className="rounded-lg border border-app-border bg-app-bg p-2">
-          <p className="font-semibold text-app-text-primary">Pagado</p>
-          <p className="text-sm font-bold text-state-success">${totalPagado.toLocaleString('es-CO')}</p>
-        </div>
-        <div className="rounded-lg border border-app-border bg-app-bg p-2">
-          <p className="font-semibold text-app-text-primary">Pendiente</p>
-          <p className="text-sm font-bold text-state-warning">${totalPendiente.toLocaleString('es-CO')}</p>
-        </div>
+        {CARTERA_SEGMENTOS.map((segmento) => (
+          <div key={segmento.key} className="rounded-lg border border-app-border bg-app-bg p-2">
+            <p className="font-semibold text-app-text-primary">{segmento.title}</p>
+            <p className={`text-sm font-bold ${segmento.textClass}`}>
+              ${resumen[segmento.key].total.toLocaleString('es-CO')}
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
