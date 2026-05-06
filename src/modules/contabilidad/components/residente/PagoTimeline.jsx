@@ -1,7 +1,7 @@
 import { getPagoStepperSteps } from '../../utils/pagosEstados';
 
 export default function PagoTimeline({ pago, compact = false }) {
-  const steps = getPagoStepperSteps(pago?.estado);
+  const steps = getPagoStepperSteps(pago);
 
   return (
     <div className={`w-full ${compact ? 'pt-1' : 'pt-1.5'}`} aria-label="Avance del pago">
@@ -10,7 +10,7 @@ export default function PagoTimeline({ pago, compact = false }) {
           <div key={step.key} className="relative flex min-w-0 flex-col items-center gap-1">
             {index > 0 && (
               <span
-                className={`absolute right-1/2 top-[7px] h-px w-full -translate-y-1/2 transition-colors duration-300 ${step.rejected
+                className={`absolute right-1/2 top-[7px] h-px w-full -translate-y-1/2 transition-colors duration-300 ${step.rejected || step.overdue
                   ? 'bg-state-error/45'
                   : step.active
                     ? 'bg-gradient-to-r from-brand-primary/70 to-brand-secondary/80'
@@ -29,7 +29,7 @@ export default function PagoTimeline({ pago, compact = false }) {
             />
 
             <span
-              className={`max-w-full truncate px-1 text-center text-[10px] font-medium leading-none transition-colors duration-300 sm:text-[11px] ${step.rejected
+              className={`max-w-full truncate px-1 text-center text-[10px] font-medium leading-none transition-colors duration-300 sm:text-[11px] ${step.rejected || step.overdue
                 ? 'text-state-error'
                 : step.active
                   ? 'text-app-text-primary'

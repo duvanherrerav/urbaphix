@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
-import { ESTADOS_PAGO, getEstadoPagoKey, getEstadoPagoUi } from '../utils/pagosEstados';
+import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoKey, getEstadoPagoUi, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
 
 export default function PanelPagosAdmin({ usuarioApp }) {
@@ -9,16 +9,17 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     const MODAL_PAGE_SIZE = 8;
     const CAUSALES_ECONOMICAS = ['no asistió', 'daño', 'tiempo excedido', 'depósito retenido'];
     const ESTADOS_BANDEJA = [
-        { key: ESTADOS_PAGO.PENDIENTE, label: 'Pendientes sin soporte', badge: 'app-badge-warning', titleClass: 'text-state-warning' },
+        { key: ESTADOS_PAGO.VENCIDO, label: 'Vencidos', badge: 'app-badge-error', titleClass: 'text-state-error' },
         { key: ESTADOS_PAGO.EN_REVISION, label: 'En revisión', badge: 'app-badge-info', titleClass: 'text-brand-secondary' },
-        { key: ESTADOS_PAGO.PAGADO, label: 'Aprobados', badge: 'app-badge-success', titleClass: 'text-state-success' },
-        { key: ESTADOS_PAGO.RECHAZADO, label: 'Rechazados', badge: 'app-badge-error', titleClass: 'text-state-error' }
+        { key: ESTADOS_PAGO.RECHAZADO, label: 'Rechazados', badge: 'app-badge-error', titleClass: 'text-state-error' },
+        { key: ESTADOS_PAGO.PENDIENTE, label: 'Pendientes sin soporte', badge: 'app-badge-warning', titleClass: 'text-state-warning' },
+        { key: ESTADOS_PAGO.PAGADO, label: 'Aprobados', badge: 'app-badge-success', titleClass: 'text-state-success' }
     ];
     const [pagos, setPagos] = useState([]);
     const [loading, setLoading] = useState(false);
     const [filtroTorre, setFiltroTorre] = useState('');
     const [busquedaApto, setBusquedaApto] = useState('');
-    const [bandejaActiva, setBandejaActiva] = useState(ESTADOS_PAGO.EN_REVISION);
+    const [bandejaActiva, setBandejaActiva] = useState(ESTADOS_PAGO.VENCIDO);
     const [panelAmpliadoOpen, setPanelAmpliadoOpen] = useState(false);
     const [busquedaPanel, setBusquedaPanel] = useState('');
     const [paginaPanel, setPaginaPanel] = useState(1);
@@ -147,39 +148,47 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
     const resumen = useMemo(() => ({
         total: pagosFiltrados.length,
-        pendientes: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PENDIENTE).length,
-        enRevision: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.EN_REVISION).length,
-        pagados: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PAGADO).length,
-        rechazados: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.RECHAZADO).length,
+        pendientes: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PENDIENTE).length,
+        vencidos: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.VENCIDO).length,
+        enRevision: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.EN_REVISION).length,
+        pagados: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PAGADO).length,
+        rechazados: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.RECHAZADO).length,
         cartera: pagosFiltrados
-            .filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PENDIENTE)
+            .filter((p) => [ESTADOS_PAGO.PENDIENTE, ESTADOS_PAGO.VENCIDO, ESTADOS_PAGO.EN_REVISION, ESTADOS_PAGO.RECHAZADO].includes(obtenerEstadoFinancieroReal(p)))
             .reduce((acc, p) => acc + Number(p.valor || 0), 0)
     }), [pagosFiltrados]);
     const pagosAgrupados = useMemo(() => ({
-        [ESTADOS_PAGO.PENDIENTE]: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PENDIENTE),
-        [ESTADOS_PAGO.EN_REVISION]: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.EN_REVISION),
-        [ESTADOS_PAGO.PAGADO]: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PAGADO),
-        [ESTADOS_PAGO.RECHAZADO]: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.RECHAZADO)
+        [ESTADOS_PAGO.VENCIDO]: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.VENCIDO)
+            .sort((a, b) => getDiasMoraPago(b) - getDiasMoraPago(a)),
+        [ESTADOS_PAGO.EN_REVISION]: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.EN_REVISION),
+        [ESTADOS_PAGO.RECHAZADO]: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.RECHAZADO),
+        [ESTADOS_PAGO.PENDIENTE]: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PENDIENTE),
+        [ESTADOS_PAGO.PAGADO]: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PAGADO)
     }), [pagosFiltrados]);
 
     const renderTarjetaPago = (pago, expandida = false) => {
         const tieneComprobante = Boolean(String(pago.comprobante_url || '').trim());
         const estadoKey = getEstadoPagoKey(pago.estado);
-        const estadoUi = getEstadoPagoUi(estadoKey);
-        const esPendiente = estadoKey === ESTADOS_PAGO.PENDIENTE;
-        const esEnRevision = estadoKey === ESTADOS_PAGO.EN_REVISION;
-        const esRechazado = estadoKey === ESTADOS_PAGO.RECHAZADO;
-        const puedeAprobar = (esEnRevision || esPendiente) && tieneComprobante;
-        const puedeRechazar = (esEnRevision || esPendiente) && tieneComprobante;
-        const requiereComprobante = (esEnRevision || esPendiente) && !tieneComprobante;
+        const estadoReal = obtenerEstadoFinancieroReal(pago);
+        const estadoUi = getEstadoPagoUi(pago);
+        const diasMora = getDiasMoraPago(pago);
+        const esPendiente = estadoReal === ESTADOS_PAGO.PENDIENTE;
+        const esVencido = estadoReal === ESTADOS_PAGO.VENCIDO;
+        const esEnRevision = estadoReal === ESTADOS_PAGO.EN_REVISION;
+        const esRechazado = estadoReal === ESTADOS_PAGO.RECHAZADO;
+        const puedeAprobar = (esEnRevision || esPendiente || esVencido) && tieneComprobante;
+        const puedeRechazar = (esEnRevision || esPendiente || esVencido) && tieneComprobante;
+        const requiereComprobante = (esEnRevision || esPendiente || esVencido) && !tieneComprobante;
         const motivoRechazo = String(pago.motivo_rechazo || '').trim();
-        const bordeEstado = esEnRevision
-            ? 'border-brand-secondary/45'
-            : esPendiente
-                ? 'border-state-warning/35'
-                : esRechazado
-                    ? 'border-state-error/35'
-                    : 'border-app-border';
+        const bordeEstado = esVencido
+            ? 'border-state-error/60 shadow-[0_0_22px_rgba(239,68,68,0.14)]'
+            : esEnRevision
+                ? 'border-brand-secondary/45'
+                : esPendiente
+                    ? 'border-state-warning/35'
+                    : esRechazado
+                        ? 'border-state-error/35'
+                        : 'border-app-border';
 
         return (
             <article key={pago.id} className={`rounded-xl border bg-app-bg px-4 py-3 shadow-[0_12px_30px_rgba(2,6,23,0.34)] ${bordeEstado}`}>
@@ -196,9 +205,11 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                             <p><span className="text-app-text-primary/90">Concepto:</span> {pago.concepto || '-'}</p>
                             <p><span className="text-app-text-primary/90">Creación:</span> {formatFechaBogota(pago.created_at)}</p>
                             <p><span className="text-app-text-primary/90">Fecha de pago:</span> {formatFechaBogota(pago.fecha_pago)}</p>
+                            <p><span className="text-app-text-primary/90">Vencimiento:</span> {formatFechaBogota(pago.fecha_vencimiento)}</p>
+                            {esVencido && <p><span className="text-app-text-primary/90">Mora:</span> {diasMora} día(s)</p>}
                             <p><span className="text-app-text-primary/90">Tipo:</span> {getTipoPagoLabel(pago.tipo_pago)}</p>
                             <p><span className="text-app-text-primary/90">Comprobante:</span> {tieneComprobante ? 'Adjunto para validar' : 'Sin soporte'}</p>
-                            {esRechazado && motivoRechazo && <p><span className="text-app-text-primary/90">Motivo rechazo:</span> {motivoRechazo}</p>}
+                            {estadoKey === ESTADOS_PAGO.RECHAZADO && motivoRechazo && <p><span className="text-app-text-primary/90">Motivo rechazo:</span> {motivoRechazo}</p>}
                         </div>
 
                         {tieneComprobante && (
@@ -214,9 +225,9 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                     </div>
                 </div>
 
-                {(esPendiente || esEnRevision || esRechazado) && (
+                {(esPendiente || esVencido || esEnRevision || esRechazado) && (
                     <div className="mt-3 space-y-2">
-                        {expandida && (esPendiente || esEnRevision) && (
+                        {expandida && (esPendiente || esVencido || esEnRevision) && (
                             <div className="app-surface-primary p-2 border border-brand-primary/20">
                                 <p className="text-xs text-app-text-secondary mb-1">Causal económica (preparación UI)</p>
                                 <div className="flex flex-wrap gap-1">
@@ -241,16 +252,19 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                             </div>
                         )}
                         <div className="space-y-1 text-right">
+                            {esVencido && (
+                                <p className="text-[11px] text-state-error">Pago vencido: {diasMora} día(s) de mora administrativa.</p>
+                            )}
                             {requiereComprobante && (
                                 <p className="text-[11px] text-state-warning">Pendiente sin soporte: no se puede aprobar hasta que el residente adjunte comprobante.</p>
                             )}
                             {esEnRevision && tieneComprobante && (
                                 <p className="text-[11px] text-brand-secondary">Comprobante en revisión: listo para validación administrativa.</p>
                             )}
-                            {esRechazado && motivoRechazo && (
+                            {estadoKey === ESTADOS_PAGO.RECHAZADO && motivoRechazo && (
                                 <p className="text-[11px] text-state-error">Rechazado: {motivoRechazo}</p>
                             )}
-                            {!esRechazado && (
+                            {estadoKey !== ESTADOS_PAGO.RECHAZADO && (
                                 <div className="flex flex-wrap justify-end gap-2">
                                     <button
                                         className="app-btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
@@ -311,13 +325,14 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
             <div>
                 <p className="text-xs uppercase tracking-wide text-app-text-secondary mb-2">Resumen general</p>
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+                <div className="grid grid-cols-2 md:grid-cols-7 gap-2 text-xs">
                     <div className="rounded-xl border border-app-border bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Registros</span><p className="text-xl font-semibold mt-1">{resumen.total}</p></div>
                     <div className="rounded-xl border border-state-warning/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Sin soporte</span><p className="text-xl font-semibold mt-1 text-state-warning">{resumen.pendientes}</p></div>
+                    <div className="rounded-xl border border-state-error/45 bg-state-error/10 px-3 py-3"><span className="text-app-text-secondary">Vencidos</span><p className="text-xl font-semibold mt-1 text-state-error">{resumen.vencidos}</p></div>
                     <div className="rounded-xl border border-brand-secondary/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">En revisión</span><p className="text-xl font-semibold mt-1 text-brand-secondary">{resumen.enRevision}</p></div>
                     <div className="rounded-xl border border-state-success/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Pagados</span><p className="text-xl font-semibold mt-1 text-state-success">{resumen.pagados}</p></div>
                     <div className="rounded-xl border border-state-error/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Rechazados</span><p className="text-xl font-semibold mt-1 text-state-error">{resumen.rechazados}</p></div>
-                    <div className="rounded-xl border border-brand-primary/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Cartera pendiente</span><p className="text-xl font-semibold mt-1">${resumen.cartera.toLocaleString('es-CO')}</p></div>
+                    <div className="rounded-xl border border-brand-primary/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Cartera total</span><p className="text-xl font-semibold mt-1">${resumen.cartera.toLocaleString('es-CO')}</p></div>
                 </div>
             </div>
 

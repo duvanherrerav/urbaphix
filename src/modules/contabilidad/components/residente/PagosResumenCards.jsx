@@ -2,11 +2,17 @@ export default function PagosResumenCards({ resumen }) {
   const saldo = Number(resumen?.pendienteValor || 0);
 
   return (
-    <section className="grid grid-cols-2 lg:grid-cols-[0.85fr_0.85fr_1.3fr] gap-3">
+    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <div className="rounded-2xl border border-state-warning/25 bg-app-bg px-4 py-3">
         <p className="text-[11px] uppercase tracking-wide text-app-text-secondary">Pendientes</p>
         <p className="mt-1 text-2xl font-bold text-state-warning">{resumen?.pendientes || 0}</p>
         <p className="text-xs text-app-text-secondary">Por gestionar</p>
+      </div>
+
+      <div className="rounded-2xl border border-state-error/30 bg-state-error/10 px-4 py-3">
+        <p className="text-[11px] uppercase tracking-wide text-app-text-secondary">Vencidos</p>
+        <p className="mt-1 text-2xl font-bold text-state-error">{resumen?.vencidos || 0}</p>
+        <p className="text-xs text-app-text-secondary">Con mora administrativa</p>
       </div>
 
       <div className="rounded-2xl border border-state-success/25 bg-app-bg px-4 py-3">

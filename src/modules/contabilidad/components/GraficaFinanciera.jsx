@@ -7,7 +7,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
-import { ESTADOS_PAGO, getEstadoPagoKey, getValorPago } from '../utils/pagosEstados';
+import { ESTADOS_PAGO, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 ChartJS.register(
   BarElement,
@@ -29,6 +29,11 @@ const DATASETS_ESTADOS = [
     backgroundColor: 'rgba(245, 158, 11, 0.85)'
   },
   {
+    key: ESTADOS_PAGO.VENCIDO,
+    label: 'Vencido 🚨',
+    backgroundColor: 'rgba(220, 38, 38, 0.9)'
+  },
+  {
     key: ESTADOS_PAGO.EN_REVISION,
     label: 'En revisión 🔎',
     backgroundColor: 'rgba(56, 189, 248, 0.85)'
@@ -45,7 +50,7 @@ export default function GraficaFinanciera({ pagos }) {
 
   pagos.forEach((p) => {
     const fecha = p.created_at.split('T')[0];
-    const estadoKey = getEstadoPagoKey(p.estado);
+    const estadoKey = obtenerEstadoFinancieroReal(p);
 
     if (!agrupado[fecha]) {
       agrupado[fecha] = DATASETS_ESTADOS.reduce((acc, dataset) => ({

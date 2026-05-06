@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
-import { ESTADOS_PAGO, getEstadoPagoKey, getEstadoPagoUi, getValorPago } from '../utils/pagosEstados';
+import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 const ESTADOS_CARTERA = [
+  ESTADOS_PAGO.VENCIDO,
   ESTADOS_PAGO.PENDIENTE,
   ESTADOS_PAGO.EN_REVISION,
   ESTADOS_PAGO.RECHAZADO
@@ -27,6 +28,8 @@ export default function CarteraResumen({ usuarioApp }) {
       .select(`
         valor,
         estado,
+        fecha_vencimiento,
+        dias_mora,
         residentes (
           id,
           usuario_id,
@@ -54,7 +57,7 @@ export default function CarteraResumen({ usuarioApp }) {
     data.forEach((p) => {
       const residente = p.residentes;
       const id = residente?.id;
-      const estadoKey = getEstadoPagoKey(p.estado);
+      const estadoKey = obtenerEstadoFinancieroReal(p);
 
       if (!id || !ESTADOS_CARTERA.includes(estadoKey)) return;
 
@@ -66,6 +69,7 @@ export default function CarteraResumen({ usuarioApp }) {
           torre: residente?.apartamentos?.torres?.nombre || '-',
           totalDeuda: 0,
           cantidadPagos: 0,
+          maxDiasMora: 0,
           porEstado: ESTADOS_CARTERA.reduce((acc, estado) => ({
             ...acc,
             [estado]: { cantidad: 0, total: 0 }
@@ -78,11 +82,13 @@ export default function CarteraResumen({ usuarioApp }) {
       mapa[id].cantidadPagos += 1;
       mapa[id].porEstado[estadoKey].cantidad += 1;
       mapa[id].porEstado[estadoKey].total += valor;
+      mapa[id].maxDiasMora = Math.max(mapa[id].maxDiasMora, getDiasMoraPago(p));
     });
 
-    const resultado = Object.values(mapa).sort(
-      (a, b) => b.totalDeuda - a.totalDeuda
-    );
+    const resultado = Object.values(mapa).sort((a, b) => {
+      const vencidosDiff = (b.porEstado[ESTADOS_PAGO.VENCIDO]?.total || 0) - (a.porEstado[ESTADOS_PAGO.VENCIDO]?.total || 0);
+      return vencidosDiff || b.totalDeuda - a.totalDeuda;
+    });
 
     setCartera(resultado);
   };
@@ -122,7 +128,7 @@ export default function CarteraResumen({ usuarioApp }) {
         💰 Cartera (no pagados)
       </h3>
       <p className="text-xs text-app-text-secondary mb-4">
-        Incluye pendientes, comprobantes en revisión y comprobantes rechazados sin aprobar.
+        Prioriza vencidos e incluye pendientes, comprobantes en revisión y comprobantes rechazados sin aprobar.
       </p>
 
       {cartera.length === 0 && (
@@ -151,7 +157,7 @@ export default function CarteraResumen({ usuarioApp }) {
               </p>
 
               <p className="text-xs text-app-text-secondary">
-                {c.cantidadPagos} pagos no aprobados
+                {c.cantidadPagos} pagos no aprobados{c.maxDiasMora ? ` · ${c.maxDiasMora} día(s) de mora máxima` : ''}
               </p>
 
               <div className="mt-2 flex flex-wrap gap-2">
