@@ -102,7 +102,14 @@ export default function ComprobanteUploader({ tieneComprobante, onArchivoChange,
     setFeedback('');
 
     try {
-      await onSubirComprobante?.();
+      const uploadSucceeded = await onSubirComprobante?.();
+
+      if (!uploadSucceeded) {
+        setStatus('error');
+        setFeedback(STATUS_COPY.error);
+        return;
+      }
+
       setStatus('success');
       setFeedback('');
       clearSelectedFile();

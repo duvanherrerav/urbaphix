@@ -121,22 +121,32 @@ export default function MisPagos({ usuarioApp }) {
   };
 
   const subirComprobante = async (pagoId) => {
-    if (!archivo) return alert('Selecciona un archivo');
+    if (!archivo) {
+      alert('Selecciona un archivo');
+      return false;
+    }
 
     const nombreArchivo = `${pagoId}_${String(archivo.name || 'comprobante').replace(/\s+/g, '_')}`;
     const { error } = await supabase.storage.from('comprobantes').upload(nombreArchivo, archivo);
-    if (error) return alert('Error subiendo archivo');
+    if (error) {
+      alert('Error subiendo archivo');
+      return false;
+    }
 
     const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(nombreArchivo);
     const { error: errorUpdate } = await supabase
       .from('pagos')
       .update({ comprobante_url: urlData.publicUrl })
       .eq('id', pagoId);
-    if (errorUpdate) return alert('Error guardando comprobante');
+    if (errorUpdate) {
+      alert('Error guardando comprobante');
+      return false;
+    }
 
     alert('📤 Comprobante subido correctamente');
     setArchivo(null);
     cargar();
+    return true;
   };
 
   const resumen = useMemo(() => ({
