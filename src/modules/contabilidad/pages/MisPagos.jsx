@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import PagoCard from '../components/residente/PagoCard';
 import PagoEmptyState from '../components/residente/PagoEmptyState';
 import PagosResumenCards from '../components/residente/PagosResumenCards';
+import { ESTADOS_PAGO, getEstadoPagoUi } from '../utils/pagosEstados';
 
-const getEstadoProcesoPago = (pago) => {
-  if (pago?.estado === 'pagado') return { key: 'pagado', label: 'Pago aprobado', badge: 'app-badge-success' };
-  if (pago?.comprobante_url) return { key: 'en_revision', label: 'Comprobante en revisión', badge: 'app-badge-info' };
-  return { key: 'pendiente', label: 'Pendiente de pago', badge: 'app-badge-warning' };
-};
+const ordenarPagosDesc = (rows = []) =>
+  [...rows].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
 export default function MisPagos({ usuarioApp }) {
   const [pagos, setPagos] = useState([]);
@@ -17,10 +15,7 @@ export default function MisPagos({ usuarioApp }) {
   const [archivo, setArchivo] = useState(null);
   const [residenteId, setResidenteId] = useState(null);
 
-  const ordenarPagosDesc = (rows = []) =>
-    [...rows].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-
-  async function obtenerConfigPago() {
+  const obtenerConfigPago = useCallback(async () => {
     const { data } = await supabase
       .from('config_pagos')
       .select('*')
@@ -28,9 +23,9 @@ export default function MisPagos({ usuarioApp }) {
       .eq('activo', true)
       .maybeSingle();
     setConfigPago(data);
-  }
+  }, [usuarioApp?.conjunto_id]);
 
-  async function cargar() {
+  const cargar = useCallback(async () => {
     try {
       setLoading(true);
       if (!usuarioApp?.id) return;
@@ -60,13 +55,13 @@ export default function MisPagos({ usuarioApp }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [usuarioApp?.id]);
 
   useEffect(() => {
     if (!usuarioApp) return;
     obtenerConfigPago();
     cargar();
-  }, [usuarioApp]);
+  }, [cargar, obtenerConfigPago, usuarioApp]);
 
   useEffect(() => {
     if (!residenteId) return;
@@ -136,8 +131,9 @@ export default function MisPagos({ usuarioApp }) {
     const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(nombreArchivo);
     const { error: errorUpdate } = await supabase
       .from('pagos')
-      .update({ comprobante_url: urlData.publicUrl })
-      .eq('id', pagoId);
+      .update({ comprobante_url: urlData.publicUrl, estado: ESTADOS_PAGO.EN_REVISION })
+      .eq('id', pagoId)
+      .eq('residente_id', residenteId);
     if (errorUpdate) {
       alert('Error guardando comprobante');
       return false;
@@ -150,9 +146,9 @@ export default function MisPagos({ usuarioApp }) {
   };
 
   const resumen = useMemo(() => ({
-    pendientes: pagos.filter((p) => p.estado === 'pendiente').length,
-    pagados: pagos.filter((p) => p.estado === 'pagado').length,
-    pendienteValor: pagos.filter((p) => p.estado === 'pendiente').reduce((a, p) => a + Number(p.valor || 0), 0)
+    pendientes: pagos.filter((p) => p.estado === ESTADOS_PAGO.PENDIENTE).length,
+    pagados: pagos.filter((p) => p.estado === ESTADOS_PAGO.PAGADO).length,
+    pendienteValor: pagos.filter((p) => p.estado === ESTADOS_PAGO.PENDIENTE).reduce((a, p) => a + Number(p.valor || 0), 0)
   }), [pagos]);
 
   return (
@@ -197,7 +193,7 @@ export default function MisPagos({ usuarioApp }) {
               <PagoCard
                 key={p.id}
                 pago={p}
-                estadoProceso={getEstadoProcesoPago(p)}
+                estadoProceso={getEstadoPagoUi(p.estado)}
                 configPago={configPago}
                 onPagar={pagar}
                 onArchivoChange={(e) => setArchivo(e.target.files[0])}

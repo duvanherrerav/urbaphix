@@ -1,11 +1,11 @@
+import { estaPagoEnRevision, estaPagoPagado, puedeSubirComprobante } from '../../utils/pagosEstados';
 import ComprobanteUploader from './ComprobanteUploader';
 
 export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoChange, onSubirComprobante }) {
   const tieneComprobante = Boolean(pago?.comprobante_url);
-  const estaPagado = pago?.estado === 'pagado';
-  const estaPendiente = pago?.estado === 'pendiente';
-  const estaRechazado = pago?.estado === 'rechazado';
-  const puedeSubir = estaPendiente || estaRechazado;
+  const estaPagado = estaPagoPagado(pago?.estado);
+  const estaEnRevision = estaPagoEnRevision(pago?.estado);
+  const puedeSubir = puedeSubirComprobante(pago?.estado);
 
   if (estaPagado) {
     return (
@@ -24,16 +24,18 @@ export default function PagoActionPanel({ pago, configPago, onPagar, onArchivoCh
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-app-text-primary">
-            {tieneComprobante ? 'Comprobante en revisión' : 'Adjunta tu comprobante'}
+            {estaEnRevision ? 'Comprobante en revisión' : tieneComprobante ? 'Comprobante adjunto' : 'Adjunta tu comprobante'}
           </p>
           <p className="mt-0.5 text-[11px] leading-snug text-app-text-secondary">
-            {tieneComprobante
+            {estaEnRevision
               ? 'Soporte enviado para validación administrativa.'
-              : 'Carga el soporte después de realizar el pago.'}
+              : tieneComprobante
+                ? 'Soporte registrado para este cobro.'
+                : 'Carga el soporte después de realizar el pago.'}
           </p>
         </div>
 
-        {estaPendiente && !tieneComprobante && (
+        {puedeSubir && !tieneComprobante && (
           <button type="button" onClick={onPagar} className="app-btn-primary px-3 py-1.5 text-xs">
             Pagar
           </button>

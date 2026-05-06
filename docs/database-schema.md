@@ -278,7 +278,7 @@ Tablas detectadas en `public`:
 - `concepto` (text, nullable)
 - `valor` (numeric, nullable)
 - `fecha_pago` (date, nullable)
-- `estado` (text, nullable)
+- `estado` (text, nullable, check: `pendiente|en_revision|pagado|rechazado`; constraint agregado `NOT VALID` para no bloquear registros históricos existentes)
 - `comprobante_url` (text, nullable)
 - `tipo_pago` (text, nullable, default: `'administracion'::text`)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
@@ -300,6 +300,7 @@ Tablas detectadas en `public`:
 - `update comprobante pagos`
   - comando: `UPDATE`
   - condición: `true`
+  - uso residente: al subir comprobante se actualiza `comprobante_url` y `estado = 'en_revision'`
 - `update pagos admin`
   - comando: `UPDATE`
   - condición: rol `admin`

@@ -1,11 +1,12 @@
 import { formatFechaBogota } from '../../../../utils/dateFormatters';
+import { estaPagoPagado } from '../../utils/pagosEstados';
 import PagoActionPanel from './PagoActionPanel';
 import PagoStatusBadge from './PagoStatusBadge';
 import PagoTimeline from './PagoTimeline';
 
 export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onArchivoChange, onSubirComprobante }) {
   const valor = Number(pago?.valor || 0);
-  const estaPagado = pago?.estado === 'pagado';
+  const estaPagado = estaPagoPagado(pago?.estado);
 
   return (
     <article className={`rounded-2xl border border-app-border/90 bg-app-bg-alt/80 shadow-[0_12px_30px_rgba(2,6,23,0.22)] transition-all duration-300 hover:border-brand-primary/25 hover:shadow-[0_16px_36px_rgba(2,6,23,0.28)] ${estaPagado ? 'p-3' : 'p-3.5 sm:p-4'}`}>
