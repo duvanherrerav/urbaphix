@@ -280,12 +280,16 @@ Tablas detectadas en `public`:
 - `fecha_pago` (date, nullable)
 - `estado` (text, nullable, check: `pendiente|en_revision|pagado|rechazado`; constraint agregado `NOT VALID` para no bloquear registros históricos existentes)
 - `comprobante_url` (text, nullable)
+- `motivo_rechazo` (text, nullable)
+- `fecha_rechazo` (timestamp with time zone, nullable)
+- `rechazado_por` (uuid, nullable)
 - `tipo_pago` (text, nullable, default: `'administracion'::text`)
 - `created_at` (timestamp without time zone, nullable, default: `now()`)
 
 ### Relaciones
 - `conjunto_id` → `conjuntos.id`
 - `residente_id` → `residentes.id`
+- `rechazado_por` → `usuarios_app.id`
 
 ### RLS
 - `crear pagos admin`
@@ -300,10 +304,11 @@ Tablas detectadas en `public`:
 - `update comprobante pagos`
   - comando: `UPDATE`
   - condición: `true`
-  - uso residente: al subir comprobante se actualiza `comprobante_url` y `estado = 'en_revision'`
+  - uso residente: al subir comprobante se actualiza `comprobante_url`, `estado = 'en_revision'` y se limpian `motivo_rechazo`, `fecha_rechazo`, `rechazado_por`
 - `update pagos admin`
   - comando: `UPDATE`
   - condición: rol `admin`
+  - uso admin: al rechazar comprobante se actualizan `estado = 'rechazado'`, `motivo_rechazo`, `fecha_rechazo` y `rechazado_por`
 
 ---
 
@@ -832,6 +837,7 @@ Tablas con FK a `usuarios_app.id`:
 - incidentes
 - notificaciones
 - paquetes
+- pagos
 - registro_visitas
 - reservas_bloqueos
 - reservas_documentos

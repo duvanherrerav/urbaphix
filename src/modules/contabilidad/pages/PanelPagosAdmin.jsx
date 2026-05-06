@@ -76,7 +76,13 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
         const { error } = await supabase
             .from('pagos')
-            .update({ estado: ESTADOS_PAGO.PAGADO, fecha_pago: new Date().toISOString() })
+            .update({
+                estado: ESTADOS_PAGO.PAGADO,
+                fecha_pago: new Date().toISOString(),
+                motivo_rechazo: null,
+                fecha_rechazo: null,
+                rechazado_por: null
+            })
             .eq('id', pago.id)
             .eq('conjunto_id', conjuntoId);
         if (error) return alert('Error al aprobar pago');
@@ -87,6 +93,48 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         }
 
         alert('✅ Pago aprobado');
+        cargarPagos();
+    };
+
+    const rechazarPago = async (pago) => {
+        const tieneComprobante = Boolean(String(pago?.comprobante_url || '').trim());
+        if (!tieneComprobante) {
+            alert('No se puede rechazar un pago sin comprobante adjunto');
+            return;
+        }
+
+        const motivo = window.prompt('Motivo del rechazo para el residente');
+        if (motivo === null) return;
+
+        const motivoLimpio = motivo.trim();
+        if (!motivoLimpio) {
+            alert('Escribe una observación para que el residente pueda corregir el soporte.');
+            return;
+        }
+
+        const { error } = await supabase
+            .from('pagos')
+            .update({
+                estado: ESTADOS_PAGO.RECHAZADO,
+                motivo_rechazo: motivoLimpio,
+                fecha_rechazo: new Date().toISOString(),
+                rechazado_por: usuarioApp?.id || null
+            })
+            .eq('id', pago.id)
+            .eq('conjunto_id', conjuntoId);
+        if (error) return alert('Error al rechazar comprobante');
+
+        const usuarioId = pago?.residentes?.usuario_id;
+        if (usuarioId) {
+            await supabase.from('notificaciones').insert([{
+                usuario_id: usuarioId,
+                tipo: 'pago_rechazado',
+                titulo: 'Comprobante rechazado',
+                mensaje: `Tu comprobante de pago fue rechazado. Observación: ${motivoLimpio}`
+            }]);
+        }
+
+        alert('Comprobante rechazado. El residente podrá reemplazarlo.');
         cargarPagos();
     };
 
@@ -102,6 +150,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         pendientes: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PENDIENTE).length,
         enRevision: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.EN_REVISION).length,
         pagados: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PAGADO).length,
+        rechazados: pagosFiltrados.filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.RECHAZADO).length,
         cartera: pagosFiltrados
             .filter((p) => getEstadoPagoKey(p.estado) === ESTADOS_PAGO.PENDIENTE)
             .reduce((acc, p) => acc + Number(p.valor || 0), 0)
@@ -121,7 +170,9 @@ export default function PanelPagosAdmin({ usuarioApp }) {
         const esEnRevision = estadoKey === ESTADOS_PAGO.EN_REVISION;
         const esRechazado = estadoKey === ESTADOS_PAGO.RECHAZADO;
         const puedeAprobar = (esEnRevision || esPendiente) && tieneComprobante;
+        const puedeRechazar = (esEnRevision || esPendiente) && tieneComprobante;
         const requiereComprobante = (esEnRevision || esPendiente) && !tieneComprobante;
+        const motivoRechazo = String(pago.motivo_rechazo || '').trim();
         const bordeEstado = esEnRevision
             ? 'border-brand-secondary/45'
             : esPendiente
@@ -147,6 +198,7 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                             <p><span className="text-app-text-primary/90">Fecha de pago:</span> {formatFechaBogota(pago.fecha_pago)}</p>
                             <p><span className="text-app-text-primary/90">Tipo:</span> {getTipoPagoLabel(pago.tipo_pago)}</p>
                             <p><span className="text-app-text-primary/90">Comprobante:</span> {tieneComprobante ? 'Adjunto para validar' : 'Sin soporte'}</p>
+                            {esRechazado && motivoRechazo && <p><span className="text-app-text-primary/90">Motivo rechazo:</span> {motivoRechazo}</p>}
                         </div>
 
                         {tieneComprobante && (
@@ -162,9 +214,9 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                     </div>
                 </div>
 
-                {(esPendiente || esEnRevision) && (
+                {(esPendiente || esEnRevision || esRechazado) && (
                     <div className="mt-3 space-y-2">
-                        {expandida && (
+                        {expandida && (esPendiente || esEnRevision) && (
                             <div className="app-surface-primary p-2 border border-brand-primary/20">
                                 <p className="text-xs text-app-text-secondary mb-1">Causal económica (preparación UI)</p>
                                 <div className="flex flex-wrap gap-1">
@@ -195,14 +247,29 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                             {esEnRevision && tieneComprobante && (
                                 <p className="text-[11px] text-brand-secondary">Comprobante en revisión: listo para validación administrativa.</p>
                             )}
-                            <button
-                                className="app-btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={() => aprobarPago(pago)}
-                                disabled={!puedeAprobar}
-                                title={!puedeAprobar ? 'Pendiente de comprobante' : 'Aprobar pago'}
-                            >
-                                Aprobar pago
-                            </button>
+                            {esRechazado && motivoRechazo && (
+                                <p className="text-[11px] text-state-error">Rechazado: {motivoRechazo}</p>
+                            )}
+                            {!esRechazado && (
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <button
+                                        className="app-btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={() => aprobarPago(pago)}
+                                        disabled={!puedeAprobar}
+                                        title={!puedeAprobar ? 'Pendiente de comprobante' : 'Aprobar pago'}
+                                    >
+                                        Aprobar pago
+                                    </button>
+                                    <button
+                                        className="app-btn-ghost text-xs text-state-error disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={() => rechazarPago(pago)}
+                                        disabled={!puedeRechazar}
+                                        title={!puedeRechazar ? 'Pendiente de comprobante' : 'Rechazar comprobante'}
+                                    >
+                                        Rechazar comprobante
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -244,11 +311,12 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
             <div>
                 <p className="text-xs uppercase tracking-wide text-app-text-secondary mb-2">Resumen general</p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
                     <div className="rounded-xl border border-app-border bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Registros</span><p className="text-xl font-semibold mt-1">{resumen.total}</p></div>
                     <div className="rounded-xl border border-state-warning/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Sin soporte</span><p className="text-xl font-semibold mt-1 text-state-warning">{resumen.pendientes}</p></div>
                     <div className="rounded-xl border border-brand-secondary/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">En revisión</span><p className="text-xl font-semibold mt-1 text-brand-secondary">{resumen.enRevision}</p></div>
                     <div className="rounded-xl border border-state-success/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Pagados</span><p className="text-xl font-semibold mt-1 text-state-success">{resumen.pagados}</p></div>
+                    <div className="rounded-xl border border-state-error/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Rechazados</span><p className="text-xl font-semibold mt-1 text-state-error">{resumen.rechazados}</p></div>
                     <div className="rounded-xl border border-brand-primary/35 bg-app-bg px-3 py-3"><span className="text-app-text-secondary">Cartera pendiente</span><p className="text-xl font-semibold mt-1">${resumen.cartera.toLocaleString('es-CO')}</p></div>
                 </div>
             </div>

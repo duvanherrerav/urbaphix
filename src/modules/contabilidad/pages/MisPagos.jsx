@@ -121,7 +121,7 @@ export default function MisPagos({ usuarioApp }) {
       return false;
     }
 
-    const nombreArchivo = `${pagoId}_${String(archivo.name || 'comprobante').replace(/\s+/g, '_')}`;
+    const nombreArchivo = `${pagoId}_${Date.now()}_${String(archivo.name || 'comprobante').replace(/\s+/g, '_')}`;
     const { error } = await supabase.storage.from('comprobantes').upload(nombreArchivo, archivo);
     if (error) {
       alert('Error subiendo archivo');
@@ -131,7 +131,13 @@ export default function MisPagos({ usuarioApp }) {
     const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(nombreArchivo);
     const { error: errorUpdate } = await supabase
       .from('pagos')
-      .update({ comprobante_url: urlData.publicUrl, estado: ESTADOS_PAGO.EN_REVISION })
+      .update({
+        comprobante_url: urlData.publicUrl,
+        estado: ESTADOS_PAGO.EN_REVISION,
+        motivo_rechazo: null,
+        fecha_rechazo: null,
+        rechazado_por: null
+      })
       .eq('id', pagoId)
       .eq('residente_id', residenteId);
     if (errorUpdate) {

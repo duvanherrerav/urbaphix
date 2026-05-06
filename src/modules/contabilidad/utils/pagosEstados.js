@@ -59,10 +59,14 @@ export function getPagoStepperSteps(estado) {
 
   return BASE_STEPPER_STEPS.map((step) => ({
     ...step,
-    label: isRejected && step.key === 'aprobado' ? 'Rechazado' : step.label,
+    label: isRejected && step.key === 'comprobante' ? 'Rechazado' : step.label,
     active: activeSteps.includes(step.key),
-    rejected: isRejected && step.key === 'aprobado'
+    rejected: isRejected && (step.key === 'comprobante' || step.key === 'aprobado')
   }));
+}
+
+export function estaPagoRechazado(estado) {
+  return getEstadoPagoKey(estado) === ESTADOS_PAGO.RECHAZADO;
 }
 
 export function puedeSubirComprobante(estado) {
