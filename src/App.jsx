@@ -179,10 +179,17 @@ function App() {
 
   if (isBootstrapping) {
     return (
-      <div className="app-shell flex items-center justify-center">
-        <div className="app-card flex items-center gap-3 text-app-text-secondary text-sm">
-          <BrandLogo variant="loading" className="h-auto w-full max-w-44 sm:max-w-52" decorative />
-          <span>Cargando Urbaphix...</span>
+      <div className="app-shell flex items-center justify-center p-6">
+        <div className="app-surface-primary flex min-w-[220px] flex-col items-center gap-4 px-8 py-7 text-center shadow-app">
+          <BrandLogo variant="loading" decorative />
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-app-text-secondary">
+              Cargando Urbaphix...
+            </p>
+            <div className="mx-auto h-1 w-24 overflow-hidden rounded-full bg-app-bg-alt">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-brand-secondary" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -220,9 +227,9 @@ function App() {
     <div className="app-shell flex flex-col lg:flex-row">
 
       {/* 🔥 SIDEBAR */}
-      <aside className="app-sidebar w-full shrink-0 p-4 lg:min-h-screen lg:w-72">
+      <aside className="app-sidebar w-full shrink-0 p-3 lg:min-h-screen lg:w-72 lg:p-4">
 
-        <div className="mb-3 app-surface-primary p-3 lg:mb-5 lg:p-3">
+        <div className="mb-3 app-surface-primary px-3 py-2.5 lg:mb-4">
           <BrandLogo variant="sidebar" className="max-w-full" alt="Urbaphix" />
         </div>
 
@@ -302,7 +309,7 @@ function App() {
         <header className="app-header px-4 py-3 sm:px-7 sm:py-4 flex justify-between items-center gap-4 relative z-50">
 
           <div className="flex min-w-0 items-center gap-3">
-            <BrandLogo variant="isotipo" className="h-8 w-8 shrink-0" decorative />
+            <BrandLogo variant="isotipo" className="h-7 w-7 shrink-0 opacity-85" decorative />
             <h2 className="truncate font-semibold text-lg capitalize text-app-text-primary">
               {moduloActual}
             </h2>
@@ -311,7 +318,7 @@ function App() {
           {/* 👤 MENU */}
           <div className="relative z-50 flex items-center gap-3" ref={menuRef}>
 
-            <BrandLogo variant="header" className="hidden max-w-[150px] sm:flex" alt="Urbaphix" />
+            <BrandLogo variant="header" className="hidden max-w-[112px] sm:flex" alt="Urbaphix" />
 
             <button
               onClick={() => setOpenMenu(!openMenu)}
