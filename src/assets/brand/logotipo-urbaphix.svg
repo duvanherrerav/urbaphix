@@ -1,0 +1,12 @@
+<svg width="204" height="48" viewBox="0 0 204 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Logotipo Urbaphix</title>
+  <desc id="desc">Nombre Urbaphix en tipografía clara para interfaces oscuras.</desc>
+  <text x="2" y="33" fill="#E2E8F0" font-size="30" font-family="Inter, Arial, sans-serif" font-weight="800" letter-spacing="-0.6">Urbaphix</text>
+  <path d="M4 42H102" stroke="url(#paint0_linear_urbaphix_logotipo)" stroke-width="3" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="paint0_linear_urbaphix_logotipo" x1="4" y1="42" x2="102" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+</svg>
