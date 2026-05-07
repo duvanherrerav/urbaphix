@@ -1,15 +1,17 @@
 import { formatFechaBogota } from '../../../../utils/dateFormatters';
 import { estaPagoPagado, getDiasMoraPago, obtenerEstadoFinancieroReal, ESTADOS_PAGO } from '../../utils/pagosEstados';
+import { getPagoEventoLabel } from '../../services/pagosEventosService';
 import PagoActionPanel from './PagoActionPanel';
 import PagoStatusBadge from './PagoStatusBadge';
 import PagoTimeline from './PagoTimeline';
 
-export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onArchivoChange, onSubirComprobante }) {
+export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onArchivoChange, onSubirComprobante, eventos = [] }) {
   const valor = Number(pago?.valor || 0);
   const estadoReal = obtenerEstadoFinancieroReal(pago);
   const estaPagado = estaPagoPagado(pago?.estado);
   const estaVencido = estadoReal === ESTADOS_PAGO.VENCIDO;
   const diasMora = getDiasMoraPago(pago);
+  const eventosVisibles = eventos.slice(0, 4);
 
   return (
     <article className={`rounded-2xl border ${estaVencido ? 'border-state-error/55 shadow-[0_0_0_1px_rgba(239,68,68,0.14),0_18px_42px_rgba(239,68,68,0.12)]' : 'border-app-border/90 shadow-[0_12px_30px_rgba(2,6,23,0.22)]'} bg-app-bg-alt/80 transition-all duration-300 hover:border-brand-primary/25 hover:shadow-[0_16px_36px_rgba(2,6,23,0.28)] ${estaPagado ? 'p-3' : 'p-3.5 sm:p-4'}`}>
@@ -36,6 +38,21 @@ export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onA
           </div>
 
           <PagoTimeline pago={pago} compact={estaPagado} />
+
+          {eventosVisibles.length > 0 && (
+            <details className="rounded-xl border border-app-border/70 bg-app-bg/55 px-3 py-2 text-xs">
+              <summary className="cursor-pointer font-semibold text-app-text-primary">Ver historial del cobro</summary>
+              <div className="mt-2 space-y-2">
+                {eventosVisibles.map((evento) => (
+                  <div key={evento.id} className="border-l-2 border-brand-primary/40 pl-2">
+                    <p className="font-semibold text-app-text-primary">{getPagoEventoLabel(evento.evento)}</p>
+                    <p className="text-[11px] text-app-text-secondary">{formatFechaBogota(evento.created_at)}</p>
+                    {evento.mensaje && <p className="text-[11px] text-app-text-secondary">{evento.mensaje}</p>}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
 
         <div className="hidden rounded-xl border border-app-border/70 bg-app-bg/65 px-3 py-2.5 lg:block lg:text-right">

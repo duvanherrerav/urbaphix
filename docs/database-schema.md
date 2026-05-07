@@ -32,6 +32,7 @@ Tablas detectadas en `public`:
 - multas
 - notificaciones
 - pagos
+- pagos_eventos
 - paquetes
 - parqueaderos
 - pqr
@@ -314,7 +315,42 @@ Tablas detectadas en `public`:
 
 ---
 
-## 11. paquetes
+## 11. pagos_eventos
+**Descripción:** trazabilidad operativa básica del ciclo de vida de pagos. Registra eventos mínimos de cobros y comprobantes sin alcance contable, conciliación ni analítica avanzada.
+
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
+- `pago_id` (uuid, NOT NULL)
+- `conjunto_id` (uuid, nullable)
+- `residente_id` (uuid, nullable)
+- `usuario_id` (uuid, nullable)
+- `evento` (text, NOT NULL; valores operativos esperados: `cobro_creado`, `comprobante_subido`, `comprobante_reemplazado`, `pago_aprobado`, `comprobante_rechazado`, `pago_vencido`)
+- `estado_anterior` (text, nullable)
+- `estado_nuevo` (text, nullable)
+- `mensaje` (text, nullable)
+- `metadata` (jsonb, NOT NULL, default: `'{}'::jsonb`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
+
+### Relaciones
+- `pago_id` → `pagos.id` (`ON DELETE CASCADE`)
+- `conjunto_id` → `conjuntos.id`
+- `residente_id` → `residentes.id`
+- `usuario_id` → `usuarios_app.id`
+
+### RLS
+- `pagos_eventos_select_admin_conjunto`
+  - comando: `SELECT`
+  - condición: admin autenticado del mismo `conjunto_id` vía `fn_auth_conjunto_id()` y `fn_auth_rol()`
+- `pagos_eventos_select_residente_propios`
+  - comando: `SELECT`
+  - condición: residente autenticado solo lee eventos donde `residente_id = fn_auth_residente_id()`
+- `pagos_eventos_insert_flujos_pagos`
+  - comando: `INSERT`
+  - condición: usuario autenticado inserta eventos del mismo conjunto, asociados a un pago existente y con `usuario_id = auth.uid()`; admin puede registrar eventos administrativos del flujo (`cobro_creado`, `pago_aprobado`, `comprobante_rechazado`, `pago_vencido`) y residente solo puede registrar eventos propios de comprobante (`comprobante_subido`, `comprobante_reemplazado`) para sus pagos
+
+---
+
+## 12. paquetes
 **Descripción:** recepción y entrega de paquetes.
 
 ### Campos
@@ -351,7 +387,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 12. parqueaderos
+## 13. parqueaderos
 **Descripción:** parqueaderos definidos para el conjunto.
 
 ### Campos
@@ -369,7 +405,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 13. pqr
+## 14. pqr
 **Descripción:** peticiones, quejas y reclamos.
 
 ### Campos
@@ -394,7 +430,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 14. recursos_comunes
+## 15. recursos_comunes
 **Descripción:** catálogo detallado de recursos comunes reservables.
 
 ### Campos
@@ -426,7 +462,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 15. registro_visitas
+## 16. registro_visitas
 **Descripción:** flujo principal de visitas, QR, validación e ingreso/salida.
 
 ### Campos
@@ -466,7 +502,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 16. reservas
+## 17. reservas
 **Descripción:** módulo simple de reservas de zonas comunes.
 
 ### Campos
@@ -492,7 +528,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 17. reservas_bloqueos
+## 18. reservas_bloqueos
 **Descripción:** bloqueos administrativos de un recurso común por fecha/hora.
 
 ### Campos
@@ -520,7 +556,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 18. reservas_documentos
+## 19. reservas_documentos
 **Descripción:** documentos anexos a una reserva de zonas.
 
 ### Campos
@@ -548,7 +584,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 19. reservas_eventos
+## 20. reservas_eventos
 **Descripción:** bitácora de eventos de reservas.
 
 ### Campos
@@ -576,7 +612,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 20. reservas_zonas
+## 21. reservas_zonas
 **Descripción:** módulo robusto de reservas de recursos comunes.
 
 ### Campos
@@ -617,7 +653,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 21. residentes
+## 22. residentes
 **Descripción:** puente entre usuario app, apartamento y conjunto.
 
 ### Campos
@@ -644,7 +680,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 22. roles
+## 23. roles
 **Descripción:** catálogo de roles de aplicación.
 
 ### Campos
@@ -659,7 +695,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 23. tipos_documento
+## 24. tipos_documento
 **Descripción:** catálogo de tipos de documento.
 
 ### Campos
@@ -678,7 +714,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 24. torres
+## 25. torres
 **Descripción:** torres o bloques del conjunto.
 
 ### Campos
@@ -696,7 +732,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 25. trasteos
+## 26. trasteos
 **Descripción:** solicitudes o registros de mudanzas/trasteos.
 
 ### Campos
@@ -715,7 +751,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 26. usuarios_app
+## 27. usuarios_app
 **Descripción:** usuarios internos de la aplicación ligados a auth.
 
 ### Campos
@@ -743,7 +779,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 27. vehiculos
+## 28. vehiculos
 **Descripción:** vehículos asociados a residentes.
 
 ### Campos confirmados en extractos
@@ -760,7 +796,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 28. visitantes
+## 29. visitantes
 **Descripción:** visitantes registrados por residentes.
 
 ### Campos confirmados en extractos
@@ -790,7 +826,7 @@ Tablas detectadas en `public`:
 
 ---
 
-## 29. zonas_comunes
+## 30. zonas_comunes
 **Descripción:** catálogo simple de zonas comunes.
 
 ### Campos confirmados en extractos
@@ -818,6 +854,7 @@ Tablas con FK directa a `conjuntos.id`:
 - incidentes
 - multas
 - pagos
+- pagos_eventos
 - paquetes
 - parqueaderos
 - recursos_comunes
@@ -840,6 +877,7 @@ Tablas con FK a `usuarios_app.id`:
 - notificaciones
 - paquetes
 - pagos
+- pagos_eventos
 - registro_visitas
 - reservas_bloqueos
 - reservas_documentos
@@ -851,6 +889,7 @@ Tablas con FK a `usuarios_app.id`:
 Tablas con FK a `residentes.id`:
 - multas
 - pagos
+- pagos_eventos
 - paquetes
 - pqr
 - reservas
@@ -886,6 +925,7 @@ Patrones de control vistos en las políticas:
 - multas
 - notificaciones
 - pagos
+- pagos_eventos
 - paquetes
 - pqr
 - recursos_comunes

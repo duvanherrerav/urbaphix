@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { EVENTOS_PAGO, crearNotificacionPago, registrarPagoEvento } from './pagosEventosService';
 
 const errorMessage = (error, fallback) => error?.message || fallback;
 
@@ -62,14 +63,23 @@ export const crearPago = async (data, user) => {
       .eq('id', data.residente_id)
       .single();
 
+    await registrarPagoEvento({
+      pago,
+      usuarioId: user.id,
+      evento: EVENTOS_PAGO.COBRO_CREADO,
+      estadoNuevo: 'pendiente',
+      mensaje: `Cobro creado por $${valorNumerico.toLocaleString('es-CO')} para ${String(data.concepto).trim()}.`,
+      metadata: { tipo_pago: tipoPago }
+    });
+
     // 🔔 notificación
     if (residente?.usuario_id) {
-      await supabase.from('notificaciones').insert([{
-        usuario_id: residente.usuario_id,
+      await crearNotificacionPago({
+        usuarioId: residente.usuario_id,
         tipo: 'nuevo_cobro',
-        titulo: '💰 Nuevo cobro',
-        mensaje: `Tienes un cobro de $${valorNumerico}`
-      }]);
+        titulo: '💰 Nuevo cobro registrado',
+        mensaje: `Tienes un nuevo cobro por $${valorNumerico.toLocaleString('es-CO')} asociado a ${String(data.concepto).trim()}.`
+      });
     }
 
     return { pago, error: null };
