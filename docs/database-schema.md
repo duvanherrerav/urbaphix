@@ -346,7 +346,7 @@ Tablas detectadas en `public`:
   - condición: residente autenticado solo lee eventos donde `residente_id = fn_auth_residente_id()`
 - `pagos_eventos_insert_flujos_pagos`
   - comando: `INSERT`
-  - condición: usuario autenticado inserta eventos del mismo conjunto, asociados a un pago existente y con `usuario_id = auth.uid()`; admin puede registrar eventos del conjunto y residente solo de sus propios pagos
+  - condición: usuario autenticado inserta eventos del mismo conjunto, asociados a un pago existente y con `usuario_id = auth.uid()`; admin puede registrar eventos administrativos del flujo (`cobro_creado`, `pago_aprobado`, `comprobante_rechazado`, `pago_vencido`) y residente solo puede registrar eventos propios de comprobante (`comprobante_subido`, `comprobante_reemplazado`) para sus pagos
 
 ---
 

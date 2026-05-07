@@ -61,8 +61,23 @@ CREATE POLICY "pagos_eventos_insert_flujos_pagos"
         AND p.residente_id = pagos_eventos.residente_id
     )
     AND (
-      public.fn_auth_rol() = 'admin'
-      OR residente_id = public.fn_auth_residente_id()
+      (
+        public.fn_auth_rol() = 'admin'
+        AND evento IN (
+          'cobro_creado',
+          'pago_aprobado',
+          'comprobante_rechazado',
+          'pago_vencido'
+        )
+      )
+      OR (
+        public.fn_auth_rol() = 'residente'
+        AND residente_id = public.fn_auth_residente_id()
+        AND evento IN (
+          'comprobante_subido',
+          'comprobante_reemplazado'
+        )
+      )
     )
   );
 
