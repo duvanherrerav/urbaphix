@@ -34,6 +34,7 @@ function App() {
   const [errorPerfil, setErrorPerfil] = useState('');
   const [openMenu, setOpenMenu] = useState(false);
   const [modulo, setModulo] = useState('');
+  const [pagosTab, setPagosTab] = useState('bandejas');
   const menuRef = useRef(null);
 
   const menuBtnClass = (target) => `app-sidebar-item ${moduloActual === target ? 'app-sidebar-item-active' : ''}`;
@@ -375,13 +376,30 @@ function App() {
                 )}
 
                 {moduloActual === 'pagos' && (
-                  <>
-                    <div className="space-y-4">
-                      <CrearCobro usuarioApp={usuarioApp} />
-                      <PanelPagosAdmin usuarioApp={usuarioApp} />
+                  <div className="space-y-4">
+                    <CrearCobro usuarioApp={usuarioApp} />
+
+                    <div className="app-surface-muted p-2 flex flex-wrap gap-2">
+                      {[
+                        { key: 'bandejas', label: 'Bandejas' },
+                        { key: 'estado', label: 'Estado de cuenta' },
+                        { key: 'analitica', label: 'Analítica' }
+                      ].map((tab) => (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setPagosTab(tab.key)}
+                          className={`app-btn text-xs ${pagosTab === tab.key ? 'app-btn-secondary' : 'app-btn-ghost'}`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
                     </div>
-                    <EstadoCuenta usuarioApp={usuarioApp} />
-                  </>
+
+                    {pagosTab === 'bandejas' && <PanelPagosAdmin usuarioApp={usuarioApp} vistaInicial="bandejas" />}
+                    {pagosTab === 'estado' && <EstadoCuenta usuarioApp={usuarioApp} />}
+                    {pagosTab === 'analitica' && <PanelPagosAdmin usuarioApp={usuarioApp} vistaInicial="analitica" />}
+                  </div>
                 )}
 
                 {moduloActual === 'incidentes' && (

@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import AppDatePicker from '../../../components/ui/AppDatePicker';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
-import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getResumenEstadosPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
+import { ESTADOS_CARTERA_ACTIVA, ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getResumenEstadosPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 const FILTROS_ESTADO = [
   { value: 'todos', label: 'Todos' },
@@ -53,6 +53,10 @@ export default function EstadoCuenta({ usuarioApp }) {
   const MOVIMIENTOS_PAGE_SIZE = 8;
   const hoy = new Date();
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroTorre, setFiltroTorre] = useState('');
+  const [busquedaApto, setBusquedaApto] = useState('');
+  const [soloVencidos, setSoloVencidos] = useState(false);
+  const [soloCarteraActiva, setSoloCarteraActiva] = useState(false);
   const [fechaDesde, setFechaDesde] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]);
   const [fechaHasta, setFechaHasta] = useState(hoy.toISOString().split('T')[0]);
   const [estado, setEstado] = useState(null);
@@ -70,7 +74,14 @@ export default function EstadoCuenta({ usuarioApp }) {
 
     let query = supabase
       .from('pagos')
-      .select('id, valor, estado, created_at, concepto, tipo_pago, fecha_vencimiento, fecha_pago, dias_mora')
+      .select(`
+        id, valor, estado, created_at, concepto, tipo_pago, fecha_vencimiento, fecha_pago, dias_mora,
+        residentes (
+          id,
+          usuarios_app ( nombre ),
+          apartamentos ( numero, torres!fk_apartamento_torre ( nombre ) )
+        )
+      `)
       .eq('conjunto_id', usuarioApp.conjunto_id)
       .gte('created_at', `${fechaDesde}T00:00:00`)
       .lte('created_at', `${fechaHasta}T23:59:59`)
@@ -86,9 +97,22 @@ export default function EstadoCuenta({ usuarioApp }) {
     }
 
     const pagosBase = data || [];
-    const pagos = filtroEstado === 'todos'
-      ? pagosBase
-      : pagosBase.filter((pago) => obtenerEstadoFinancieroReal(pago) === filtroEstado);
+    const pagos = pagosBase
+      .map((pago) => ({
+        ...pago,
+        residente: pago.residentes?.usuarios_app?.nombre || 'Residente',
+        apartamento: pago.residentes?.apartamentos?.numero || '-',
+        torre: pago.residentes?.apartamentos?.torres?.nombre || '-'
+      }))
+      .filter((pago) => {
+        const estadoReal = obtenerEstadoFinancieroReal(pago);
+        const cumpleEstado = filtroEstado === 'todos' ? true : estadoReal === filtroEstado;
+        const cumpleTorre = filtroTorre ? pago.torre === filtroTorre : true;
+        const cumpleApto = busquedaApto ? String(pago.apartamento || '').includes(busquedaApto) : true;
+        const cumpleVencidos = soloVencidos ? estadoReal === ESTADOS_PAGO.VENCIDO : true;
+        const cumpleCartera = soloCarteraActiva ? ESTADOS_CARTERA_ACTIVA.includes(estadoReal) : true;
+        return cumpleEstado && cumpleTorre && cumpleApto && cumpleVencidos && cumpleCartera;
+      });
     const porEstado = getResumenEstadosPago(pagos);
     const totalMovimientos = pagos.length;
     const totalValorPeriodo = pagos.reduce((acc, p) => acc + Number(p.valor || 0), 0);
@@ -115,8 +139,45 @@ export default function EstadoCuenta({ usuarioApp }) {
       totalValorPeriodo,
       pagos,
       porEstado,
-      porTipo
+      porTipo,
+      filtros: { filtroTorre, busquedaApto, soloVencidos, soloCarteraActiva }
     });
+  };
+
+
+  const escaparCSV = (value) => {
+    const texto = String(value ?? '').replace(/"/g, '""');
+    return `"${texto}"`;
+  };
+
+  const generarCSV = () => {
+    if (!estado) return;
+
+    const headers = ['fecha', 'concepto', 'estado', 'valor', 'apartamento', 'residente', 'mora', 'vencimiento'];
+    const rows = estado.pagos.map((pago) => {
+      const estadoUi = getEstadoPagoUi(pago);
+      return [
+        formatFechaBogota(pago.created_at),
+        pago.concepto || '-',
+        estadoUi.label,
+        Number(pago.valor || 0),
+        `Torre ${pago.torre || '-'} Apto ${pago.apartamento || '-'}`,
+        pago.residente || 'Residente',
+        getDiasMoraPago(pago),
+        pago.fecha_vencimiento ? formatFechaBogota(pago.fecha_vencimiento) : '-'
+      ].map(escaparCSV).join(',');
+    });
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `estado_cuenta_${estado.fechaDesde}_${estado.fechaHasta}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const generarPDF = () => {
@@ -246,6 +307,7 @@ export default function EstadoCuenta({ usuarioApp }) {
     );
   };
 
+  const torres = estado ? [...new Set(estado.pagos.map((pago) => pago.torre).filter(Boolean))] : [];
   const movimientos = estado?.pagos || [];
   const movimientosPreview = movimientos.slice(0, MOVIMIENTOS_PREVIEW_LIMIT);
   const totalPaginasMovimientos = Math.max(1, Math.ceil(movimientos.length / MOVIMIENTOS_PAGE_SIZE));
@@ -261,15 +323,29 @@ export default function EstadoCuenta({ usuarioApp }) {
         <p className="text-sm text-app-text-secondary">Resumen financiero del periodo seleccionado. Este bloque respeta exclusivamente filtros de fecha y estado.</p>
       </div>
 
-      <div className="app-surface-muted p-3 grid md:grid-cols-4 gap-3">
+      <div className="app-surface-muted p-3 grid md:grid-cols-4 xl:grid-cols-8 gap-3">
         <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} className="app-input">
           {FILTROS_ESTADO.map((filtro) => (
             <option key={filtro.value} value={filtro.value}>{filtro.label}</option>
           ))}
         </select>
+        <select value={filtroTorre} onChange={(e) => setFiltroTorre(e.target.value)} className="app-input">
+          <option value="">Todas las torres</option>
+          {torres.map((torre) => <option key={torre} value={torre}>{torre}</option>)}
+        </select>
+        <input className="app-input" placeholder="Apartamento" value={busquedaApto} onChange={(e) => setBusquedaApto(e.target.value)} />
 
         <AppDatePicker value={fechaDesde} max={fechaHasta} onChange={setFechaDesde} />
         <AppDatePicker value={fechaHasta} min={fechaDesde} onChange={setFechaHasta} />
+
+        <label className="rounded-lg border border-app-border bg-app-bg px-3 py-2 text-xs text-app-text-secondary flex items-center gap-2">
+          <input type="checkbox" checked={soloVencidos} onChange={(e) => setSoloVencidos(e.target.checked)} />
+          Vencidos únicamente
+        </label>
+        <label className="rounded-lg border border-app-border bg-app-bg px-3 py-2 text-xs text-app-text-secondary flex items-center gap-2">
+          <input type="checkbox" checked={soloCarteraActiva} onChange={(e) => setSoloCarteraActiva(e.target.checked)} />
+          Cartera activa
+        </label>
 
         <button onClick={generarEstado} className="app-btn-secondary">
           {loading ? 'Generando...' : 'Generar reporte'}
@@ -318,9 +394,14 @@ export default function EstadoCuenta({ usuarioApp }) {
             </div>
           </div>
 
-          <button onClick={generarPDF} className="app-btn-ghost">
-            Descargar PDF 📄
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={generarPDF} className="app-btn-ghost">
+              Descargar PDF 📄
+            </button>
+            <button onClick={generarCSV} className="app-btn-secondary">
+              Exportar CSV
+            </button>
+          </div>
 
           <div>
             <h3 className="font-semibold mb-2">Movimientos del periodo</h3>
@@ -330,7 +411,7 @@ export default function EstadoCuenta({ usuarioApp }) {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="font-medium">{p.concepto || 'Sin concepto'}</p>
-                      <p className="text-xs text-app-text-secondary">{formatFechaBogota(p.created_at)} · Tipo: {getTipoPagoLabel(p.tipo_pago)}</p>
+                      <p className="text-xs text-app-text-secondary">{formatFechaBogota(p.created_at)} · Torre {p.torre} Apto {p.apartamento} · {p.residente} · Tipo: {getTipoPagoLabel(p.tipo_pago)}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">${Number(p.valor || 0).toLocaleString('es-CO')}</p>
@@ -377,7 +458,7 @@ export default function EstadoCuenta({ usuarioApp }) {
                     <div>
                       <p className="font-medium">{p.concepto || 'Sin concepto'}</p>
                       <p className="text-xs text-app-text-secondary">
-                        {formatFechaBogota(p.created_at)} · Tipo: {getTipoPagoLabel(p.tipo_pago)}
+                        {formatFechaBogota(p.created_at)} · Torre {p.torre} Apto {p.apartamento} · {p.residente} · Tipo: {getTipoPagoLabel(p.tipo_pago)}
                       </p>
                     </div>
                     <div className="text-right">

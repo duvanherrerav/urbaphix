@@ -193,3 +193,114 @@ export function esPagoCartera(pagoOrEstado) {
     : getEstadoPagoKey(pagoOrEstado);
   return estadoKey !== ESTADOS_PAGO.PAGADO;
 }
+
+export const ESTADOS_CARTERA_ACTIVA = Object.freeze([
+  ESTADOS_PAGO.PENDIENTE,
+  ESTADOS_PAGO.VENCIDO,
+  ESTADOS_PAGO.EN_REVISION,
+  ESTADOS_PAGO.RECHAZADO
+]);
+
+export const AGING_CARTERA_BUCKETS = Object.freeze([
+  { key: '1_30', label: '1-30 días', min: 1, max: 30 },
+  { key: '31_60', label: '31-60 días', min: 31, max: 60 },
+  { key: '61_90', label: '61-90 días', min: 61, max: 90 },
+  { key: '90_plus', label: '+90 días', min: 91, max: Infinity }
+]);
+
+export function getResumenFinancieroEjecutivo(pagos = []) {
+  const porEstado = getResumenEstadosPago(pagos);
+  const totalRecaudado = porEstado[ESTADOS_PAGO.PAGADO].total;
+  const totalPendiente = porEstado[ESTADOS_PAGO.PENDIENTE].total;
+  const totalVencido = porEstado[ESTADOS_PAGO.VENCIDO].total;
+  const totalEnValidacion = porEstado[ESTADOS_PAGO.EN_REVISION].total;
+  const totalRechazado = porEstado[ESTADOS_PAGO.RECHAZADO].total;
+  const carteraTotal = totalPendiente + totalVencido + totalEnValidacion + totalRechazado;
+  const universoPeriodo = totalRecaudado + carteraTotal;
+  const safePercent = (valor) => (universoPeriodo > 0 ? Math.round((valor / universoPeriodo) * 100) : 0);
+
+  return {
+    porEstado,
+    universoPeriodo,
+    carteraTotal,
+    totalRecaudado,
+    totalPendiente,
+    totalVencido,
+    totalEnValidacion,
+    totalRechazado,
+    porcentajeRecaudo: safePercent(totalRecaudado),
+    porcentajeCarteraPendiente: safePercent(carteraTotal),
+    porcentajeCarteraVencida: safePercent(totalVencido),
+    pagosAprobados: porEstado[ESTADOS_PAGO.PAGADO].cantidad,
+    pagosVencidos: porEstado[ESTADOS_PAGO.VENCIDO].cantidad,
+    comprobantesEnRevision: porEstado[ESTADOS_PAGO.EN_REVISION].cantidad
+  };
+}
+
+export function getAgingCartera(pagos = []) {
+  const buckets = AGING_CARTERA_BUCKETS.reduce((acc, bucket) => ({
+    ...acc,
+    [bucket.key]: { ...bucket, total: 0, cantidad: 0 }
+  }), {});
+
+  pagos.forEach((pago) => {
+    const estadoKey = obtenerEstadoFinancieroReal(pago);
+    if (!ESTADOS_CARTERA_ACTIVA.includes(estadoKey)) return;
+
+    const diasMora = getDiasMoraPago(pago);
+    if (diasMora <= 0) return;
+
+    const bucket = AGING_CARTERA_BUCKETS.find((item) => diasMora >= item.min && diasMora <= item.max);
+    if (!bucket) return;
+
+    buckets[bucket.key].total += getValorPago(pago);
+    buckets[bucket.key].cantidad += 1;
+  });
+
+  return AGING_CARTERA_BUCKETS.map((bucket) => buckets[bucket.key]);
+}
+
+export function getTopCarteraApartamentos(pagos = [], limit = 5) {
+  const mapa = new Map();
+
+  pagos.forEach((pago) => {
+    const estadoKey = obtenerEstadoFinancieroReal(pago);
+    if (!ESTADOS_CARTERA_ACTIVA.includes(estadoKey)) return;
+
+    const apartamento = pago.apartamento || pago.residentes?.apartamentos?.numero || '-';
+    const torre = pago.torre || pago.residentes?.apartamentos?.torres?.nombre || '-';
+    const residente = pago.nombre || pago.residentes?.usuarios_app?.nombre || 'Residente';
+    const key = `${torre}::${apartamento}::${pago.residente_id || pago.residentes?.id || residente}`;
+
+    if (!mapa.has(key)) {
+      mapa.set(key, {
+        key,
+        torre,
+        apartamento,
+        residente,
+        totalAdeudado: 0,
+        cantidadPagos: 0,
+        maxDiasMora: 0,
+        porEstado: ESTADOS_CARTERA_ACTIVA.reduce((acc, estado) => ({
+          ...acc,
+          [estado]: { cantidad: 0, total: 0 }
+        }), {})
+      });
+    }
+
+    const row = mapa.get(key);
+    const valor = getValorPago(pago);
+    row.totalAdeudado += valor;
+    row.cantidadPagos += 1;
+    row.maxDiasMora = Math.max(row.maxDiasMora, getDiasMoraPago(pago));
+    row.porEstado[estadoKey].cantidad += 1;
+    row.porEstado[estadoKey].total += valor;
+  });
+
+  return Array.from(mapa.values())
+    .sort((a, b) => {
+      const vencidoDiff = b.porEstado[ESTADOS_PAGO.VENCIDO].total - a.porEstado[ESTADOS_PAGO.VENCIDO].total;
+      return vencidoDiff || b.totalAdeudado - a.totalAdeudado || b.maxDiasMora - a.maxDiasMora;
+    })
+    .slice(0, limit);
+}

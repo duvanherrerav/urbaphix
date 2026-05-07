@@ -8,7 +8,7 @@ import KPIsAdmin from '../components/KPIsAdmin';
 import DashboardResumen from '../components/DashboardResumen';
 import CarteraResumen from '../../contabilidad/components/CarteraResumen';
 import GraficaCartera from '../../contabilidad/components/GraficaCartera';
-import { ESTADOS_PAGO, getResumenEstadosPago } from '../../contabilidad/utils/pagosEstados';
+import { ESTADOS_PAGO, getResumenEstadosPago, getResumenFinancieroEjecutivo } from '../../contabilidad/utils/pagosEstados';
 
 const ESTADOS_VISITA_VALIDOS = ['pendiente', 'ingresado', 'salido'];
 
@@ -33,6 +33,7 @@ export default function DashboardAdmin({ usuarioApp }) {
 
   const resumenFinanciero = useMemo(() => {
     const porEstado = getResumenEstadosPago(pagos);
+    const ejecutivo = getResumenFinancieroEjecutivo(pagos);
 
     return {
       pendientesCantidad: porEstado[ESTADOS_PAGO.PENDIENTE].cantidad,
@@ -44,10 +45,11 @@ export default function DashboardAdmin({ usuarioApp }) {
       enRevisionMonto: porEstado[ESTADOS_PAGO.EN_REVISION].total,
       pagadoMonto: porEstado[ESTADOS_PAGO.PAGADO].total,
       rechazadoMonto: porEstado[ESTADOS_PAGO.RECHAZADO].total,
-      carteraMonto: porEstado[ESTADOS_PAGO.PENDIENTE].total
-        + porEstado[ESTADOS_PAGO.VENCIDO].total
-        + porEstado[ESTADOS_PAGO.EN_REVISION].total
-        + porEstado[ESTADOS_PAGO.RECHAZADO].total
+      carteraMonto: ejecutivo.carteraTotal,
+      porcentajeRecaudo: ejecutivo.porcentajeRecaudo,
+      porcentajeCarteraPendiente: ejecutivo.porcentajeCarteraPendiente,
+      porcentajeCarteraVencida: ejecutivo.porcentajeCarteraVencida,
+      pagosAprobados: ejecutivo.pagosAprobados
     };
   }, [pagos]);
 
@@ -171,7 +173,7 @@ export default function DashboardAdmin({ usuarioApp }) {
   async function obtenerPagos() {
     const { data, error } = await supabase
       .from('pagos')
-      .select('valor, estado, created_at, fecha_vencimiento, dias_mora')
+      .select('valor, estado, created_at, fecha_vencimiento, fecha_pago, dias_mora')
       .eq('conjunto_id', usuarioApp.conjunto_id);
 
     if (error) return;
@@ -357,6 +359,10 @@ export default function DashboardAdmin({ usuarioApp }) {
             <div className="rounded-xl border border-state-error/45 bg-state-error/10 p-3"><p className="text-state-error font-medium">Vencido</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.vencidoMonto.toLocaleString('es-CO')}</p></div>
             <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-info font-medium">En validación</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.enRevisionMonto.toLocaleString('es-CO')}</p></div>
             <div className="rounded-xl border border-app-border bg-app-bg p-3"><p className="text-state-error font-medium">Rechazado no aprobado</p><p className="text-lg font-bold text-app-text-primary">${resumenFinanciero.rechazadoMonto.toLocaleString('es-CO')}</p></div>
+            <div className="rounded-xl border border-state-success/35 bg-app-bg p-3"><p className="text-state-success font-medium">% recaudo periodo</p><p className="text-lg font-bold text-app-text-primary">{resumenFinanciero.porcentajeRecaudo}%</p></div>
+            <div className="rounded-xl border border-state-warning/35 bg-app-bg p-3"><p className="text-state-warning font-medium">% cartera pendiente</p><p className="text-lg font-bold text-app-text-primary">{resumenFinanciero.porcentajeCarteraPendiente}%</p></div>
+            <div className="rounded-xl border border-state-error/45 bg-state-error/10 p-3"><p className="text-state-error font-medium">% cartera vencida</p><p className="text-lg font-bold text-app-text-primary">{resumenFinanciero.porcentajeCarteraVencida}%</p></div>
+            <div className="rounded-xl border border-state-success/35 bg-app-bg p-3"><p className="text-state-success font-medium">Pagos aprobados</p><p className="text-lg font-bold text-app-text-primary">{resumenFinanciero.pagosAprobados}</p></div>
           </div>
         </div>
       </div>

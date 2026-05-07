@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { EVENTOS_PAGO, adjuntarEventosAPagos, crearNotificacionPago, getPagoEventoLabel, registrarPagoEvento } from '../services/pagosEventosService';
+import AnaliticaFinancieraAvanzada from '../components/AnaliticaFinancieraAvanzada';
+import GraficaFinanciera from '../components/GraficaFinanciera';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
-import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoKey, getEstadoPagoUi, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
+import { ESTADOS_CARTERA_ACTIVA, ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoKey, getEstadoPagoUi, getResumenFinancieroEjecutivo, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
 
-export default function PanelPagosAdmin({ usuarioApp }) {
+export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' }) {
     const PREVIEW_LIMIT = 3;
     const MODAL_PAGE_SIZE = 8;
     const CAUSALES_ECONOMICAS = ['no asistió', 'daño', 'tiempo excedido', 'depósito retenido'];
@@ -20,6 +22,11 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     const [loading, setLoading] = useState(false);
     const [filtroTorre, setFiltroTorre] = useState('');
     const [busquedaApto, setBusquedaApto] = useState('');
+    const [filtroEstado, setFiltroEstado] = useState('todos');
+    const [fechaDesde, setFechaDesde] = useState('');
+    const [fechaHasta, setFechaHasta] = useState('');
+    const [soloVencidos, setSoloVencidos] = useState(false);
+    const [soloCarteraActiva, setSoloCarteraActiva] = useState(false);
     const [bandejaActiva, setBandejaActiva] = useState(ESTADOS_PAGO.VENCIDO);
     const [panelAmpliadoOpen, setPanelAmpliadoOpen] = useState(false);
     const [busquedaPanel, setBusquedaPanel] = useState('');
@@ -27,6 +34,8 @@ export default function PanelPagosAdmin({ usuarioApp }) {
     const [causalDraft, setCausalDraft] = useState({});
     const [impactoDraft, setImpactoDraft] = useState({});
     const conjuntoId = usuarioApp?.conjunto_id;
+    const mostrarAnalitica = vistaInicial === 'completa' || vistaInicial === 'analitica';
+    const mostrarBandejas = vistaInicial === 'completa' || vistaInicial === 'bandejas';
 
     const cargarPagos = useCallback(async () => {
         setLoading(true);
@@ -198,22 +207,28 @@ export default function PanelPagosAdmin({ usuarioApp }) {
 
     const torres = useMemo(() => [...new Set(pagos.map((p) => p.torre).filter(Boolean))], [pagos]);
     const pagosFiltrados = useMemo(() => pagos.filter((p) => {
+        const estadoReal = obtenerEstadoFinancieroReal(p);
+        const fechaBase = String(p.created_at || '').split('T')[0];
         const cumpleTorre = filtroTorre ? p.torre === filtroTorre : true;
         const cumpleApto = busquedaApto ? p.apartamento?.toString().includes(busquedaApto) : true;
-        return cumpleTorre && cumpleApto;
-    }), [pagos, filtroTorre, busquedaApto]);
+        const cumpleEstado = filtroEstado === 'todos' ? true : estadoReal === filtroEstado;
+        const cumpleDesde = fechaDesde ? fechaBase >= fechaDesde : true;
+        const cumpleHasta = fechaHasta ? fechaBase <= fechaHasta : true;
+        const cumpleVencidos = soloVencidos ? estadoReal === ESTADOS_PAGO.VENCIDO : true;
+        const cumpleCartera = soloCarteraActiva ? ESTADOS_CARTERA_ACTIVA.includes(estadoReal) : true;
+        return cumpleTorre && cumpleApto && cumpleEstado && cumpleDesde && cumpleHasta && cumpleVencidos && cumpleCartera;
+    }), [pagos, filtroTorre, busquedaApto, filtroEstado, fechaDesde, fechaHasta, soloVencidos, soloCarteraActiva]);
 
+    const resumenEjecutivo = useMemo(() => getResumenFinancieroEjecutivo(pagosFiltrados), [pagosFiltrados]);
     const resumen = useMemo(() => ({
         total: pagosFiltrados.length,
-        pendientes: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PENDIENTE).length,
-        vencidos: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.VENCIDO).length,
-        enRevision: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.EN_REVISION).length,
-        pagados: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PAGADO).length,
-        rechazados: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.RECHAZADO).length,
-        cartera: pagosFiltrados
-            .filter((p) => [ESTADOS_PAGO.PENDIENTE, ESTADOS_PAGO.VENCIDO, ESTADOS_PAGO.EN_REVISION, ESTADOS_PAGO.RECHAZADO].includes(obtenerEstadoFinancieroReal(p)))
-            .reduce((acc, p) => acc + Number(p.valor || 0), 0)
-    }), [pagosFiltrados]);
+        pendientes: resumenEjecutivo.porEstado[ESTADOS_PAGO.PENDIENTE].cantidad,
+        vencidos: resumenEjecutivo.porEstado[ESTADOS_PAGO.VENCIDO].cantidad,
+        enRevision: resumenEjecutivo.porEstado[ESTADOS_PAGO.EN_REVISION].cantidad,
+        pagados: resumenEjecutivo.porEstado[ESTADOS_PAGO.PAGADO].cantidad,
+        rechazados: resumenEjecutivo.porEstado[ESTADOS_PAGO.RECHAZADO].cantidad,
+        cartera: resumenEjecutivo.carteraTotal
+    }), [pagosFiltrados.length, resumenEjecutivo]);
     const pagosAgrupados = useMemo(() => ({
         [ESTADOS_PAGO.VENCIDO]: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.VENCIDO)
             .sort((a, b) => getDiasMoraPago(b) - getDiasMoraPago(a)),
@@ -411,20 +426,55 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                 </div>
             </div>
 
-            <div className="app-surface-muted p-3 grid md:grid-cols-3 gap-2">
+            <div className="app-surface-muted p-3 grid md:grid-cols-3 xl:grid-cols-7 gap-2">
                 <select className="app-input" value={filtroTorre} onChange={(e) => setFiltroTorre(e.target.value)}>
                     <option value="">Todas las torres</option>
                     {torres.map((torre) => <option key={torre} value={torre}>{torre}</option>)}
                 </select>
                 <input className="app-input" placeholder="Buscar apto" value={busquedaApto} onChange={(e) => setBusquedaApto(e.target.value)} />
-                <div className="text-xs text-app-text-secondary flex items-center">Aplicando filtros en tiempo real</div>
+                <select className="app-input" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                    <option value="todos">Todos los estados</option>
+                    <option value={ESTADOS_PAGO.PENDIENTE}>Pendiente</option>
+                    <option value={ESTADOS_PAGO.VENCIDO}>Vencido</option>
+                    <option value={ESTADOS_PAGO.EN_REVISION}>En revisión</option>
+                    <option value={ESTADOS_PAGO.PAGADO}>Pagado</option>
+                    <option value={ESTADOS_PAGO.RECHAZADO}>Rechazado</option>
+                </select>
+                <input className="app-input" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+                <input className="app-input" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+                <label className="rounded-lg border border-app-border bg-app-bg px-3 py-2 text-xs text-app-text-secondary flex items-center gap-2">
+                    <input type="checkbox" checked={soloVencidos} onChange={(e) => setSoloVencidos(e.target.checked)} />
+                    Vencidos únicamente
+                </label>
+                <label className="rounded-lg border border-app-border bg-app-bg px-3 py-2 text-xs text-app-text-secondary flex items-center gap-2">
+                    <input type="checkbox" checked={soloCarteraActiva} onChange={(e) => setSoloCarteraActiva(e.target.checked)} />
+                    Cartera activa
+                </label>
             </div>
+
+
+            {mostrarAnalitica && (
+                <>
+                    <div className="app-surface-primary p-4 border border-brand-primary/20">
+                        <AnaliticaFinancieraAvanzada pagos={pagosFiltrados} />
+                    </div>
+
+                    <div className="app-surface-primary p-4 border border-brand-primary/20">
+                        <h4 className="font-semibold text-app-text-primary mb-1">Analítica temporal financiera</h4>
+                        <p className="text-xs text-app-text-secondary mb-3">Recaudo por fecha de aprobación, deuda generada, cantidad de pagos aprobados y vencidos por fecha de vencimiento.</p>
+                        <div className="h-[320px]">
+                            <GraficaFinanciera pagos={pagosFiltrados} />
+                        </div>
+                    </div>
+                </>
+            )}
 
             {loading && <p className="text-sm text-app-text-secondary">Cargando pagos...</p>}
             {!loading && pagosFiltrados.length === 0 && <p className="text-sm text-app-text-secondary">Sin resultados para filtros actuales.</p>}
 
-            <div className="space-y-3">
-                <div className="app-surface-muted p-2 flex flex-wrap gap-2">
+            {mostrarBandejas && (
+                <div className="space-y-3">
+                    <div className="app-surface-muted p-2 flex flex-wrap gap-2">
                     {ESTADOS_BANDEJA.map((bandeja) => (
                         <button
                             key={bandeja.key}
@@ -464,10 +514,11 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                             {textoBotonVerTodos} ({pagosBandejaActiva.length})
                         </button>
                     )}
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {panelAmpliadoOpen && (
+            {mostrarBandejas && panelAmpliadoOpen && (
                 <div className="fixed inset-0 bg-app-bg/85 backdrop-blur-sm z-50 p-4 flex items-center justify-center">
                     <div className="app-surface-primary w-full max-w-5xl p-4 space-y-4 border border-brand-primary/20 shadow-2xl">
                         <div className="flex items-center justify-between gap-3">
