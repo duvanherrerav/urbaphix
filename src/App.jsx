@@ -181,7 +181,7 @@ function App() {
     return (
       <div className="app-shell flex items-center justify-center">
         <div className="app-card flex items-center gap-3 text-app-text-secondary text-sm">
-          <BrandLogo variant="banner" className="h-auto w-full max-w-44 sm:max-w-52" decorative />
+          <BrandLogo variant="loading" className="h-auto w-full max-w-44 sm:max-w-52" decorative />
           <span>Cargando Urbaphix...</span>
         </div>
       </div>
@@ -222,14 +222,8 @@ function App() {
       {/* 🔥 SIDEBAR */}
       <aside className="app-sidebar w-full shrink-0 p-4 lg:min-h-screen lg:w-72">
 
-        <div className="mb-3 app-surface-primary flex items-center gap-3 p-3 lg:mb-5 lg:gap-3 lg:p-3">
-          <BrandLogo variant="isotipo" className="h-10 w-10 shrink-0" alt="Isotipo Urbaphix" />
-          <div className="min-w-0 flex-1">
-            <BrandLogo variant="sidebar" className="h-7 w-auto max-w-[150px]" alt="Urbaphix" />
-            <p className="mt-1 text-[11px] leading-snug text-app-text-secondary">
-              Plataforma SaaS para propiedad horizontal
-            </p>
-          </div>
+        <div className="mb-3 app-surface-primary p-3 lg:mb-5 lg:p-3">
+          <BrandLogo variant="sidebar" className="max-w-full" alt="Urbaphix" />
         </div>
 
         <nav className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
@@ -317,7 +311,7 @@ function App() {
           {/* 👤 MENU */}
           <div className="relative z-50 flex items-center gap-3" ref={menuRef}>
 
-            <BrandLogo variant="header" className="hidden h-7 w-auto max-w-[128px] sm:block" alt="Urbaphix" />
+            <BrandLogo variant="header" className="hidden max-w-[150px] sm:flex" alt="Urbaphix" />
 
             <button
               onClick={() => setOpenMenu(!openMenu)}

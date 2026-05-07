@@ -1,19 +1,17 @@
-import isotipo from '../../assets/brand/isotipo-urbaphix.svg';
-import imagotipo from '../../assets/brand/imagotipo-urbaphix.svg';
-import logotipo from '../../assets/brand/logotipo-urbaphix.svg';
-import banner from '../../assets/brand/banner-urbaphix.svg';
+import isotipo from '../../assets/brand/isotipo-urbaphix.png';
+import logotipo from '../../assets/brand/logotipo-urbaphix.jpg';
+import banner from '../../assets/brand/banner-urbaphix.png';
 
 const brandAssets = {
   isotipo,
-  imagotipo,
+  imagotipo: logotipo,
   logotipo,
   banner
 };
 
 const variantAliases = {
-  compact: 'imagotipo',
-  header: 'imagotipo',
-  sidebar: 'imagotipo'
+  compact: 'logotipo',
+  loading: 'banner'
 };
 
 const defaultAlt = {
@@ -23,10 +21,50 @@ const defaultAlt = {
   banner: 'Banner Urbaphix',
   compact: 'Urbaphix',
   header: 'Urbaphix',
-  sidebar: 'Urbaphix'
+  sidebar: 'Urbaphix',
+  loading: 'Banner Urbaphix'
 };
 
+const brandTextClass = 'font-bold leading-none tracking-tight text-app-text-primary';
+
+function BrandLockup({ variant, className, alt, decorative }) {
+  const accessibleName = alt || defaultAlt[variant];
+  const showDescriptor = variant === 'sidebar';
+
+  return (
+    <div
+      aria-hidden={decorative || undefined}
+      aria-label={decorative ? undefined : accessibleName}
+      className={`flex min-w-0 items-center gap-2 ${className}`.trim()}
+      role={decorative ? undefined : 'img'}
+    >
+      <img
+        src={isotipo}
+        alt=""
+        aria-hidden="true"
+        className="h-8 w-8 shrink-0 object-contain"
+        loading="eager"
+        decoding="async"
+      />
+      <div className="min-w-0">
+        <span className={`block truncate ${brandTextClass} ${showDescriptor ? 'text-lg' : 'text-base'}`}>
+          Urbaphix
+        </span>
+        {showDescriptor && (
+          <span className="mt-1 block text-[11px] leading-snug text-app-text-secondary">
+            SaaS para propiedad horizontal
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function BrandLogo({ variant = 'imagotipo', className = '', alt, decorative = false }) {
+  if (variant === 'header' || variant === 'sidebar') {
+    return <BrandLockup variant={variant} className={className} alt={alt} decorative={decorative} />;
+  }
+
   const selectedVariant = brandAssets[variant] ? variant : variantAliases[variant] || 'imagotipo';
 
   return (
