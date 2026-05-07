@@ -5,13 +5,59 @@ import PagoActionPanel from './PagoActionPanel';
 import PagoStatusBadge from './PagoStatusBadge';
 import PagoTimeline from './PagoTimeline';
 
-export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onArchivoChange, onSubirComprobante, eventos = [] }) {
+export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onArchivoChange, onSubirComprobante, eventos = [], compactHistorico = false }) {
   const valor = Number(pago?.valor || 0);
   const estadoReal = obtenerEstadoFinancieroReal(pago);
   const estaPagado = estaPagoPagado(pago?.estado);
   const estaVencido = estadoReal === ESTADOS_PAGO.VENCIDO;
   const diasMora = getDiasMoraPago(pago);
   const eventosVisibles = eventos.slice(0, 4);
+
+  if (compactHistorico && estaPagado) {
+    return (
+      <details className="group rounded-xl border border-state-success/25 bg-app-bg-alt/65 px-3 py-2.5 shadow-[0_8px_22px_rgba(2,6,23,0.18)] transition-all duration-300 hover:border-state-success/45 hover:bg-app-bg-alt/85">
+        <summary className="flex cursor-pointer list-none flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className="min-w-0 truncate text-sm font-bold text-app-text-primary">{pago.concepto || 'Pago registrado'}</p>
+            <PagoStatusBadge estadoProceso={estadoProceso} compact />
+            <span className="text-xs text-app-text-secondary">{formatFechaBogota(pago.fecha_pago || pago.created_at)}</span>
+          </div>
+          <div className="flex items-center gap-3 text-left sm:text-right">
+            <p className="text-sm font-black text-app-text-primary">${valor.toLocaleString('es-CO')}</p>
+            <span className="text-[11px] font-semibold text-brand-secondary group-open:hidden">Expandir detalle</span>
+            <span className="hidden text-[11px] font-semibold text-brand-secondary group-open:inline">Ocultar detalle</span>
+          </div>
+        </summary>
+
+        <div className="mt-3 grid gap-3 border-t border-app-border/60 pt-3 lg:grid-cols-[minmax(0,1fr)_minmax(160px,190px)] lg:items-start">
+          <div className="min-w-0 space-y-2">
+            <p className="text-xs text-app-text-secondary">Generado {formatFechaBogota(pago.created_at)} · Vence {formatFechaBogota(pago.fecha_vencimiento)}</p>
+            <PagoTimeline pago={pago} compact />
+            {eventosVisibles.length > 0 && (
+              <div className="rounded-xl border border-app-border/70 bg-app-bg/55 px-3 py-2 text-xs">
+                <p className="font-semibold text-app-text-primary">Historial operativo</p>
+                <div className="mt-2 space-y-2">
+                  {eventosVisibles.map((evento) => (
+                    <div key={evento.id} className="border-l-2 border-brand-primary/40 pl-2">
+                      <p className="font-semibold text-app-text-primary">{getPagoEventoLabel(evento.evento)}</p>
+                      <p className="text-[11px] text-app-text-secondary">{formatFechaBogota(evento.created_at)}</p>
+                      {evento.mensaje && <p className="text-[11px] text-app-text-secondary">{evento.mensaje}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-app-border/70 bg-app-bg/65 px-3 py-2.5 text-xs text-app-text-secondary">
+            <p><span className="text-app-text-primary/90">Estado:</span> {estadoProceso?.label || 'Pagado'}</p>
+            <p><span className="text-app-text-primary/90">Valor:</span> ${valor.toLocaleString('es-CO')}</p>
+            <p><span className="text-app-text-primary/90">Radicado:</span> {String(pago.id || '-').slice(0, 8)}</p>
+          </div>
+        </div>
+      </details>
+    );
+  }
 
   return (
     <article className={`rounded-2xl border ${estaVencido ? 'border-state-error/55 shadow-[0_0_0_1px_rgba(239,68,68,0.14),0_18px_42px_rgba(239,68,68,0.12)]' : 'border-app-border/90 shadow-[0_12px_30px_rgba(2,6,23,0.22)]'} bg-app-bg-alt/80 transition-all duration-300 hover:border-brand-primary/25 hover:shadow-[0_16px_36px_rgba(2,6,23,0.28)] ${estaPagado ? 'p-3' : 'p-3.5 sm:p-4'}`}>

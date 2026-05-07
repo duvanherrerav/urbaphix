@@ -9,12 +9,23 @@ import { ESTADOS_PAGO, esPagoDeudaActiva, getEstadoPagoUi, obtenerEstadoFinancie
 const ordenarPagosDesc = (rows = []) =>
   [...rows].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
+const HISTORIAL_PAGE_SIZE = 5;
+const PRIORIDAD_ESTADO_PAGO = {
+  [ESTADOS_PAGO.PENDIENTE]: 1,
+  [ESTADOS_PAGO.VENCIDO]: 2,
+  [ESTADOS_PAGO.EN_REVISION]: 3,
+  [ESTADOS_PAGO.RECHAZADO]: 4,
+  [ESTADOS_PAGO.PAGADO]: 5
+};
+
 export default function MisPagos({ usuarioApp }) {
   const [pagos, setPagos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [configPago, setConfigPago] = useState(null);
   const [archivo, setArchivo] = useState(null);
   const [residenteId, setResidenteId] = useState(null);
+  const [historialCompletoOpen, setHistorialCompletoOpen] = useState(false);
+  const [paginaHistorial, setPaginaHistorial] = useState(1);
 
   const obtenerConfigPago = useCallback(async () => {
     const { data } = await supabase
@@ -192,12 +203,29 @@ export default function MisPagos({ usuarioApp }) {
     return true;
   };
 
+  useEffect(() => {
+    setPaginaHistorial(1);
+  }, [historialCompletoOpen, pagos.length]);
+
   const resumen = useMemo(() => ({
     pendientes: pagos.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PENDIENTE).length,
     vencidos: pagos.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.VENCIDO).length,
     pagados: pagos.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PAGADO).length,
     pendienteValor: pagos.filter((p) => esPagoDeudaActiva(p)).reduce((a, p) => a + Number(p.valor || 0), 0)
   }), [pagos]);
+
+  const pagosPriorizados = useMemo(() => [...pagos].sort((a, b) => {
+    const prioridadA = PRIORIDAD_ESTADO_PAGO[obtenerEstadoFinancieroReal(a)] || 99;
+    const prioridadB = PRIORIDAD_ESTADO_PAGO[obtenerEstadoFinancieroReal(b)] || 99;
+    if (prioridadA !== prioridadB) return prioridadA - prioridadB;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  }), [pagos]);
+
+  const totalPaginasHistorial = Math.max(1, Math.ceil(pagosPriorizados.length / HISTORIAL_PAGE_SIZE));
+  const paginaHistorialActual = Math.min(paginaHistorial, totalPaginasHistorial);
+  const pagosVisibles = historialCompletoOpen
+    ? pagosPriorizados.slice((paginaHistorialActual - 1) * HISTORIAL_PAGE_SIZE, paginaHistorialActual * HISTORIAL_PAGE_SIZE)
+    : pagosPriorizados.slice(0, HISTORIAL_PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -236,19 +264,61 @@ export default function MisPagos({ usuarioApp }) {
             <span className="app-badge app-badge-info text-[11px]">{pagos.length} cobro(s)</span>
           </div>
 
-          <div className="grid gap-3">
-            {pagos.map((p) => (
-              <PagoCard
-                key={p.id}
-                pago={p}
-                estadoProceso={getEstadoPagoUi(p)}
-                configPago={configPago}
-                onPagar={pagar}
-                onArchivoChange={(e) => setArchivo(e.target.files[0])}
-                onSubirComprobante={() => subirComprobante(p.id)}
-                eventos={p.eventos || []}
-              />
-            ))}
+          <div className="rounded-2xl border border-app-border/70 bg-app-bg/45 p-2">
+            <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1 app-scrollbar">
+              {pagosVisibles.map((p) => {
+                const esHistoricoAprobado = obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.PAGADO;
+                return (
+                  <PagoCard
+                    key={p.id}
+                    pago={p}
+                    estadoProceso={getEstadoPagoUi(p)}
+                    configPago={configPago}
+                    onPagar={pagar}
+                    onArchivoChange={(e) => setArchivo(e.target.files[0])}
+                    onSubirComprobante={() => subirComprobante(p.id)}
+                    eventos={p.eventos || []}
+                    compactHistorico={esHistoricoAprobado}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-2xl border border-app-border/70 bg-app-bg-alt/60 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-app-text-secondary">
+              {historialCompletoOpen
+                ? `Página ${paginaHistorialActual} de ${totalPaginasHistorial} · ${pagos.length} registro(s) priorizados`
+                : `Vista ejecutiva: ${Math.min(HISTORIAL_PAGE_SIZE, pagos.length)} de ${pagos.length} registro(s)`}
+            </span>
+            {historialCompletoOpen ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="app-btn-ghost text-xs disabled:opacity-40"
+                  disabled={paginaHistorialActual === 1}
+                  onClick={() => setPaginaHistorial((prev) => Math.max(1, prev - 1))}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  className="app-btn-ghost text-xs disabled:opacity-40"
+                  disabled={paginaHistorialActual === totalPaginasHistorial}
+                  onClick={() => setPaginaHistorial((prev) => Math.min(totalPaginasHistorial, prev + 1))}
+                >
+                  Siguiente
+                </button>
+              </div>
+            ) : pagos.length > HISTORIAL_PAGE_SIZE && (
+              <button
+                type="button"
+                className="app-btn-secondary text-xs"
+                onClick={() => setHistorialCompletoOpen(true)}
+              >
+                Ver historial completo
+              </button>
+            )}
           </div>
         </section>
       )}
