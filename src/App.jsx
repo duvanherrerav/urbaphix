@@ -197,27 +197,85 @@ function App() {
 
   // 🔐 LOGIN
   if (!user) {
+    const loginFeatures = ['Control de visitas', 'Reservas', 'Pagos', 'Comunicados', 'Seguridad'];
+
     return (
-      <div className="app-shell flex items-center justify-center p-4 sm:p-6">
+      <div className="app-shell relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.20),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_48%,_#020617_100%)] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="pointer-events-none absolute inset-0 -z-10 opacity-40 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:44px_44px]" />
+        <div className="pointer-events-none absolute -left-24 top-16 -z-10 h-72 w-72 rounded-full bg-brand-primary/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 right-0 -z-10 h-80 w-80 rounded-full bg-brand-secondary/10 blur-3xl" />
 
-        <div className="app-card w-full max-w-lg overflow-hidden">
+        <main className="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/70 shadow-[0_28px_90px_rgba(2,6,23,0.65)] backdrop-blur-xl lg:grid-cols-[1.08fr_0.92fr]">
+          <section className="relative hidden min-h-[640px] overflow-hidden border-r border-white/10 bg-gradient-to-br from-slate-950 via-slate-900 to-[#071827] p-10 lg:flex lg:flex-col lg:justify-between">
+            <div className="absolute right-10 top-12 h-36 w-36 rounded-full border border-brand-secondary/20" />
+            <div className="absolute -right-20 bottom-20 h-64 w-64 rounded-full border border-brand-primary/20" />
+            <div className="absolute inset-x-10 bottom-32 h-px bg-gradient-to-r from-transparent via-brand-secondary/40 to-transparent" />
 
-          <div className="mb-6 flex flex-col items-center gap-4">
-            <BrandLogo variant="banner" className="h-auto w-full max-w-[480px]" alt="Banner Urbaphix" />
-          </div>
+            <div className="relative z-10">
+              <div className="mb-10 inline-flex rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 shadow-app">
+                <BrandLogo variant="banner" className="h-auto w-56" alt="Banner Urbaphix" />
+              </div>
 
-          <h1 className="text-2xl font-bold text-center mb-2 text-app-text-primary">
-            Bienvenido
-          </h1>
+              <p className="mb-5 inline-flex rounded-full border border-brand-secondary/25 bg-brand-secondary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-brand-secondary">
+                SaaS para propiedad horizontal
+              </p>
 
-          <p className="text-center text-app-text-secondary text-sm mb-6">
-            Gestión inteligente para propiedad horizontal
-          </p>
+              <h1 className="max-w-xl text-4xl font-bold leading-tight tracking-[-0.04em] text-app-text-primary xl:text-5xl">
+                Administra tu conjunto con control, seguridad y trazabilidad.
+              </h1>
 
-          <Login />
+              <p className="mt-5 max-w-lg text-base leading-7 text-app-text-secondary">
+                Gestión inteligente para administradores, residentes y vigilancia en una experiencia centralizada, moderna y confiable.
+              </p>
+            </div>
 
-        </div>
+            <div className="relative z-10 grid gap-4 sm:grid-cols-2">
+              {[
+                ['99.9%', 'Disponibilidad visual para operación diaria'],
+                ['3 roles', 'Administración, residentes y vigilancia'],
+                ['24/7', 'Entrada segura a la plataforma'],
+                ['360°', 'Gestión de comunidad conectada']
+              ].map(([metric, label]) => (
+                <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-2xl font-bold text-app-text-primary">{metric}</p>
+                  <p className="mt-1 text-xs leading-5 text-app-text-secondary">{label}</p>
+                </div>
+              ))}
+            </div>
+          </section>
 
+          <section className="relative flex flex-col justify-center p-5 sm:p-8 lg:p-10">
+            <div className="mx-auto w-full max-w-md">
+              <div className="mb-7 flex justify-center lg:hidden">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 shadow-app">
+                  <BrandLogo variant="banner" className="h-auto w-64 max-w-full" alt="Banner Urbaphix" />
+                </div>
+              </div>
+
+              <div className="mb-7 text-center lg:text-left">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-brand-secondary">
+                  Acceso seguro
+                </p>
+                <h2 className="text-3xl font-bold tracking-[-0.03em] text-app-text-primary">
+                  Bienvenido a Urbaphix
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-app-text-secondary">
+                  Acceso para administradores, residentes y vigilancia de tu conjunto residencial.
+                </p>
+              </div>
+
+              <Login />
+
+              <div className="mt-7 flex flex-wrap justify-center gap-2 lg:justify-start" aria-label="Capacidades de Urbaphix">
+                {loginFeatures.map((feature) => (
+                  <span key={feature} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-app-text-secondary">
+                    {feature}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+        </main>
       </div>
     );
   }
