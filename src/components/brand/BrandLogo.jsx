@@ -1,19 +1,19 @@
-import isotipo from '../../assets/brand/isotipo-urbaphix.svg';
-import imagotipo from '../../assets/brand/imagotipo-urbaphix.svg';
-import logotipo from '../../assets/brand/logotipo-urbaphix.svg';
-import banner from '../../assets/brand/banner-urbaphix.svg';
+import isotipo from '../../assets/brand/isotipo-urbaphix.png';
+import logotipo from '../../assets/brand/logotipo-urbaphix.jpg';
+import banner from '../../assets/brand/banner-urbaphix.png';
 
 const brandAssets = {
   isotipo,
-  imagotipo,
+  imagotipo: logotipo,
   logotipo,
   banner
 };
 
 const variantAliases = {
-  compact: 'imagotipo',
-  header: 'imagotipo',
-  sidebar: 'imagotipo'
+  compact: 'logotipo',
+  header: 'logotipo',
+  sidebar: 'logotipo',
+  loading: 'banner'
 };
 
 const defaultAlt = {
@@ -23,7 +23,8 @@ const defaultAlt = {
   banner: 'Banner Urbaphix',
   compact: 'Urbaphix',
   header: 'Urbaphix',
-  sidebar: 'Urbaphix'
+  sidebar: 'Urbaphix',
+  loading: 'Banner Urbaphix'
 };
 
 export default function BrandLogo({ variant = 'imagotipo', className = '', alt, decorative = false }) {
