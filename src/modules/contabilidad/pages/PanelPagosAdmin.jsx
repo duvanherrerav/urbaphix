@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { EVENTOS_PAGO, adjuntarEventosAPagos, crearNotificacionPago, getPagoEventoLabel, registrarPagoEvento } from '../services/pagosEventosService';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
 import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoKey, getEstadoPagoUi, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
@@ -57,7 +58,8 @@ export default function PanelPagosAdmin({ usuarioApp }) {
             torre: p.residentes?.apartamentos?.torres?.nombre || '-'
         }));
 
-        setPagos(pagosFormateados);
+        const { pagos: pagosConEventos } = await adjuntarEventosAPagos(pagosFormateados);
+        setPagos(pagosConEventos);
     }, [conjuntoId]);
 
     useEffect(() => {
@@ -66,6 +68,38 @@ export default function PanelPagosAdmin({ usuarioApp }) {
             cargarPagos();
         }, 0);
         return () => clearTimeout(timer);
+    }, [conjuntoId, cargarPagos]);
+
+    useEffect(() => {
+        if (!conjuntoId) return undefined;
+
+        const channel = supabase
+            .channel(`panel-pagos-admin-${conjuntoId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'pagos',
+                    filter: `conjunto_id=eq.${conjuntoId}`
+                },
+                () => cargarPagos()
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'pagos_eventos',
+                    filter: `conjunto_id=eq.${conjuntoId}`
+                },
+                () => cargarPagos()
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [conjuntoId, cargarPagos]);
 
     const aprobarPago = async (pago) => {
@@ -88,9 +122,23 @@ export default function PanelPagosAdmin({ usuarioApp }) {
             .eq('conjunto_id', conjuntoId);
         if (error) return alert('Error al aprobar pago');
 
+        await registrarPagoEvento({
+            pago,
+            usuarioId: usuarioApp?.id,
+            evento: EVENTOS_PAGO.PAGO_APROBADO,
+            estadoAnterior: pago.estado || null,
+            estadoNuevo: ESTADOS_PAGO.PAGADO,
+            mensaje: `Pago aprobado por administración por $${Number(pago.valor || 0).toLocaleString('es-CO')}.`
+        });
+
         const usuarioId = pago?.residentes?.usuario_id;
         if (usuarioId) {
-            await supabase.from('notificaciones').insert([{ usuario_id: usuarioId, tipo: 'pago_aprobado', titulo: 'Pago aprobado', mensaje: `Tu pago de ${pago.valor} fue aprobado` }]);
+            await crearNotificacionPago({
+                usuarioId,
+                tipo: 'pago_aprobado',
+                titulo: '✅ Pago aprobado',
+                mensaje: `Tu pago de ${pago.concepto || 'un cobro'} por $${Number(pago.valor || 0).toLocaleString('es-CO')} fue aprobado.`
+            });
         }
 
         alert('✅ Pago aprobado');
@@ -125,14 +173,23 @@ export default function PanelPagosAdmin({ usuarioApp }) {
             .eq('conjunto_id', conjuntoId);
         if (error) return alert('Error al rechazar comprobante');
 
+        await registrarPagoEvento({
+            pago,
+            usuarioId: usuarioApp?.id,
+            evento: EVENTOS_PAGO.COMPROBANTE_RECHAZADO,
+            estadoAnterior: pago.estado || null,
+            estadoNuevo: ESTADOS_PAGO.RECHAZADO,
+            mensaje: `Comprobante rechazado por administración. Observación: ${motivoLimpio}`
+        });
+
         const usuarioId = pago?.residentes?.usuario_id;
         if (usuarioId) {
-            await supabase.from('notificaciones').insert([{
-                usuario_id: usuarioId,
+            await crearNotificacionPago({
+                usuarioId,
                 tipo: 'pago_rechazado',
-                titulo: 'Comprobante rechazado',
-                mensaje: `Tu comprobante de pago fue rechazado. Observación: ${motivoLimpio}`
-            }]);
+                titulo: '⚠️ Comprobante rechazado',
+                mensaje: `Tu comprobante de ${pago.concepto || 'pago'} fue rechazado. Observación: ${motivoLimpio}`
+            });
         }
 
         alert('Comprobante rechazado. El residente podrá reemplazarlo.');
@@ -216,6 +273,24 @@ export default function PanelPagosAdmin({ usuarioApp }) {
                             <a href={pago.comprobante_url} target="_blank" rel="noreferrer" className="inline-flex text-xs text-brand-secondary hover:text-brand-primary">
                                 Ver comprobante 📄
                             </a>
+                        )}
+
+                        {(pago.eventos || []).length > 0 && (
+                            <details className="rounded-xl border border-app-border/70 bg-app-bg/55 px-3 py-2 text-xs">
+                                <summary className="cursor-pointer font-semibold text-app-text-primary">Ver historial</summary>
+                                <div className="mt-2 space-y-2">
+                                    {(pago.eventos || []).slice(0, expandida ? 8 : 3).map((evento) => (
+                                        <div key={evento.id} className="border-l-2 border-brand-primary/40 pl-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-semibold text-app-text-primary">{getPagoEventoLabel(evento.evento)}</span>
+                                                <span className="text-[11px] text-app-text-secondary">{formatFechaBogota(evento.created_at)}</span>
+                                            </div>
+                                            <p className="text-[11px] text-app-text-secondary">Usuario: {evento.usuarios_app?.nombre || 'Sistema/usuario'}</p>
+                                            {evento.mensaje && <p className="text-[11px] text-app-text-secondary">{evento.mensaje}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </details>
                         )}
                     </div>
 

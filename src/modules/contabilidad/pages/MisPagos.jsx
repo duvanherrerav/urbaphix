@@ -3,6 +3,7 @@ import { supabase } from '../../../services/supabaseClient';
 import PagoCard from '../components/residente/PagoCard';
 import PagoEmptyState from '../components/residente/PagoEmptyState';
 import PagosResumenCards from '../components/residente/PagosResumenCards';
+import { EVENTOS_PAGO, adjuntarEventosAPagos, notificarAdminsPago, registrarPagoEvento } from '../services/pagosEventosService';
 import { ESTADOS_PAGO, esPagoDeudaActiva, getEstadoPagoUi, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 const ordenarPagosDesc = (rows = []) =>
@@ -51,7 +52,8 @@ export default function MisPagos({ usuarioApp }) {
         .eq('residente_id', residente.id)
         .order('created_at', { ascending: false });
 
-      setPagos(ordenarPagosDesc(data || []));
+      const { pagos: pagosConEventos } = await adjuntarEventosAPagos(data || []);
+      setPagos(ordenarPagosDesc(pagosConEventos));
     } finally {
       setLoading(false);
     }
@@ -98,12 +100,22 @@ export default function MisPagos({ usuarioApp }) {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pagos_eventos',
+          filter: `residente_id=eq.${residenteId}`
+        },
+        () => cargar()
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [residenteId]);
+  }, [cargar, residenteId]);
 
   const pagar = () => {
     if (!configPago) return alert('No hay configuración de pagos');
@@ -120,6 +132,10 @@ export default function MisPagos({ usuarioApp }) {
       alert('Selecciona un archivo');
       return false;
     }
+
+    const pagoActual = pagos.find((pago) => pago.id === pagoId);
+    const comprobanteAnterior = String(pagoActual?.comprobante_url || '').trim();
+    const eventoComprobante = comprobanteAnterior ? EVENTOS_PAGO.COMPROBANTE_REEMPLAZADO : EVENTOS_PAGO.COMPROBANTE_SUBIDO;
 
     const nombreArchivo = `${pagoId}_${Date.now()}_${String(archivo.name || 'comprobante').replace(/\s+/g, '_')}`;
     const { error } = await supabase.storage.from('comprobantes').upload(nombreArchivo, archivo);
@@ -144,6 +160,31 @@ export default function MisPagos({ usuarioApp }) {
       alert('Error guardando comprobante');
       return false;
     }
+
+    await registrarPagoEvento({
+      pago: pagoActual || {
+        id: pagoId,
+        conjunto_id: usuarioApp?.conjunto_id,
+        residente_id: residenteId
+      },
+      usuarioId: usuarioApp?.id,
+      evento: eventoComprobante,
+      estadoAnterior: pagoActual?.estado || null,
+      estadoNuevo: ESTADOS_PAGO.EN_REVISION,
+      mensaje: comprobanteAnterior
+        ? 'El residente reemplazó el comprobante para una nueva revisión administrativa.'
+        : 'El residente subió un comprobante para revisión administrativa.',
+      metadata: { archivo: nombreArchivo }
+    });
+
+    await notificarAdminsPago({
+      conjuntoId: usuarioApp?.conjunto_id,
+      tipo: 'comprobante_subido',
+      titulo: comprobanteAnterior ? 'Comprobante reemplazado' : 'Nuevo comprobante por revisar',
+      mensaje: comprobanteAnterior
+        ? 'Un residente reemplazó un comprobante rechazado o pendiente. Revisa la bandeja de pagos.'
+        : 'Un residente subió un comprobante. Revisa la bandeja de pagos en revisión.'
+    });
 
     alert('📤 Comprobante subido correctamente');
     setArchivo(null);
@@ -205,6 +246,7 @@ export default function MisPagos({ usuarioApp }) {
                 onPagar={pagar}
                 onArchivoChange={(e) => setArchivo(e.target.files[0])}
                 onSubirComprobante={() => subirComprobante(p.id)}
+                eventos={p.eventos || []}
               />
             ))}
           </div>
