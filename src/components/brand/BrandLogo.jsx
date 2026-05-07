@@ -1,18 +1,17 @@
-import isotipo from '../../assets/brand/isotipo-urbaphix.svg';
-import imagotipo from '../../assets/brand/imagotipo-urbaphix.svg';
-import logotipo from '../../assets/brand/logotipo-urbaphix.svg';
-import banner from '../../assets/brand/banner-urbaphix.svg';
+import isotipo from '../../assets/brand/isotipo-urbaphix.png';
+import logotipo from '../../assets/brand/logotipo-urbaphix.jpg';
+import banner from '../../assets/brand/banner-urbaphix.png';
 
 const brandAssets = {
   isotipo,
-  imagotipo,
+  imagotipo: logotipo,
   logotipo,
   banner
 };
 
 const defaultAlt = {
   isotipo: 'Isotipo Urbaphix',
-  imagotipo: 'Imagotipo Urbaphix',
+  imagotipo: 'Logotipo Urbaphix',
   logotipo: 'Logotipo Urbaphix',
   banner: 'Banner Urbaphix'
 };
