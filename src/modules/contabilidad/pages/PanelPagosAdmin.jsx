@@ -8,8 +8,8 @@ import { ESTADOS_CARTERA_ACTIVA, ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoKey
 import { formatFechaBogota } from '../../../utils/dateFormatters';
 
 export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' }) {
-    const PREVIEW_LIMIT = 3;
-    const MODAL_PAGE_SIZE = 8;
+    const BANDEJA_PAGE_SIZE = 10;
+    const MODAL_PAGE_SIZE = 10;
     const CAUSALES_ECONOMICAS = ['no asistió', 'daño', 'tiempo excedido', 'depósito retenido'];
     const ESTADOS_BANDEJA = [
         { key: ESTADOS_PAGO.VENCIDO, label: 'Vencidos', badge: 'app-badge-error', titleClass: 'text-state-error' },
@@ -31,6 +31,7 @@ export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' 
     const [panelAmpliadoOpen, setPanelAmpliadoOpen] = useState(false);
     const [busquedaPanel, setBusquedaPanel] = useState('');
     const [paginaPanel, setPaginaPanel] = useState(1);
+    const [paginasBandeja, setPaginasBandeja] = useState({});
     const [causalDraft, setCausalDraft] = useState({});
     const [impactoDraft, setImpactoDraft] = useState({});
     const conjuntoId = usuarioApp?.conjunto_id;
@@ -381,8 +382,26 @@ export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' 
 
     const pagosBandejaActiva = useMemo(() => pagosAgrupados[bandejaActiva] || [], [pagosAgrupados, bandejaActiva]);
     const bandejaSeleccionada = ESTADOS_BANDEJA.find((b) => b.key === bandejaActiva) || ESTADOS_BANDEJA[0];
-    const pagosBandejaPreview = pagosBandejaActiva.slice(0, PREVIEW_LIMIT);
-    const textoBotonVerTodos = `Ver todos los ${bandejaSeleccionada.label.toLowerCase()}`;
+    const totalPaginasBandeja = Math.max(1, Math.ceil(pagosBandejaActiva.length / BANDEJA_PAGE_SIZE));
+    const paginaBandejaActual = Math.min(paginasBandeja[bandejaActiva] || 1, totalPaginasBandeja);
+    const pagosBandejaPaginados = useMemo(() => {
+        const desde = (paginaBandejaActual - 1) * BANDEJA_PAGE_SIZE;
+        return pagosBandejaActiva.slice(desde, desde + BANDEJA_PAGE_SIZE);
+    }, [pagosBandejaActiva, paginaBandejaActual]);
+    const cambiarPaginaBandeja = (direccion) => {
+        setPaginasBandeja((prev) => {
+            const actual = Math.min(prev[bandejaActiva] || 1, totalPaginasBandeja);
+            const siguiente = direccion === 'prev'
+                ? Math.max(1, actual - 1)
+                : Math.min(totalPaginasBandeja, actual + 1);
+            return { ...prev, [bandejaActiva]: siguiente };
+        });
+    };
+    const abrirPanelAmpliado = () => {
+        setBusquedaPanel('');
+        setPaginaPanel(paginaBandejaActual);
+        setPanelAmpliadoOpen(true);
+    };
     const pagosPanelFiltrados = useMemo(() => {
         const termino = busquedaPanel.trim().toLowerCase();
         if (!termino) return pagosBandejaActiva;
@@ -496,21 +515,42 @@ export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' 
                         <span className="text-xs text-app-text-secondary">{pagosBandejaActiva.length} registros</span>
                     </div>
                     {pagosBandejaActiva.length === 0 && <p className="text-xs text-app-text-secondary">Sin pagos para esta bandeja.</p>}
-                    <div className="space-y-2">
-                        {pagosBandejaPreview.map((pago) => renderTarjetaPago(pago, false))}
+                    <div className="rounded-2xl border border-app-border/70 bg-app-bg/45 p-2">
+                        <div className="max-h-[720px] space-y-2 overflow-y-auto pr-1 app-scrollbar">
+                            {pagosBandejaPaginados.map((pago) => renderTarjetaPago(pago, false))}
+                        </div>
                     </div>
-                    {pagosBandejaActiva.length > PREVIEW_LIMIT && (
-                        <button
-                            type="button"
-                            className="app-btn-ghost text-xs"
-                            onClick={() => {
-                                setBusquedaPanel('');
-                                setPaginaPanel(1);
-                                setPanelAmpliadoOpen(true);
-                            }}
-                        >
-                            {textoBotonVerTodos} ({pagosBandejaActiva.length})
-                        </button>
+                    {pagosBandejaActiva.length > BANDEJA_PAGE_SIZE && (
+                        <div className="flex flex-col gap-2 rounded-2xl border border-app-border/70 bg-app-bg-alt/60 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+                            <span className="text-app-text-secondary">
+                                Página {paginaBandejaActual} de {totalPaginasBandeja} · {pagosBandejaActiva.length} registros
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    className="app-btn-ghost text-xs disabled:opacity-40"
+                                    disabled={paginaBandejaActual === 1}
+                                    onClick={() => cambiarPaginaBandeja('prev')}
+                                >
+                                    Anterior
+                                </button>
+                                <button
+                                    type="button"
+                                    className="app-btn-ghost text-xs disabled:opacity-40"
+                                    disabled={paginaBandejaActual === totalPaginasBandeja}
+                                    onClick={() => cambiarPaginaBandeja('next')}
+                                >
+                                    Siguiente
+                                </button>
+                                <button
+                                    type="button"
+                                    className="app-btn-secondary text-xs"
+                                    onClick={abrirPanelAmpliado}
+                                >
+                                    Ver más
+                                </button>
+                            </div>
+                        </div>
                     )}
                     </div>
                 </div>
