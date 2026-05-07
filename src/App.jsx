@@ -181,7 +181,7 @@ function App() {
     return (
       <div className="app-shell flex items-center justify-center">
         <div className="app-card flex items-center gap-3 text-app-text-secondary text-sm">
-          <BrandLogo variant="isotipo" className="h-9 w-9" decorative />
+          <BrandLogo variant="isotipo" className="h-16 w-11" decorative />
           <span>Cargando Urbaphix...</span>
         </div>
       </div>
@@ -193,10 +193,10 @@ function App() {
     return (
       <div className="app-shell flex items-center justify-center p-4 sm:p-6">
 
-        <div className="app-card w-full max-w-md overflow-hidden">
+        <div className="app-card w-full max-w-lg overflow-hidden">
 
           <div className="mb-6 flex flex-col items-center gap-4">
-            <BrandLogo variant="banner" className="h-auto w-full max-w-[360px] rounded-2xl" alt="Banner Urbaphix" />
+            <BrandLogo variant="banner" className="h-auto w-full max-w-[480px]" alt="Banner Urbaphix" />
           </div>
 
           <h1 className="text-2xl font-bold text-center mb-2 text-app-text-primary">
@@ -222,11 +222,11 @@ function App() {
       {/* 🔥 SIDEBAR */}
       <aside className="app-sidebar w-full shrink-0 p-4 lg:min-h-screen lg:w-72">
 
-        <div className="mb-4 app-surface-primary flex items-center gap-3 p-3 lg:mb-6 lg:block lg:p-4">
-          <BrandLogo variant="isotipo" className="h-11 w-11 shrink-0 lg:hidden" alt="Isotipo Urbaphix" />
-          <div>
-            <BrandLogo variant="imagotipo" className="h-8 w-auto" alt="Imagotipo Urbaphix" />
-            <p className="mt-1 text-xs text-app-text-secondary lg:mt-2">
+        <div className="mb-4 app-surface-primary flex items-center gap-4 p-3 lg:mb-6 lg:flex-col lg:items-start lg:p-4">
+          <BrandLogo variant="isotipo" className="h-16 w-11 shrink-0 lg:hidden" alt="Isotipo Urbaphix" />
+          <div className="min-w-0 lg:w-full">
+            <BrandLogo variant="logotipo" className="h-16 w-auto max-w-[170px] lg:h-auto lg:w-full lg:max-w-full" alt="Logotipo Urbaphix" />
+            <p className="mt-2 text-xs text-app-text-secondary lg:mt-3">
               Plataforma SaaS para propiedad horizontal
             </p>
           </div>
@@ -308,7 +308,7 @@ function App() {
         <header className="app-header px-4 py-3 sm:px-7 sm:py-4 flex justify-between items-center gap-4 relative z-50">
 
           <div className="flex min-w-0 items-center gap-3">
-            <BrandLogo variant="isotipo" className="h-8 w-8 shrink-0" decorative />
+            <BrandLogo variant="isotipo" className="h-10 w-7 shrink-0" decorative />
             <h2 className="truncate font-semibold text-lg capitalize text-app-text-primary">
               {moduloActual}
             </h2>
@@ -317,7 +317,7 @@ function App() {
           {/* 👤 MENU */}
           <div className="relative z-50 flex items-center gap-3" ref={menuRef}>
 
-            <BrandLogo variant="logotipo" className="hidden h-7 w-auto sm:block" alt="Logotipo Urbaphix" />
+            <BrandLogo variant="logotipo" className="hidden h-12 w-auto sm:block" alt="Logotipo Urbaphix" />
 
             <button
               onClick={() => setOpenMenu(!openMenu)}
