@@ -9,6 +9,7 @@ export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onA
   const valor = Number(pago?.valor || 0);
   const estadoReal = obtenerEstadoFinancieroReal(pago);
   const estaPagado = estaPagoPagado(pago?.estado);
+  const tieneComprobante = Boolean(pago?.comprobante_url);
   const estaVencido = estadoReal === ESTADOS_PAGO.VENCIDO;
   const diasMora = getDiasMoraPago(pago);
   const eventosVisibles = eventos.slice(0, 4);
@@ -53,6 +54,11 @@ export default function PagoCard({ pago, estadoProceso, configPago, onPagar, onA
             <p><span className="text-app-text-primary/90">Estado:</span> {estadoProceso?.label || 'Pagado'}</p>
             <p><span className="text-app-text-primary/90">Valor:</span> ${valor.toLocaleString('es-CO')}</p>
             <p><span className="text-app-text-primary/90">Radicado:</span> {String(pago.id || '-').slice(0, 8)}</p>
+            {tieneComprobante && (
+              <a href={pago.comprobante_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-[11px] font-semibold text-brand-secondary transition-colors hover:text-brand-primary">
+                Ver comprobante
+              </a>
+            )}
           </div>
         </div>
       </details>
