@@ -7,7 +7,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
-import { ESTADOS_PAGO, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
+import { ESTADOS_PAGO, estaFechaEnRango, getFechaPagoKey, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 ChartJS.register(
   BarElement,
@@ -17,49 +17,48 @@ ChartJS.register(
   Legend
 );
 
-const DATASETS_ESTADOS = [
-  {
-    key: ESTADOS_PAGO.PAGADO,
-    label: 'Recaudado 💰',
-    backgroundColor: 'rgba(16, 185, 129, 0.85)'
-  },
-  {
-    key: ESTADOS_PAGO.PENDIENTE,
-    label: 'Pendiente ⏳',
-    backgroundColor: 'rgba(245, 158, 11, 0.85)'
-  },
-  {
-    key: ESTADOS_PAGO.VENCIDO,
-    label: 'Vencido 🚨',
-    backgroundColor: 'rgba(220, 38, 38, 0.9)'
-  },
-  {
-    key: ESTADOS_PAGO.EN_REVISION,
-    label: 'En revisión 🔎',
-    backgroundColor: 'rgba(56, 189, 248, 0.85)'
-  },
-  {
-    key: ESTADOS_PAGO.RECHAZADO,
-    label: 'Rechazado ⚠️',
-    backgroundColor: 'rgba(239, 68, 68, 0.85)'
-  }
+const DATASETS_TEMPORALES = [
+  { key: 'recaudo', label: 'Recaudo aprobado 💰', backgroundColor: 'rgba(16, 185, 129, 0.85)' },
+  { key: 'deudaGenerada', label: 'Deuda generada 📌', backgroundColor: 'rgba(245, 158, 11, 0.85)' },
+  { key: 'aprobadosCantidad', label: 'Pagos aprobados #', backgroundColor: 'rgba(34, 197, 94, 0.65)', yAxisID: 'yCount' },
+  { key: 'vencidos', label: 'Vencidos por fecha 🚨', backgroundColor: 'rgba(220, 38, 38, 0.9)' }
 ];
 
-export default function GraficaFinanciera({ pagos }) {
+function ensureDay(acc, key) {
+  if (!acc[key]) {
+    acc[key] = DATASETS_TEMPORALES.reduce((row, dataset) => ({
+      ...row,
+      [dataset.key]: 0
+    }), {});
+  }
+}
+
+export default function GraficaFinanciera({ pagos = [], fechaDesde = '', fechaHasta = '' }) {
   const agrupado = {};
+  const rangoFechas = { fechaDesde, fechaHasta };
 
   pagos.forEach((p) => {
-    const fecha = p.created_at.split('T')[0];
+    const valor = getValorPago(p);
     const estadoKey = obtenerEstadoFinancieroReal(p);
+    const fechaCreacion = getFechaPagoKey(p.created_at);
+    const fechaRecaudo = getFechaPagoKey(p.fecha_pago);
+    const fechaVencimiento = getFechaPagoKey(p.fecha_vencimiento);
 
-    if (!agrupado[fecha]) {
-      agrupado[fecha] = DATASETS_ESTADOS.reduce((acc, dataset) => ({
-        ...acc,
-        [dataset.key]: 0
-      }), {});
+    if (fechaCreacion && estaFechaEnRango(p.created_at, rangoFechas)) {
+      ensureDay(agrupado, fechaCreacion);
+      agrupado[fechaCreacion].deudaGenerada += valor;
     }
 
-    agrupado[fecha][estadoKey] += getValorPago(p);
+    if (estadoKey === ESTADOS_PAGO.PAGADO && fechaRecaudo && estaFechaEnRango(p.fecha_pago, rangoFechas)) {
+      ensureDay(agrupado, fechaRecaudo);
+      agrupado[fechaRecaudo].recaudo += valor;
+      agrupado[fechaRecaudo].aprobadosCantidad += 1;
+    }
+
+    if (estadoKey === ESTADOS_PAGO.VENCIDO && fechaVencimiento && estaFechaEnRango(p.fecha_vencimiento, rangoFechas)) {
+      ensureDay(agrupado, fechaVencimiento);
+      agrupado[fechaVencimiento].vencidos += valor;
+    }
   });
 
   const fechas = Object.keys(agrupado).sort();
@@ -74,12 +73,13 @@ export default function GraficaFinanciera({ pagos }) {
 
   const data = {
     labels,
-    datasets: DATASETS_ESTADOS.map((dataset) => ({
+    datasets: DATASETS_TEMPORALES.map((dataset) => ({
       label: dataset.label,
       data: fechas.map((f) => agrupado[f][dataset.key]),
       backgroundColor: dataset.backgroundColor,
       borderRadius: 8,
-      maxBarThickness: 34
+      maxBarThickness: 34,
+      yAxisID: dataset.yAxisID || 'y'
     }))
   };
 
@@ -124,6 +124,18 @@ export default function GraficaFinanciera({ pagos }) {
         },
         grid: {
           color: 'rgba(148, 163, 184, 0.18)'
+        }
+      },
+      yCount: {
+        beginAtZero: true,
+        position: 'right',
+        ticks: {
+          color: '#A7F3D0',
+          precision: 0,
+          font: { size: 11, weight: '600' }
+        },
+        grid: {
+          drawOnChartArea: false
         }
       }
     }
