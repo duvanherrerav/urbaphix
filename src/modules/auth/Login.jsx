@@ -73,17 +73,17 @@ export default function Login() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_60px_rgba(2,6,23,0.35)] backdrop-blur sm:p-6">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_22px_70px_rgba(2,6,23,0.42),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:p-6">
 
       {/* TOGGLE */}
-      <div className="grid grid-cols-2 rounded-2xl border border-white/10 bg-slate-950/70 p-1.5 shadow-inner shadow-black/20">
+      <div className="grid grid-cols-2 rounded-2xl border border-white/10 bg-slate-950/75 p-1.5 shadow-inner shadow-black/25">
         <button
           type="button"
           onClick={() => setModo('login')}
           className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
             modo === 'login'
-              ? 'bg-gradient-to-r from-brand-primary to-brand-secondary text-white shadow-lg shadow-brand-primary/25'
-              : 'text-app-text-secondary hover:bg-white/[0.04] hover:text-app-text-primary'
+              ? 'bg-gradient-to-r from-brand-primary/95 to-brand-secondary/95 text-white shadow-lg shadow-brand-primary/20'
+              : 'text-app-text-secondary hover:bg-white/[0.035] hover:text-app-text-primary'
             }`}
         >
           Iniciar sesión
@@ -94,8 +94,8 @@ export default function Login() {
           onClick={() => setModo('register')}
           className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
             modo === 'register'
-            ? 'bg-gradient-to-r from-brand-primary to-brand-secondary text-white shadow-lg shadow-brand-primary/25'
-            : 'text-app-text-secondary hover:bg-white/[0.04] hover:text-app-text-primary'
+            ? 'bg-gradient-to-r from-brand-primary/95 to-brand-secondary/95 text-white shadow-lg shadow-brand-primary/20'
+            : 'text-app-text-secondary hover:bg-white/[0.035] hover:text-app-text-primary'
             }`}
         >
           Crear cuenta
@@ -110,7 +110,7 @@ export default function Login() {
       {/* INPUT EMAIL */}
       <div className="space-y-2">
         <label className="text-xs font-semibold uppercase tracking-[0.16em] text-app-text-secondary">Correo electrónico</label>
-        <div className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 transition-all focus-within:border-brand-secondary/70 focus-within:ring-2 focus-within:ring-brand-secondary/20">
+        <div className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 transition-all focus-within:border-brand-secondary/60 focus-within:bg-slate-950/85 focus-within:ring-2 focus-within:ring-brand-secondary/15">
           <span className="text-base text-brand-secondary/80" aria-hidden="true">✉</span>
           <input
             type="email"
@@ -126,7 +126,7 @@ export default function Login() {
       {/* INPUT PASSWORD */}
       <div className="space-y-2">
         <label className="text-xs font-semibold uppercase tracking-[0.16em] text-app-text-secondary">Contraseña</label>
-        <div className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 transition-all focus-within:border-brand-secondary/70 focus-within:ring-2 focus-within:ring-brand-secondary/20">
+        <div className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 transition-all focus-within:border-brand-secondary/60 focus-within:bg-slate-950/85 focus-within:ring-2 focus-within:ring-brand-secondary/15">
           <span className="text-base text-brand-secondary/80" aria-hidden="true">●</span>
           <input
             type="password"
@@ -143,9 +143,9 @@ export default function Login() {
       <button
         type="submit"
         disabled={loading}
-        className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-r from-brand-primary via-blue-500 to-brand-secondary px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-primary/25 transition-all hover:-translate-y-0.5 hover:shadow-brand-secondary/25 focus:outline-none focus:ring-2 focus:ring-brand-secondary/60 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+        className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-r from-brand-primary via-blue-500/95 to-brand-secondary px-4 py-3.5 text-sm font-bold text-white shadow-[0_14px_36px_rgba(37,99,235,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(14,165,233,0.24)] focus:outline-none focus:ring-2 focus:ring-brand-secondary/50 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
       >
-        <span className="absolute inset-0 translate-x-[-120%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-[120%]" />
+        <span className="absolute inset-0 translate-x-[-120%] bg-gradient-to-r from-transparent via-white/16 to-transparent transition-transform duration-700 group-hover:translate-x-[120%]" />
         <span className="relative">{loading ? 'Procesando...' : (modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta')}</span>
       </button>
 
