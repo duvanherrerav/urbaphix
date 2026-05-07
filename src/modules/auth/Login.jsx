@@ -73,70 +73,85 @@ export default function Login() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_18px_60px_rgba(2,6,23,0.35)] backdrop-blur sm:p-6">
 
       {/* TOGGLE */}
-      <div className="mb-6 flex rounded-lg border border-app-border bg-app-bg p-1">
+      <div className="grid grid-cols-2 rounded-2xl border border-white/10 bg-slate-950/70 p-1.5 shadow-inner shadow-black/20">
         <button
+          type="button"
           onClick={() => setModo('login')}
-          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+          className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
             modo === 'login'
-              ? 'bg-brand-primary text-app-text-primary'
-              : 'text-app-text-secondary hover:bg-app-bg-alt'
+              ? 'bg-gradient-to-r from-brand-primary to-brand-secondary text-white shadow-lg shadow-brand-primary/25'
+              : 'text-app-text-secondary hover:bg-white/[0.04] hover:text-app-text-primary'
             }`}
         >
           Iniciar sesión
         </button>
 
         <button
+          type="button"
           onClick={() => setModo('register')}
-          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+          className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
             modo === 'register'
-            ? 'bg-brand-primary text-app-text-primary'
-            : 'text-app-text-secondary hover:bg-app-bg-alt'
+            ? 'bg-gradient-to-r from-brand-primary to-brand-secondary text-white shadow-lg shadow-brand-primary/25'
+            : 'text-app-text-secondary hover:bg-white/[0.04] hover:text-app-text-primary'
             }`}
         >
           Crear cuenta
         </button>
       </div>
 
-      {errorMsg && <div className="app-surface-muted border border-state-error/30 text-state-error text-xs p-2 rounded-lg">{errorMsg}</div>}
-      {infoMsg && <div className="app-surface-muted border border-state-info/30 text-state-info text-xs p-2 rounded-lg">{infoMsg}</div>}
+      <div className="min-h-0 space-y-3" aria-live="polite">
+        {errorMsg && <div className="rounded-2xl border border-state-error/30 bg-state-error/10 px-4 py-3 text-sm text-state-error">{errorMsg}</div>}
+        {infoMsg && <div className="rounded-2xl border border-state-info/30 bg-state-info/10 px-4 py-3 text-sm text-state-info">{infoMsg}</div>}
+      </div>
 
       {/* INPUT EMAIL */}
-      <div>
-        <label className="text-xs text-app-text-secondary">Correo electrónico</label>
-        <input
-          type="email"
-          placeholder="tu@correo.com"
-          className="app-input mt-1"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          autoComplete="email"
-        />
+      <div className="space-y-2">
+        <label className="text-xs font-semibold uppercase tracking-[0.16em] text-app-text-secondary">Correo electrónico</label>
+        <div className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 transition-all focus-within:border-brand-secondary/70 focus-within:ring-2 focus-within:ring-brand-secondary/20">
+          <span className="text-base text-brand-secondary/80" aria-hidden="true">✉</span>
+          <input
+            type="email"
+            placeholder="tu@correo.com"
+            className="border-0 bg-transparent p-0 text-sm shadow-none focus:ring-0"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+        </div>
       </div>
 
       {/* INPUT PASSWORD */}
-      <div>
-        <label className="text-xs text-app-text-secondary">Contraseña</label>
-        <input
-          type="password"
-          placeholder="••••••••"
-          className="app-input mt-1"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          autoComplete={modo === 'login' ? 'current-password' : 'new-password'}
-        />
+      <div className="space-y-2">
+        <label className="text-xs font-semibold uppercase tracking-[0.16em] text-app-text-secondary">Contraseña</label>
+        <div className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 transition-all focus-within:border-brand-secondary/70 focus-within:ring-2 focus-within:ring-brand-secondary/20">
+          <span className="text-base text-brand-secondary/80" aria-hidden="true">●</span>
+          <input
+            type="password"
+            placeholder="••••••••"
+            className="border-0 bg-transparent p-0 text-sm shadow-none focus:ring-0"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            autoComplete={modo === 'login' ? 'current-password' : 'new-password'}
+          />
+        </div>
       </div>
 
       {/* BOTÓN PRINCIPAL */}
       <button
         type="submit"
         disabled={loading}
-        className="app-btn-primary w-full"
+        className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-r from-brand-primary via-blue-500 to-brand-secondary px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-primary/25 transition-all hover:-translate-y-0.5 hover:shadow-brand-secondary/25 focus:outline-none focus:ring-2 focus:ring-brand-secondary/60 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
       >
-        {loading ? 'Procesando...' : (modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta')}
+        <span className="absolute inset-0 translate-x-[-120%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-[120%]" />
+        <span className="relative">{loading ? 'Procesando...' : (modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta')}</span>
       </button>
+
+      <p className="text-center text-xs leading-5 text-app-text-secondary">
+        Plataforma protegida para operación residencial. Tus credenciales se validan de forma segura.
+      </p>
 
     </form>
   );
