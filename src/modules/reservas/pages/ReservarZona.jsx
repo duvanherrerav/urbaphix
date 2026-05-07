@@ -5,7 +5,8 @@ import ReservaCard from '../components/residente/ReservaCard';
 import ReservaEmptyState from '../components/residente/ReservaEmptyState';
 import ReservaErrorBanner from '../components/residente/ReservaErrorBanner';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
-import { formatDateRangeBogota, getNowBogotaTimeHHMM, getTodayBogotaDate } from '../utils/dateTimeBogota';
+import { formatDateRangeBogota, getTodayBogotaDate } from '../utils/dateTimeBogota';
+import { getReservaEstadoLabel } from '../utils/reservaFormatters';
 import {
     cambiarEstadoReserva,
     crearReserva,
@@ -19,7 +20,36 @@ import {
 } from '../services/reservasService';
 
 const ESTADOS_ACTIVOS = ['solicitada', 'aprobada', 'en_curso'];
+const ESTADOS_HISTORIAL = ['finalizada', 'cancelada', 'rechazada', 'no_show'];
+const HISTORIAL_PAGE_SIZE = 5;
 const TIMELINE_ENABLED = false;
+
+const RESERVA_FILTERS = [
+    { value: 'todos', label: 'Todos los estados' },
+    { value: 'finalizada', label: 'Finalizadas' },
+    { value: 'cancelada', label: 'Canceladas' },
+    { value: 'rechazada', label: 'Rechazadas' },
+    { value: 'no_show', label: 'No asistió' }
+];
+
+const ReservaListSkeleton = ({ count = 2 }) => (
+    <div className="space-y-3" aria-label="Cargando reservas">
+        {Array.from({ length: count }).map((_, index) => (
+            <div key={index} className="app-surface-muted p-4 space-y-3 animate-pulse">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-2 flex-1">
+                        <div className="h-4 w-2/3 rounded bg-app-border" />
+                        <div className="h-3 w-1/2 rounded bg-app-border" />
+                    </div>
+                    <div className="h-6 w-20 rounded-full bg-app-border" />
+                </div>
+                <div className="h-3 w-full rounded bg-app-border" />
+            </div>
+        ))}
+    </div>
+);
+
+const getReservaFechaInicioValue = (reserva) => new Date(reserva.fecha_inicio).getTime() || 0;
 
 export default function ReservarZona({ usuarioApp }) {
     const [recursos, setRecursos] = useState([]);
@@ -40,6 +70,9 @@ export default function ReservarZona({ usuarioApp }) {
     const [mensajeDisponibilidad, setMensajeDisponibilidad] = useState('');
     const [horarioInvalido, setHorarioInvalido] = useState(false);
     const [mensajeHorario, setMensajeHorario] = useState('');
+    const [tabActiva, setTabActiva] = useState('activas');
+    const [filtroHistorial, setFiltroHistorial] = useState('todos');
+    const [paginaHistorial, setPaginaHistorial] = useState(1);
     const [form, setForm] = useState({
         recurso_id: '',
         fecha: '',
@@ -101,6 +134,8 @@ export default function ReservarZona({ usuarioApp }) {
 
                 setReservas(conSoportes);
             }
+        } else {
+            setReservas([]);
         }
 
         setLoadingReservas(false);
@@ -152,50 +187,53 @@ export default function ReservarZona({ usuarioApp }) {
             setFranjasDisponibles(resp.data.franjas || []);
             setDisponibilidadConfig(resp.data.config || null);
             setFallbackConfigAplicado(Boolean(resp.data.fallbackAplicado));
-            setMensajeDisponibilidad('');
+            setMensajeDisponibilidad(resp.data.mensaje || '');
+            setSugerenciasHorario([]);
+            setHorarioInvalido(false);
+            setMensajeHorario('');
         };
 
         cargarDisponibilidad();
     }, [usuarioApp?.conjunto_id, form.recurso_id, form.fecha]);
 
+    useEffect(() => {
+        setPaginaHistorial(1);
+    }, [filtroHistorial]);
+
+    const recursoSeleccionado = useMemo(
+        () => recursos.find((r) => r.id === form.recurso_id) || null,
+        [recursos, form.recurso_id]
+    );
+
     const franjaSeleccionada = useMemo(
-        () => franjasDisponibles.find((f) => f.id === form.franja_id) || null,
+        () => franjasDisponibles.find((franja) => franja.id === form.franja_id) || null,
         [franjasDisponibles, form.franja_id]
     );
+
     const depositoRecursoSeleccionado = useMemo(() => {
-        const recurso = recursos.find((r) => r.id === form.recurso_id);
-        if (!recurso) return null;
+        if (!recursoSeleccionado) return null;
+        const reglasDeposito = recursoSeleccionado.reglas?.deposito || {};
+        const requiere = Boolean(recursoSeleccionado.requiere_deposito || reglasDeposito.requiere);
         return {
-            requiere: recurso.requiere_deposito === true,
-            valor: recurso.deposito_valor,
-            tipo: recurso.reglas?.deposito?.tipo || null,
-            observacion: recurso.reglas?.deposito?.observacion || null
+            requiere,
+            valor: recursoSeleccionado.deposito_valor || reglasDeposito.valor || 0,
+            tipo: reglasDeposito.tipo || null,
+            observacion: reglasDeposito.observacion || null
         };
-    }, [recursos, form.recurso_id]);
+    }, [recursoSeleccionado]);
 
     const crear = async () => {
-        if (!perfilResidente?.id) return toast.error('No se encontró tu perfil de residente');
-        if (!form.recurso_id || !form.fecha || !form.franja_id) return toast.error('Completa recurso, fecha y franja');
-        if (form.fecha < getTodayBogotaDate()) return toast.error('No puedes reservar fechas pasadas');
-        if (!franjaSeleccionada) return toast.error('Selecciona una franja válida');
-        if (!franjaSeleccionada.seleccionable) {
+        if (!perfilResidente?.id) return toast.error('Tu usuario no tiene perfil de residente asociado');
+        if (!form.recurso_id || !form.fecha || !form.franja_id) return toast.error('Selecciona recurso, fecha y franja disponible');
+
+        if (!franjaSeleccionada || !franjaSeleccionada.seleccionable) {
             setHorarioInvalido(true);
-            setMensajeHorario('Esta franja ya no está disponible.');
-            return toast.error('La franja seleccionada no está disponible');
+            setMensajeHorario('Selecciona una franja marcada como disponible.');
+            return toast.error('Selecciona una franja disponible');
         }
 
-        if (form.fecha === getTodayBogotaDate()) {
-            const ahora = getNowBogotaTimeHHMM();
-            if (franjaSeleccionada.inicio < ahora) {
-                setHorarioInvalido(true);
-                setMensajeHorario('Parte de la franja ya pasó. Selecciona un horario futuro para hoy.');
-                return toast.error('No puedes reservar una hora pasada para hoy');
-            }
-        }
-
-        setHorarioInvalido(false);
-        setMensajeHorario('');
-        setSugerenciasHorario([]);
+        const ahora = getTodayBogotaDate();
+        if (form.fecha < ahora) return toast.error('No puedes reservar fechas pasadas');
 
         setLoadingCreate(true);
         const result = await crearReserva({
@@ -211,7 +249,7 @@ export default function ReservarZona({ usuarioApp }) {
             observaciones: form.observaciones || null,
             metadata: {
                 origen: 'app_residente',
-                recurso_tipo: recursos.find((r) => r.id === form.recurso_id)?.tipo || null,
+                recurso_tipo: recursoSeleccionado?.tipo || null,
                 disponibilidad_modo: disponibilidadConfig?.modo || 'slots',
                 franja_id: franjaSeleccionada.id
             }
@@ -237,6 +275,7 @@ export default function ReservarZona({ usuarioApp }) {
             motivo: '',
             observaciones: ''
         }));
+        setTabActiva('activas');
         cargar();
     };
 
@@ -292,14 +331,30 @@ export default function ReservarZona({ usuarioApp }) {
     };
 
     const reservasActivas = useMemo(
-        () => reservas.filter((r) => ESTADOS_ACTIVOS.includes(r.estado)),
+        () => reservas
+            .filter((r) => ESTADOS_ACTIVOS.includes(r.estado))
+            .sort((a, b) => getReservaFechaInicioValue(a) - getReservaFechaInicioValue(b)),
         [reservas]
     );
 
     const reservasHistorial = useMemo(
-        () => reservas.filter((r) => !ESTADOS_ACTIVOS.includes(r.estado)).slice(0, 5),
+        () => reservas.filter((r) => !ESTADOS_ACTIVOS.includes(r.estado)),
         [reservas]
     );
+
+    const reservasHistorialFiltradas = useMemo(
+        () => reservasHistorial.filter((r) => filtroHistorial === 'todos' || r.estado === filtroHistorial),
+        [reservasHistorial, filtroHistorial]
+    );
+
+    const totalPaginasHistorial = Math.max(1, Math.ceil(reservasHistorialFiltradas.length / HISTORIAL_PAGE_SIZE));
+    const paginaHistorialSegura = Math.min(paginaHistorial, totalPaginasHistorial);
+    const reservasHistorialPagina = reservasHistorialFiltradas.slice(
+        (paginaHistorialSegura - 1) * HISTORIAL_PAGE_SIZE,
+        paginaHistorialSegura * HISTORIAL_PAGE_SIZE
+    );
+    const rangoHistorialInicio = reservasHistorialFiltradas.length === 0 ? 0 : ((paginaHistorialSegura - 1) * HISTORIAL_PAGE_SIZE) + 1;
+    const rangoHistorialFin = Math.min(paginaHistorialSegura * HISTORIAL_PAGE_SIZE, reservasHistorialFiltradas.length);
 
     const bloqueoPreview = franjaSeleccionada?.estado === 'bloqueada';
     const estadoPostReserva = (reserva) => {
@@ -311,103 +366,226 @@ export default function ReservarZona({ usuarioApp }) {
         return 'Pendiente de gestión';
     };
 
+    const totalFranjasDisponibles = slotsDisponibles.length;
+    const totalFranjasNoDisponibles = Math.max(0, franjasDisponibles.length - totalFranjasDisponibles);
+
     return (
         <div className="space-y-6">
-            <div className="app-surface-primary p-5 text-app-text-primary">
-                <h1 className="text-2xl font-bold">Mis reservas</h1>
-                <p className="text-sm text-app-text-secondary">Gestiona tus solicitudes de zonas comunes de forma simple y clara.</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className="app-badge-info">Activas: {reservasActivas.length}</span>
-                    <span className="app-badge-info">Historial: {reservasHistorial.length}</span>
-                    <span className="app-badge-info">Recursos: {recursos.length}</span>
+            <div className="app-surface-primary p-5 text-app-text-primary overflow-hidden relative">
+                <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-brand-primary/10 to-transparent pointer-events-none" />
+                <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                    <div className="space-y-2">
+                        <p className="text-xs uppercase tracking-[0.22em] text-brand-primary font-semibold">Reservas de residente</p>
+                        <h1 className="text-2xl md:text-3xl font-bold">Mis reservas</h1>
+                        <p className="text-sm text-app-text-secondary max-w-2xl">
+                            Crea solicitudes de zonas comunes, revisa su estado operativo y consulta tu historial sin perder contexto.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 min-w-full sm:min-w-[24rem]">
+                        <div className="app-surface-muted p-3 text-center">
+                            <p className="text-xl font-bold text-brand-primary">{reservasActivas.length}</p>
+                            <p className="text-[11px] text-app-text-secondary">Activas</p>
+                        </div>
+                        <div className="app-surface-muted p-3 text-center">
+                            <p className="text-xl font-bold text-brand-primary">{reservasHistorial.length}</p>
+                            <p className="text-[11px] text-app-text-secondary">Historial</p>
+                        </div>
+                        <div className="app-surface-muted p-3 text-center">
+                            <p className="text-xl font-bold text-brand-primary">{recursos.length}</p>
+                            <p className="text-[11px] text-app-text-secondary">Recursos</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <ReservaErrorBanner message={errorGeneral} onRetry={cargar} />
 
-            <ReservaCreateCard
-                form={form}
-                recursos={recursos}
-                loading={loadingCreate}
-                onChange={setFormField}
-                onSubmit={crear}
-                perfilMissing={!perfilResidente?.id}
-                bloqueoDetectado={bloqueoPreview}
-                disponibilidadLoading={loadingDisponibilidad}
-                slotsDisponibles={slotsDisponibles}
-                franjasDisponibles={franjasDisponibles}
-                franjaSeleccionadaId={form.franja_id}
-                disponibilidadConfig={disponibilidadConfig}
-                fallbackConfigAplicado={fallbackConfigAplicado}
-                mensajeDisponibilidad={mensajeDisponibilidad}
-                depositoConfig={depositoRecursoSeleccionado}
-                horarioInvalido={horarioInvalido}
-                horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
-                sugerencias={sugerenciasHorario}
-                onSeleccionarFranja={seleccionarFranja}
-                minFecha={getTodayBogotaDate()}
-            />
+            <div className="grid xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+                <ReservaCreateCard
+                    form={form}
+                    recursos={recursos}
+                    loading={loadingCreate}
+                    onChange={setFormField}
+                    onSubmit={crear}
+                    perfilMissing={!perfilResidente?.id}
+                    bloqueoDetectado={bloqueoPreview}
+                    disponibilidadLoading={loadingDisponibilidad}
+                    slotsDisponibles={slotsDisponibles}
+                    franjasDisponibles={franjasDisponibles}
+                    franjaSeleccionadaId={form.franja_id}
+                    disponibilidadConfig={disponibilidadConfig}
+                    fallbackConfigAplicado={fallbackConfigAplicado}
+                    mensajeDisponibilidad={mensajeDisponibilidad}
+                    depositoConfig={depositoRecursoSeleccionado}
+                    horarioInvalido={horarioInvalido}
+                    horarioMensaje={mensajeHorario || 'Este horario no está disponible.'}
+                    sugerencias={sugerenciasHorario}
+                    onSeleccionarFranja={seleccionarFranja}
+                    minFecha={getTodayBogotaDate()}
+                    recursoSeleccionado={recursoSeleccionado}
+                />
 
-            <section className="app-surface-primary p-5 space-y-3 border border-brand-primary/20">
-                <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-lg font-semibold">Mis reservas activas ({reservasActivas.length})</h3>
-                    {loadingReservas && <p className="text-xs text-app-text-secondary">Actualizando...</p>}
+                <aside className="app-surface-primary p-4 space-y-3 xl:sticky xl:top-4 border border-brand-primary/20">
+                    <div>
+                        <h2 className="font-semibold text-app-text-primary">Resumen de disponibilidad</h2>
+                        <p className="text-xs text-app-text-secondary">Se actualiza al seleccionar recurso y fecha.</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="app-surface-muted p-3">
+                            <p className="text-2xl font-bold text-emerald-600">{totalFranjasDisponibles}</p>
+                            <p className="text-xs text-app-text-secondary">Franjas libres</p>
+                        </div>
+                        <div className="app-surface-muted p-3">
+                            <p className="text-2xl font-bold text-amber-600">{totalFranjasNoDisponibles}</p>
+                            <p className="text-xs text-app-text-secondary">No disponibles</p>
+                        </div>
+                    </div>
+                    <div className="text-xs text-app-text-secondary space-y-1">
+                        <p><span className="font-semibold text-app-text-primary">Recurso:</span> {recursoSeleccionado?.nombre || 'Sin seleccionar'}</p>
+                        <p><span className="font-semibold text-app-text-primary">Fecha:</span> {form.fecha || 'Sin seleccionar'}</p>
+                        <p><span className="font-semibold text-app-text-primary">Franja:</span> {franjaSeleccionada ? `${franjaSeleccionada.inicio} - ${franjaSeleccionada.fin}` : 'Sin seleccionar'}</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                        Las reservas pueden quedar solicitadas o aprobadas automáticamente según la política configurada por administración para cada recurso.
+                    </div>
+                </aside>
+            </div>
+
+            <section className="app-surface-primary border border-brand-primary/20 overflow-hidden">
+                <div className="border-b border-app-border/60 p-4 space-y-3">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <h3 className="text-lg font-semibold">Seguimiento de reservas</h3>
+                            <p className="text-xs text-app-text-secondary">Activas para acciones rápidas e historial paginado para consultas.</p>
+                        </div>
+                        {loadingReservas && <p className="text-xs text-app-text-secondary">Actualizando información...</p>}
+                    </div>
+                    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Secciones de reservas">
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={tabActiva === 'activas'}
+                            className={`app-btn-ghost text-xs ${tabActiva === 'activas' ? 'bg-brand-primary/10 text-brand-primary border-brand-primary/30' : ''}`}
+                            onClick={() => setTabActiva('activas')}
+                        >
+                            Activas ({reservasActivas.length})
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={tabActiva === 'historial'}
+                            className={`app-btn-ghost text-xs ${tabActiva === 'historial' ? 'bg-brand-primary/10 text-brand-primary border-brand-primary/30' : ''}`}
+                            onClick={() => setTabActiva('historial')}
+                        >
+                            Historial ({reservasHistorial.length})
+                        </button>
+                    </div>
                 </div>
 
-                {reservasActivas.length === 0 && (
-                    <ReservaEmptyState
-                        title="No tienes reservas activas"
-                        description="Cuando crees una solicitud aparecerá aquí para seguimiento y acciones rápidas."
-                        actionLabel="Crear una reserva"
-                        onAction={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                    />
-                )}
+                <div className="p-4 space-y-3">
+                    {loadingReservas && reservas.length === 0 && <ReservaListSkeleton count={3} />}
 
-                <div className="space-y-3">
-                    {reservasActivas.map((r) => (
-                        <div key={r.id} className="space-y-2">
-                            <ReservaCard
-                                reserva={r}
-                                canCancel={['solicitada', 'aprobada'].includes(r.estado)}
-                                onCancel={cancelar}
-                                onAttach={adjuntarSoporte}
-                                uploading={subiendoSoporteId === r.id}
-                                timelineEnabled={TIMELINE_ENABLED}
-                                onToggleTimeline={(reservaId) => setTimelineOpenId((prev) => prev === reservaId ? null : reservaId)}
-                                timelineOpen={timelineOpenId === r.id}
-                                timelineItems={timelineByReserva[r.id] || []}
-                            />
-                            <div className="app-surface-muted p-2 grid md:grid-cols-3 gap-2 text-xs">
-                                <p><span className="text-app-text-secondary">Post-reserva:</span> {estadoPostReserva(r)}</p>
-                                <p><span className="text-app-text-secondary">Depósito:</span> {r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
-                                <p><span className="text-app-text-secondary">Causal:</span> {r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
+                    {tabActiva === 'activas' && !loadingReservas && reservasActivas.length === 0 && (
+                        <ReservaEmptyState
+                            title="No tienes reservas activas"
+                            description="Cuando crees una solicitud aparecerá aquí para seguimiento y acciones rápidas."
+                            actionLabel="Crear una reserva"
+                            onAction={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                        />
+                    )}
+
+                    {tabActiva === 'activas' && reservasActivas.length > 0 && (
+                        <div className="space-y-3">
+                            {reservasActivas.map((r) => (
+                                <div key={r.id} className="space-y-2">
+                                    <ReservaCard
+                                        reserva={r}
+                                        canCancel={['solicitada', 'aprobada'].includes(r.estado)}
+                                        onCancel={cancelar}
+                                        onAttach={adjuntarSoporte}
+                                        uploading={subiendoSoporteId === r.id}
+                                        timelineEnabled={TIMELINE_ENABLED}
+                                        onToggleTimeline={(reservaId) => setTimelineOpenId((prev) => prev === reservaId ? null : reservaId)}
+                                        timelineOpen={timelineOpenId === r.id}
+                                        timelineItems={timelineByReserva[r.id] || []}
+                                    />
+                                    <div className="app-surface-muted p-2 grid md:grid-cols-3 gap-2 text-xs">
+                                        <p><span className="text-app-text-secondary">Post-reserva:</span> {estadoPostReserva(r)}</p>
+                                        <p><span className="text-app-text-secondary">Depósito:</span> {r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente de política 7B'}</p>
+                                        <p><span className="text-app-text-secondary">Causal:</span> {r.causal_economica || r.metadata?.causal_economica || 'Sin causal definida'}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {tabActiva === 'historial' && (
+                        <div className="space-y-3">
+                            <div className="app-surface-muted p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-app-text-primary">Historial de reservas</p>
+                                    <p className="text-xs text-app-text-secondary">Mostrando {rangoHistorialInicio}-{rangoHistorialFin} de {reservasHistorialFiltradas.length} reservas.</p>
+                                </div>
+                                <select
+                                    className="app-input md:max-w-56"
+                                    value={filtroHistorial}
+                                    onChange={(e) => setFiltroHistorial(e.target.value)}
+                                    aria-label="Filtrar historial por estado"
+                                >
+                                    {RESERVA_FILTERS.map((filter) => (
+                                        <option key={filter.value} value={filter.value}>{filter.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {!loadingReservas && reservasHistorialFiltradas.length === 0 && (
+                                <ReservaEmptyState
+                                    title="Aún no tienes historial"
+                                    description="Las reservas finalizadas, canceladas o rechazadas aparecerán en esta sección."
+                                />
+                            )}
+
+                            <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1 app-scrollbar" aria-live="polite">
+                                {reservasHistorialPagina.map((r) => (
+                                    <div key={r.id} className="app-surface-muted p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                        <div className="space-y-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-medium text-app-text-primary">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
+                                                <span className="text-[11px] text-app-text-secondary">{getReservaEstadoLabel(r.estado)}</span>
+                                            </div>
+                                            <p className="text-xs text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
+                                            <p className="text-xs text-app-text-secondary">
+                                                Post-reserva: {estadoPostReserva(r)} · Depósito: {r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente 7B'} · Causal: {r.causal_economica || r.metadata?.causal_economica || 'Sin causal'}
+                                            </p>
+                                        </div>
+                                        <ReservaStatusBadge estado={r.estado} />
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="pt-2 border-t border-app-border/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-xs text-app-text-secondary">Página {paginaHistorialSegura} de {totalPaginasHistorial}</p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        className="app-btn-ghost text-xs disabled:opacity-40"
+                                        onClick={() => setPaginaHistorial((prev) => Math.max(1, prev - 1))}
+                                        disabled={paginaHistorialSegura === 1}
+                                    >
+                                        Anterior
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="app-btn-ghost text-xs disabled:opacity-40"
+                                        onClick={() => setPaginaHistorial((prev) => Math.min(totalPaginasHistorial, prev + 1))}
+                                        disabled={paginaHistorialSegura === totalPaginasHistorial}
+                                    >
+                                        Siguiente
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    ))}
-                </div>
-            </section>
-
-            <section className="app-surface-primary p-5 space-y-3 border border-brand-primary/20">
-                <h3 className="text-lg font-semibold">Historial reciente</h3>
-
-                {reservasHistorial.length === 0 && (
-                    <ReservaEmptyState
-                        title="Aún no tienes historial"
-                        description="Las reservas finalizadas, canceladas o rechazadas aparecerán en esta sección."
-                    />
-                )}
-
-                <div className="space-y-2">
-                    {reservasHistorial.map((r) => (
-                        <div key={r.id} className="app-surface-muted p-3 flex items-center justify-between gap-2">
-                            <div className="space-y-1">
-                                <p className="font-medium">{r.recursos_comunes?.nombre || 'Recurso común'}</p>
-                                <p className="text-xs text-app-text-secondary">{formatDateRangeBogota(r.fecha_inicio, r.fecha_fin)}</p>
-                                <p className="text-xs text-app-text-secondary">Post-reserva: {estadoPostReserva(r)} · Depósito: {r.deposito_estado || r.metadata?.deposito_estado || 'Pendiente 7B'} · Causal: {r.causal_economica || r.metadata?.causal_economica || 'Sin causal'}</p>
-                            </div>
-                            <ReservaStatusBadge estado={r.estado} />
-                        </div>
-                    ))}
+                    )}
                 </div>
             </section>
         </div>
