@@ -163,7 +163,35 @@ export function getDiasMoraPago(pago) {
   return Math.max(diasCalculados, Number.isFinite(diasPersistidos) ? diasPersistidos : 0);
 }
 
-export function getResumenEstadosPago(pagos = []) {
+export function getFechaPagoKey(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().split('T')[0];
+}
+
+export function estaFechaEnRango(value, { fechaDesde = '', fechaHasta = '' } = {}) {
+  if (!fechaDesde && !fechaHasta) return true;
+
+  const fechaKey = getFechaPagoKey(value);
+  if (!fechaKey) return false;
+
+  const cumpleDesde = fechaDesde ? fechaKey >= fechaDesde : true;
+  const cumpleHasta = fechaHasta ? fechaKey <= fechaHasta : true;
+  return cumpleDesde && cumpleHasta;
+}
+
+function getFechaMetricaPago(pago, estadoKey) {
+  if (estadoKey === ESTADOS_PAGO.PAGADO) return pago?.fecha_pago;
+  if (estadoKey === ESTADOS_PAGO.VENCIDO) return pago?.fecha_vencimiento;
+  return pago?.created_at;
+}
+
+function estaPagoEnRangoMetrica(pago, estadoKey, rangoFechas = {}) {
+  return estaFechaEnRango(getFechaMetricaPago(pago, estadoKey), rangoFechas);
+}
+
+export function getResumenEstadosPago(pagos = [], rangoFechas = {}) {
   const resumen = ESTADOS_PAGO_FINANCIEROS.reduce((acc, estado) => ({
     ...acc,
     [estado]: { cantidad: 0, total: 0 }
@@ -171,6 +199,8 @@ export function getResumenEstadosPago(pagos = []) {
 
   pagos.forEach((pago) => {
     const estadoKey = obtenerEstadoFinancieroReal(pago);
+    if (!estaPagoEnRangoMetrica(pago, estadoKey, rangoFechas)) return;
+
     const valor = getValorPago(pago);
 
     resumen[estadoKey].cantidad += 1;
@@ -208,8 +238,8 @@ export const AGING_CARTERA_BUCKETS = Object.freeze([
   { key: '90_plus', label: '+90 días', min: 91, max: Infinity }
 ]);
 
-export function getResumenFinancieroEjecutivo(pagos = []) {
-  const porEstado = getResumenEstadosPago(pagos);
+export function getResumenFinancieroEjecutivo(pagos = [], rangoFechas = {}) {
+  const porEstado = getResumenEstadosPago(pagos, rangoFechas);
   const totalRecaudado = porEstado[ESTADOS_PAGO.PAGADO].total;
   const totalPendiente = porEstado[ESTADOS_PAGO.PENDIENTE].total;
   const totalVencido = porEstado[ESTADOS_PAGO.VENCIDO].total;
@@ -237,7 +267,7 @@ export function getResumenFinancieroEjecutivo(pagos = []) {
   };
 }
 
-export function getAgingCartera(pagos = []) {
+export function getAgingCartera(pagos = [], rangoFechas = {}) {
   const buckets = AGING_CARTERA_BUCKETS.reduce((acc, bucket) => ({
     ...acc,
     [bucket.key]: { ...bucket, total: 0, cantidad: 0 }
@@ -246,6 +276,8 @@ export function getAgingCartera(pagos = []) {
   pagos.forEach((pago) => {
     const estadoKey = obtenerEstadoFinancieroReal(pago);
     if (!ESTADOS_CARTERA_ACTIVA.includes(estadoKey)) return;
+
+    if (!estaFechaEnRango(pago.fecha_vencimiento, rangoFechas)) return;
 
     const diasMora = getDiasMoraPago(pago);
     if (diasMora <= 0) return;
@@ -260,12 +292,14 @@ export function getAgingCartera(pagos = []) {
   return AGING_CARTERA_BUCKETS.map((bucket) => buckets[bucket.key]);
 }
 
-export function getTopCarteraApartamentos(pagos = [], limit = 5) {
+export function getTopCarteraApartamentos(pagos = [], limit = 5, rangoFechas = {}) {
   const mapa = new Map();
 
   pagos.forEach((pago) => {
     const estadoKey = obtenerEstadoFinancieroReal(pago);
     if (!ESTADOS_CARTERA_ACTIVA.includes(estadoKey)) return;
+
+    if (!estaPagoEnRangoMetrica(pago, estadoKey, rangoFechas)) return;
 
     const apartamento = pago.apartamento || pago.residentes?.apartamentos?.numero || '-';
     const torre = pago.torre || pago.residentes?.apartamentos?.torres?.nombre || '-';

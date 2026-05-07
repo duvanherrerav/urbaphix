@@ -208,27 +208,25 @@ export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' 
     const torres = useMemo(() => [...new Set(pagos.map((p) => p.torre).filter(Boolean))], [pagos]);
     const pagosFiltrados = useMemo(() => pagos.filter((p) => {
         const estadoReal = obtenerEstadoFinancieroReal(p);
-        const fechaBase = String(p.created_at || '').split('T')[0];
         const cumpleTorre = filtroTorre ? p.torre === filtroTorre : true;
         const cumpleApto = busquedaApto ? p.apartamento?.toString().includes(busquedaApto) : true;
         const cumpleEstado = filtroEstado === 'todos' ? true : estadoReal === filtroEstado;
-        const cumpleDesde = fechaDesde ? fechaBase >= fechaDesde : true;
-        const cumpleHasta = fechaHasta ? fechaBase <= fechaHasta : true;
         const cumpleVencidos = soloVencidos ? estadoReal === ESTADOS_PAGO.VENCIDO : true;
         const cumpleCartera = soloCarteraActiva ? ESTADOS_CARTERA_ACTIVA.includes(estadoReal) : true;
-        return cumpleTorre && cumpleApto && cumpleEstado && cumpleDesde && cumpleHasta && cumpleVencidos && cumpleCartera;
-    }), [pagos, filtroTorre, busquedaApto, filtroEstado, fechaDesde, fechaHasta, soloVencidos, soloCarteraActiva]);
+        return cumpleTorre && cumpleApto && cumpleEstado && cumpleVencidos && cumpleCartera;
+    }), [pagos, filtroTorre, busquedaApto, filtroEstado, soloVencidos, soloCarteraActiva]);
 
-    const resumenEjecutivo = useMemo(() => getResumenFinancieroEjecutivo(pagosFiltrados), [pagosFiltrados]);
+    const rangoFechasAnalitica = useMemo(() => ({ fechaDesde, fechaHasta }), [fechaDesde, fechaHasta]);
+    const resumenEjecutivo = useMemo(() => getResumenFinancieroEjecutivo(pagosFiltrados, rangoFechasAnalitica), [pagosFiltrados, rangoFechasAnalitica]);
     const resumen = useMemo(() => ({
-        total: pagosFiltrados.length,
+        total: Object.values(resumenEjecutivo.porEstado).reduce((total, estado) => total + estado.cantidad, 0),
         pendientes: resumenEjecutivo.porEstado[ESTADOS_PAGO.PENDIENTE].cantidad,
         vencidos: resumenEjecutivo.porEstado[ESTADOS_PAGO.VENCIDO].cantidad,
         enRevision: resumenEjecutivo.porEstado[ESTADOS_PAGO.EN_REVISION].cantidad,
         pagados: resumenEjecutivo.porEstado[ESTADOS_PAGO.PAGADO].cantidad,
         rechazados: resumenEjecutivo.porEstado[ESTADOS_PAGO.RECHAZADO].cantidad,
         cartera: resumenEjecutivo.carteraTotal
-    }), [pagosFiltrados.length, resumenEjecutivo]);
+    }), [resumenEjecutivo]);
     const pagosAgrupados = useMemo(() => ({
         [ESTADOS_PAGO.VENCIDO]: pagosFiltrados.filter((p) => obtenerEstadoFinancieroReal(p) === ESTADOS_PAGO.VENCIDO)
             .sort((a, b) => getDiasMoraPago(b) - getDiasMoraPago(a)),
@@ -456,14 +454,14 @@ export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' 
             {mostrarAnalitica && (
                 <>
                     <div className="app-surface-primary p-4 border border-brand-primary/20">
-                        <AnaliticaFinancieraAvanzada pagos={pagosFiltrados} />
+                        <AnaliticaFinancieraAvanzada pagos={pagosFiltrados} fechaDesde={fechaDesde} fechaHasta={fechaHasta} />
                     </div>
 
                     <div className="app-surface-primary p-4 border border-brand-primary/20">
                         <h4 className="font-semibold text-app-text-primary mb-1">Analítica temporal financiera</h4>
                         <p className="text-xs text-app-text-secondary mb-3">Recaudo por fecha de aprobación, deuda generada, cantidad de pagos aprobados y vencidos por fecha de vencimiento.</p>
                         <div className="h-[320px]">
-                            <GraficaFinanciera pagos={pagosFiltrados} />
+                            <GraficaFinanciera pagos={pagosFiltrados} fechaDesde={fechaDesde} fechaHasta={fechaHasta} />
                         </div>
                     </div>
                 </>

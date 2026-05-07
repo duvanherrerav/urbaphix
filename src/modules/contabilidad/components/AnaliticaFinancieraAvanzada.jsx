@@ -34,10 +34,11 @@ const KPI_CARDS = [
   { key: 'comprobantesEnRevision', title: 'Comprobantes en revisión', className: 'text-state-info' }
 ];
 
-export default function AnaliticaFinancieraAvanzada({ pagos = [] }) {
-  const resumen = getResumenFinancieroEjecutivo(pagos);
-  const aging = getAgingCartera(pagos);
-  const topCartera = getTopCarteraApartamentos(pagos, 6);
+export default function AnaliticaFinancieraAvanzada({ pagos = [], fechaDesde = '', fechaHasta = '' }) {
+  const rangoFechas = { fechaDesde, fechaHasta };
+  const resumen = getResumenFinancieroEjecutivo(pagos, rangoFechas);
+  const aging = getAgingCartera(pagos, rangoFechas);
+  const topCartera = getTopCarteraApartamentos(pagos, 6, rangoFechas);
   const maxAging = Math.max(...aging.map((bucket) => bucket.total), 1);
 
   const agingData = {

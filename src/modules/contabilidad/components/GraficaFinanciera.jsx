@@ -7,7 +7,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
-import { ESTADOS_PAGO, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
+import { ESTADOS_PAGO, estaFechaEnRango, getFechaPagoKey, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 ChartJS.register(
   BarElement,
@@ -24,13 +24,6 @@ const DATASETS_TEMPORALES = [
   { key: 'vencidos', label: 'Vencidos por fecha 🚨', backgroundColor: 'rgba(220, 38, 38, 0.9)' }
 ];
 
-function getDateKey(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().split('T')[0];
-}
-
 function ensureDay(acc, key) {
   if (!acc[key]) {
     acc[key] = DATASETS_TEMPORALES.reduce((row, dataset) => ({
@@ -40,28 +33,29 @@ function ensureDay(acc, key) {
   }
 }
 
-export default function GraficaFinanciera({ pagos }) {
+export default function GraficaFinanciera({ pagos = [], fechaDesde = '', fechaHasta = '' }) {
   const agrupado = {};
+  const rangoFechas = { fechaDesde, fechaHasta };
 
   pagos.forEach((p) => {
     const valor = getValorPago(p);
     const estadoKey = obtenerEstadoFinancieroReal(p);
-    const fechaCreacion = getDateKey(p.created_at);
-    const fechaRecaudo = getDateKey(p.fecha_pago || p.created_at);
-    const fechaVencimiento = getDateKey(p.fecha_vencimiento || p.created_at);
+    const fechaCreacion = getFechaPagoKey(p.created_at);
+    const fechaRecaudo = getFechaPagoKey(p.fecha_pago);
+    const fechaVencimiento = getFechaPagoKey(p.fecha_vencimiento);
 
-    if (fechaCreacion && estadoKey !== ESTADOS_PAGO.PAGADO) {
+    if (fechaCreacion && estaFechaEnRango(p.created_at, rangoFechas)) {
       ensureDay(agrupado, fechaCreacion);
       agrupado[fechaCreacion].deudaGenerada += valor;
     }
 
-    if (estadoKey === ESTADOS_PAGO.PAGADO && fechaRecaudo) {
+    if (estadoKey === ESTADOS_PAGO.PAGADO && fechaRecaudo && estaFechaEnRango(p.fecha_pago, rangoFechas)) {
       ensureDay(agrupado, fechaRecaudo);
       agrupado[fechaRecaudo].recaudo += valor;
       agrupado[fechaRecaudo].aprobadosCantidad += 1;
     }
 
-    if (estadoKey === ESTADOS_PAGO.VENCIDO && fechaVencimiento) {
+    if (estadoKey === ESTADOS_PAGO.VENCIDO && fechaVencimiento && estaFechaEnRango(p.fecha_vencimiento, rangoFechas)) {
       ensureDay(agrupado, fechaVencimiento);
       agrupado[fechaVencimiento].vencidos += valor;
     }
