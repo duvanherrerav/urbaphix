@@ -287,7 +287,7 @@ function App() {
       {/* 🔥 SIDEBAR */}
       <aside className="app-sidebar w-full shrink-0 p-3 lg:min-h-screen lg:w-72 lg:p-4">
 
-        <div className="mb-3 app-surface-primary px-3 py-2.5 lg:mb-4">
+        <div className="mb-3 app-surface-primary px-4 py-3.5 lg:mb-4">
           <BrandLogo variant="sidebar" className="max-w-full" alt="Urbaphix" />
         </div>
 
