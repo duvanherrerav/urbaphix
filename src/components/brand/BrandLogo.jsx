@@ -1,6 +1,6 @@
-import isotipo from '../../assets/brand/isotipo-urbaphix.png';
-import logotipo from '../../assets/brand/logotipo-urbaphix.jpg';
-import banner from '../../assets/brand/banner-urbaphix.png';
+import isotipo from '../../assets/brand/isotipo-urbaphix.jpeg';
+import logotipo from '../../assets/brand/logotipo-urbaphix.jpeg';
+import banner from '../../assets/brand/banner-urbaphix.jpeg';
 
 const brandAssets = {
   isotipo,
