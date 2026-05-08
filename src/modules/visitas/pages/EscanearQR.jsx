@@ -106,7 +106,7 @@ export default function EscanearQR({ usuarioApp }) {
         .single();
 
       // 🔥 enviar push
-      await fetch('https://dhuerumqizprrudgurla.supabase.co/functions/v1/enviar-notificacion', {
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enviar-notificacion`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
