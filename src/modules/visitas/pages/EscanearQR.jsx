@@ -3,6 +3,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { enqueueOfflineAction, registrarBitacora, registrarIntentoQRInvalido, validarReglasAcceso } from '../services/porteriaService';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 export default function EscanearQR({ usuarioApp }) {
 
@@ -156,7 +157,7 @@ export default function EscanearQR({ usuarioApp }) {
 
   return (
     <div>
-      <h2>Escanear QR 📷</h2>
+      <ModuleTitle icon="visitas" title="Escanear QR" className="text-xl font-bold text-app-text-primary" iconClassName="h-9 w-9 rounded-xl" />
       <div style={{ marginBottom: '10px' }}>
         <label>
           Modo lectura:&nbsp;

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { crearPago } from '../services/contabilidadService';
 import toast from 'react-hot-toast';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 const CATEGORIAS_PH = [
   { value: 'administracion', label: 'Administración' },
@@ -225,7 +226,7 @@ export default function CrearCobro({ usuarioApp }) {
 
   return (
     <div className="app-surface-primary p-5 space-y-4">
-      <h2 className="text-xl font-bold mb-1">Crear cobro 💰</h2>
+      <ModuleTitle icon="cobros" title="Crear cobro" className="text-xl font-bold" iconClassName="h-9 w-9 rounded-xl" />
       <p className="text-sm text-app-text-secondary mb-4">Cobro individual por apartamento escrito o masivo por tipo de apartamento.</p>
 
       <div className="flex mb-6 bg-app-bg rounded-lg p-1">

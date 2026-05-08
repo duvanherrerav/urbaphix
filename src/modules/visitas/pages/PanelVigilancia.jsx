@@ -3,6 +3,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, syncOfflineQueue } from '../services/porteriaService';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
@@ -352,7 +353,7 @@ export default function PanelVigilancia({ usuarioApp }) {
     return (
         <div className="app-surface-primary rounded-2xl shadow p-5 space-y-4 relative">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-xl font-bold">Control Visitas 👮‍♂️</h2>
+                <ModuleTitle icon="visitas" title="Control de visitas" className="text-xl font-bold" iconClassName="h-9 w-9 rounded-xl" />
                 <div className="flex gap-2 text-xs">
                     <button className={`px-3 py-1 rounded-full border ${vista === 'pendientes' ? 'bg-[#F59E0B1F] text-state-warning border-state-warning/40' : 'bg-app-bg border-app-border text-app-text-secondary'}`} onClick={() => { setVista('pendientes'); setPagina(1); }}>Pendientes ({resumen.pendientes})</button>
                     <button className={`px-3 py-1 rounded-full border ${vista === 'ingresadas' ? 'bg-[#38BDF826] text-state-info border-state-info/40' : 'bg-app-bg border-app-border text-app-text-secondary'}`} onClick={() => { setVista('ingresadas'); setPagina(1); }}>En curso ({resumen.ingresadas})</button>

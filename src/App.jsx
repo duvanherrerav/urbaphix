@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
 import BrandLogo from './components/brand/BrandLogo';
+import ModuleIcon from './components/ui/ModuleIcon';
 
 import Login from './modules/auth/Login';
 import { pedirPermiso } from './utils/push';
@@ -163,6 +164,15 @@ function App() {
   };
 
   const moduloActual = modulo || moduloPorRol[usuarioApp?.rol_id] || '';
+  const moduloHeader = {
+    dashboard: { label: 'Dashboard', icon: 'dashboard' },
+    visitas: { label: usuarioApp?.rol_id === 'vigilancia' ? 'Control de visitas' : 'Solicitar visita', icon: 'visitas' },
+    paquetes: { label: usuarioApp?.rol_id === 'residente' ? 'Mis paquetes' : 'Paquetería', icon: 'paquetes' },
+    pagos: { label: usuarioApp?.rol_id === 'residente' ? 'Mis pagos' : 'Pagos', icon: 'pagos' },
+    reservas: { label: 'Reservas', icon: 'reservas' },
+    incidentes: { label: 'Seguridad', icon: 'seguridad' }
+  };
+  const headerModulo = moduloHeader[moduloActual] || { label: moduloActual, icon: 'default' };
   const seleccionarModulo = (siguienteModulo) => {
     setModulo(siguienteModulo);
   };
@@ -367,9 +377,9 @@ function App() {
         <header className="app-header px-4 py-3 sm:px-7 sm:py-4 flex justify-between items-center gap-4 relative z-50">
 
           <div className="flex min-w-0 items-center gap-3">
-            <BrandLogo variant="isotipo" className="h-7 w-7 shrink-0 opacity-85" decorative />
-            <h2 className="truncate font-semibold text-lg capitalize text-app-text-primary">
-              {moduloActual}
+            <ModuleIcon name={headerModulo.icon} className="h-8 w-8 rounded-xl" />
+            <h2 className="truncate text-lg font-semibold text-app-text-primary">
+              {headerModulo.label}
             </h2>
           </div>
 

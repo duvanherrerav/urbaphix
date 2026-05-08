@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import jsPDF from 'jspdf';
 import AppDatePicker from '../../../components/ui/AppDatePicker';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
 import { ESTADOS_CARTERA_ACTIVA, ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getResumenEstadosPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
@@ -319,7 +320,7 @@ export default function EstadoCuenta({ usuarioApp }) {
   return (
     <div className="app-surface-primary p-6 space-y-4">
       <div>
-        <h2 className="text-xl font-bold mb-1">Estado de cuenta consolidado</h2>
+        <ModuleTitle icon="pagos" title="Estado de cuenta consolidado" className="text-xl font-bold" iconClassName="h-9 w-9 rounded-xl" containerClassName="mb-1" />
         <p className="text-sm text-app-text-secondary">Resumen financiero del periodo seleccionado. Este bloque respeta exclusivamente filtros de fecha y estado.</p>
       </div>
 
