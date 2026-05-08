@@ -5,6 +5,7 @@ import ReservaCard from '../components/residente/ReservaCard';
 import ReservaEmptyState from '../components/residente/ReservaEmptyState';
 import ReservaErrorBanner from '../components/residente/ReservaErrorBanner';
 import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import { formatDateRangeBogota, getTodayBogotaDate } from '../utils/dateTimeBogota';
 import { getReservaEstadoLabel } from '../utils/reservaFormatters';
 import {
@@ -376,7 +377,7 @@ export default function ReservarZona({ usuarioApp }) {
                 <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                     <div className="space-y-2">
                         <p className="text-xs uppercase tracking-[0.22em] text-brand-primary font-semibold">Reservas de residente</p>
-                        <h1 className="text-2xl md:text-3xl font-bold">Mis reservas</h1>
+                        <ModuleTitle as="h1" icon="reservas" title="Mis reservas" className="text-2xl md:text-3xl font-bold" />
                         <p className="text-sm text-app-text-secondary max-w-2xl">
                             Crea solicitudes de zonas comunes, revisa su estado operativo y consulta tu historial sin perder contexto.
                         </p>

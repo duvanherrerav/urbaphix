@@ -1,3 +1,5 @@
+import { ModuleTitle } from '../../../../components/ui/ModuleIcon';
+
 const estadoFranjaUI = {
     disponible: {
         label: 'Disponible',
@@ -57,7 +59,7 @@ export default function ReservaCreateCard({
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                 <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-brand-primary font-semibold">Nueva solicitud</p>
-                    <h2 id="crear-reserva-title" className="text-2xl font-bold">Crear reserva</h2>
+                    <ModuleTitle id="crear-reserva-title" as="h2" icon="reservas" title="Crear reserva" className="text-2xl font-bold" />
                     <p className="text-sm text-app-text-secondary">Selecciona recurso, fecha y franja horaria para enviar tu solicitud.</p>
                 </div>
                 {recursoSeleccionado?.capacidad && (

@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
 import QRShareCard from '../components/QRShareCard';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 
 const formatManualIngresoCode = (qrCode) => {
@@ -374,7 +375,7 @@ export default function CrearVisita() {
   return (
     <div className="w-full max-w-6xl mx-auto space-y-4 overflow-x-hidden">
       <header className="app-surface-primary p-3 md:p-3.5">
-        <h2 className="text-xl md:text-[1.65rem] font-bold leading-tight">Solicitar visita</h2>
+        <ModuleTitle icon="visitas" title="Solicitar visita" className="text-xl md:text-[1.65rem] font-bold leading-tight" iconClassName="h-9 w-9 rounded-xl" />
         <p className="mt-1 text-sm text-app-text-secondary">Genera un código para portería.</p>
       </header>
 

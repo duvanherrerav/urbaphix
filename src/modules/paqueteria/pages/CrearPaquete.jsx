@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { registrarPaquete } from '../services/paquetesService';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 export default function CrearPaquete({ usuarioApp }) {
   const [torres, setTorres] = useState([]);
@@ -58,7 +59,7 @@ export default function CrearPaquete({ usuarioApp }) {
   return (
     <div className="app-surface-primary/95 rounded-2xl border border-brand-primary/15 p-4 space-y-4 shadow-sm backdrop-blur-sm">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">Registrar recepción 📦</h2>
+        <ModuleTitle icon="paquetes" title="Registrar recepción" className="text-lg font-semibold" iconClassName="h-9 w-9 rounded-xl" />
         <p className="text-xs text-app-text-secondary">Paso 2 del flujo: registra rápidamente después de revisar pendientes.</p>
       </div>
 

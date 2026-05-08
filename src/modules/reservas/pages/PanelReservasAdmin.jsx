@@ -17,6 +17,7 @@ import ReservaStatusBadge from '../components/shared/ReservaStatusBadge';
 import { formatDateRangeBogota, formatDateTimeBogota } from '../utils/dateTimeBogota';
 import AppTimePicker from '../../../components/ui/AppTimePicker';
 import AppDatePicker from '../../../components/ui/AppDatePicker';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import {
     getReservaAccionLabel,
     formatearMilesCOP,
@@ -681,7 +682,7 @@ export default function PanelReservasAdmin({ usuarioApp }) {
         <div className="space-y-5">
             <div className="app-surface-primary rounded-2xl p-5 shadow space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-2xl font-bold">Recursos comunes</h2>
+                    <ModuleTitle icon="reservas" title="Recursos comunes" className="text-2xl font-bold" />
                     {vistaAdmin === 'lista' ? (
                         <button className="app-btn-primary text-xs" onClick={iniciarCreacion}>Crear recurso</button>
                     ) : (

@@ -5,6 +5,7 @@ import PagoEmptyState from '../components/residente/PagoEmptyState';
 import PagosResumenCards from '../components/residente/PagosResumenCards';
 import { EVENTOS_PAGO, adjuntarEventosAPagos, notificarAdminsPago, registrarPagoEvento } from '../services/pagosEventosService';
 import { ESTADOS_PAGO, esPagoDeudaActiva, getEstadoPagoUi, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 const ordenarPagosDesc = (rows = []) =>
   [...rows].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
@@ -233,7 +234,7 @@ export default function MisPagos({ usuarioApp }) {
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-brand-secondary">Módulo financiero</p>
-            <h2 className="mt-1 text-2xl font-black text-app-text-primary">Mis pagos 💰</h2>
+            <ModuleTitle icon="pagos" title="Mis pagos" className="text-2xl font-black text-app-text-primary" containerClassName="mt-1" />
             <p className="mt-1 max-w-2xl text-sm text-app-text-secondary">Consulta tus cobros, revisa el saldo pendiente y adjunta comprobantes para validación de la administración.</p>
           </div>
           <div className="rounded-2xl border border-brand-primary/25 bg-brand-primary/10 px-3 py-2 text-xs text-app-text-secondary">

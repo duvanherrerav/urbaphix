@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { crearIncidente } from '../services/seguridadService';
 import toast from 'react-hot-toast';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 export default function ReportarIncidente({ user }) {
   const [form, setForm] = useState({
@@ -71,7 +72,7 @@ export default function ReportarIncidente({ user }) {
     <div className="app-surface-primary p-6 max-w-4xl mx-auto space-y-5">
       <div className="grid md:grid-cols-[1.4fr_1fr] gap-4 items-start">
         <div>
-          <h2 className="text-2xl font-bold">Reportar incidente 🚨</h2>
+          <ModuleTitle icon="seguridad" title="Reportar incidente" className="text-2xl font-bold" />
           <p className="text-sm text-app-text-secondary mt-1">Registro operativo para trazabilidad administrativa y seguimiento por prioridad.</p>
         </div>
         <div className="app-surface-muted text-xs space-y-1">

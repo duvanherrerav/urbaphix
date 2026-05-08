@@ -4,6 +4,7 @@ import { supabase } from '../../../services/supabaseClient';
 import GraficaVisitas from '../components/GraficaVisitas';
 import GraficaFinanciera from '../../contabilidad/components/GraficaFinanciera';
 import PaquetesPorTorre from '../components/PaquetesPorTorre';
+import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import KPIsAdmin from '../components/KPIsAdmin';
 import DashboardResumen from '../components/DashboardResumen';
 import CarteraResumen from '../../contabilidad/components/CarteraResumen';
@@ -314,7 +315,7 @@ export default function DashboardAdmin({ usuarioApp }) {
       <div className="app-surface-primary p-6 text-app-text-primary">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold">👋 Hola {usuarioApp?.nombre || 'Admin'}</h2>
+            <ModuleTitle icon="dashboard" title={`Hola ${usuarioApp?.nombre || 'Admin'}`} className="text-2xl font-bold" />
             <p className="text-sm text-app-text-secondary mt-1">Resumen operativo de los últimos 3 días con foco financiero y de visitas.</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs min-w-[280px]">
