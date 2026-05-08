@@ -38,9 +38,10 @@ function BrandLockup({ variant, className, alt, decorative }) {
       text: 'text-sm font-medium tracking-[-0.02em]'
     },
     sidebar: {
-      container: 'gap-2 opacity-90',
-      icon: 'h-7 w-7',
-      text: 'text-base font-semibold tracking-[-0.02em]'
+      container: 'gap-3 opacity-95',
+      icon: 'h-10 w-10 drop-shadow-[0_0_18px_rgba(56,189,248,0.22)]',
+      text: 'text-xl font-semibold tracking-[-0.035em]',
+      descriptor: 'mt-1 text-[11px] leading-snug tracking-[0.01em] text-app-text-secondary/75'
     },
     loading: {
       container: 'flex-col gap-3 text-center',
@@ -72,7 +73,7 @@ function BrandLockup({ variant, className, alt, decorative }) {
             Urbaphix
           </span>
           {showDescriptor && (
-            <span className="mt-0.5 block text-[10px] leading-snug text-app-text-secondary/80">
+            <span className={`block ${styles.descriptor}`}>
               SaaS para propiedad horizontal
             </span>
           )}
