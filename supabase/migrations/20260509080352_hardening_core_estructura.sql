@@ -31,11 +31,11 @@ on public.apartamentos
 for all
 to authenticated
 using (
-    public.get_user_role() = 'administrador'
+    public.get_user_role() = 'admin'
     and conjunto_id = public.get_user_conjunto_id()
 )
 with check (
-    public.get_user_role() = 'administrador'
+    public.get_user_role() = 'admin'
     and conjunto_id = public.get_user_conjunto_id()
 );
 
@@ -65,10 +65,10 @@ on public.torres
 for all
 to authenticated
 using (
-    public.get_user_role() = 'administrador'
+    public.get_user_role() = 'admin'
     and conjunto_id = public.get_user_conjunto_id()
 )
 with check (
-    public.get_user_role() = 'administrador'
+    public.get_user_role() = 'admin'
     and conjunto_id = public.get_user_conjunto_id()
 );
