@@ -2,12 +2,13 @@
 -- URBAPHIX SEED DATA
 -- Ambiente: DEV
 -- =====================================================
-
--- Roles base
+-- Roles base oficiales Urbaphix
 insert into public.roles (id, nombre)
-values
-  ('superadmin', 'Super Administrador'),
+values ('superadmin', 'Super Administrador'),
   ('admin', 'Administrador'),
   ('residente', 'Residente'),
-  ('vigilante', 'Vigilancia')
-on conflict (id) do nothing;
+  ('vigilante', 'Vigilancia'),
+  ('contador', 'Contador'),
+  ('auditor', 'Auditor') on conflict (id) do
+update
+set nombre = excluded.nombre;
