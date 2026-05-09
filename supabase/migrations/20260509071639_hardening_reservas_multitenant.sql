@@ -28,6 +28,19 @@ as $$
   limit 1;
 $$;
 
+create or replace function public.get_user_residente_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id
+  from residentes
+  where usuario_id = auth.uid()
+  limit 1;
+$$;
+
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -123,6 +136,10 @@ using (
 drop policy if exists reservas_insert_residente_admin on public.reservas_zonas;
 drop policy if exists reservas_select_admin_vigilancia_residente on public.reservas_zonas;
 drop policy if exists reservas_update_admin_vigilancia_residente on public.reservas_zonas;
+drop policy if exists reservas_zonas_select_conjunto on public.reservas_zonas;
+drop policy if exists reservas_zonas_insert on public.reservas_zonas;
+drop policy if exists reservas_zonas_update on public.reservas_zonas;
+drop policy if exists reservas_zonas_delete_admin on public.reservas_zonas;
 
 create policy reservas_zonas_select_conjunto
 on public.reservas_zonas
@@ -138,6 +155,14 @@ for insert
 to authenticated
 with check (
   conjunto_id = public.get_user_conjunto_id()
+  and (
+    public.is_admin()
+    or public.is_vigilancia()
+    or (
+      public.is_residente()
+      and residente_id = public.get_user_residente_id()
+    )
+  )
 );
 
 create policy reservas_zonas_update
@@ -146,6 +171,25 @@ for update
 to authenticated
 using (
   conjunto_id = public.get_user_conjunto_id()
+  and (
+    public.is_admin()
+    or public.is_vigilancia()
+    or (
+      public.is_residente()
+      and residente_id = public.get_user_residente_id()
+    )
+  )
+)
+with check (
+  conjunto_id = public.get_user_conjunto_id()
+  and (
+    public.is_admin()
+    or public.is_vigilancia()
+    or (
+      public.is_residente()
+      and residente_id = public.get_user_residente_id()
+    )
+  )
 );
 
 create policy reservas_zonas_delete_admin
@@ -165,6 +209,9 @@ drop policy if exists visitantes_insert_propios on public.visitantes;
 drop policy if exists visitantes_select_propios on public.visitantes;
 drop policy if exists visitantes_update_propios on public.visitantes;
 drop policy if exists visitantes_select_same_conjunto on public.visitantes;
+drop policy if exists visitantes_select_conjunto on public.visitantes;
+drop policy if exists visitantes_insert_residente on public.visitantes;
+drop policy if exists visitantes_update_residente on public.visitantes;
 
 create policy visitantes_select_conjunto
 on public.visitantes
@@ -181,6 +228,7 @@ to authenticated
 with check (
   public.is_residente()
   and conjunto_id = public.get_user_conjunto_id()
+  and residente_id = public.get_user_residente_id()
 );
 
 create policy visitantes_update_residente
@@ -190,6 +238,12 @@ to authenticated
 using (
   public.is_residente()
   and conjunto_id = public.get_user_conjunto_id()
+  and residente_id = public.get_user_residente_id()
+)
+with check (
+  public.is_residente()
+  and conjunto_id = public.get_user_conjunto_id()
+  and residente_id = public.get_user_residente_id()
 );
 
 -- =====================================================
