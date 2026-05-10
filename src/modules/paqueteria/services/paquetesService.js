@@ -267,15 +267,38 @@ export const entregarPaquete = async (paquete_id) => {
     }
 
     // 🔔 Notificación
-    const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
-      usuario_id: paquete.residente_id,
-      tipo: 'paquete_entregado',
-      titulo: 'Paquete entregado',
-      mensaje: 'Tu paquete fue entregado correctamente'
-    }]);
+    if (paquete.residente_id) {
+      let residenteQuery = supabase
+        .from('residentes')
+        .select('id, usuario_id')
+        .eq('id', paquete.residente_id);
 
-    if (errorNotificacion) {
-      console.warn('entregarPaquete: no se pudo crear notificación', errorNotificacion);
+      if (paquete.conjunto_id) {
+        residenteQuery = residenteQuery.eq('conjunto_id', paquete.conjunto_id);
+      }
+
+      const { data: residente, error: errorResidente } = await residenteQuery.maybeSingle();
+
+      if (errorResidente) {
+        console.warn('entregarPaquete: no se pudo obtener usuario del residente', errorResidente);
+      } else if (!residente?.usuario_id) {
+        console.warn('entregarPaquete: residente sin usuario_id, se omite notificación', {
+          residente_id: paquete.residente_id
+        });
+      } else {
+        const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
+          usuario_id: residente.usuario_id,
+          tipo: 'paquete_entregado',
+          titulo: 'Paquete entregado',
+          mensaje: 'Tu paquete fue entregado correctamente'
+        }]);
+
+        if (errorNotificacion) {
+          console.warn('entregarPaquete: no se pudo crear notificación', errorNotificacion);
+        }
+      }
+    } else {
+      console.warn('entregarPaquete: paquete sin residente_id, se omite notificación', { paquete_id });
     }
 
     return { ok: true, paquete, error: null };
