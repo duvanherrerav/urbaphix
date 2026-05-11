@@ -94,7 +94,18 @@ Tablas detectadas en `public`:
 - `torre_id` → `torres.id`
 
 ### RLS
-- No visible en los TXT cargados
+- `apartamentos_select_conjunto`
+  - comando: `SELECT`
+  - condición: `conjunto_id = fn_auth_conjunto_id()`
+- `apartamentos_admin_insert`
+  - comando: `INSERT`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `apartamentos_admin_update`
+  - comando: `UPDATE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `apartamentos_admin_delete`
+  - comando: `DELETE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
 
 ---
 
@@ -177,7 +188,10 @@ Tablas detectadas en `public`:
 - tabla padre de múltiples módulos
 
 ### RLS
-- No visible en los TXT cargados
+- `conjuntos_select_conjunto`
+  - comando: `SELECT`
+  - condición: `id = fn_auth_conjunto_id()`
+- Sin políticas de escritura para clientes `anon`/`authenticated`; las escrituras deben realizarse por `service_role` o backend administrativo aprobado.
 
 ---
 
@@ -691,7 +705,10 @@ Tablas detectadas en `public`:
 - `usuarios_app.rol_id` → `roles.id`
 
 ### RLS
-- No visible en los TXT cargados
+- `roles_select_authenticated`
+  - comando: `SELECT`
+  - condición: `true` para usuarios autenticados
+- Sin políticas de escritura para clientes `anon`/`authenticated`; el catálogo se administra por migraciones o consola protegida.
 
 ---
 
@@ -728,7 +745,18 @@ Tablas detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- No visible en los TXT cargados
+- `torres_select_conjunto`
+  - comando: `SELECT`
+  - condición: `conjunto_id = fn_auth_conjunto_id()`
+- `torres_admin_insert`
+  - comando: `INSERT`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `torres_admin_update`
+  - comando: `UPDATE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `torres_admin_delete`
+  - comando: `DELETE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
 
 ---
 

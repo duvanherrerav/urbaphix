@@ -247,6 +247,10 @@ with check (
 commit;
 ```
 
+## Migración versionada propuesta
+
+Se agregó la migración revisable `supabase/migrations/20260511120000_normalizar_rls_roles_core.sql` para convertir la propuesta documentada en SQL versionado. Debe revisarse y validarse manualmente antes de aplicarla en cualquier ambiente remoto.
+
 ## Riesgos de aplicar la migración
 
 1. **Ruptura por RLS sin políticas suficientes:** si se activa RLS en `conjuntos` o `roles` sin políticas compatibles con el frontend, las consultas pueden dejar de devolver filas.
