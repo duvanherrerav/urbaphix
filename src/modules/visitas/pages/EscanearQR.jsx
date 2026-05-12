@@ -39,23 +39,35 @@ export default function EscanearQR({ usuarioApp }) {
       }
 
       const { visita_id, conjunto_id, qr_code } = parsed;
+      const usuarioConjuntoId = usuarioApp?.conjunto_id;
+
+      if (!usuarioConjuntoId) {
+        console.warn('EscanearQR: usuario sin conjunto_id; búsqueda QR depende de RLS', {
+          usuario_id: usuarioApp?.id
+        });
+      }
 
       // 🔥 validar conjunto
-      if (conjunto_id && conjunto_id !== usuarioApp.conjunto_id) {
+      if (conjunto_id && usuarioConjuntoId && conjunto_id !== usuarioConjuntoId) {
         await registrarIntentoQRInvalido({ qrRaw: text, usuarioApp });
         toast.error("QR no pertenece a este conjunto");
         return;
       }
 
       // 🔥 buscar visita
-      const { data: visita, error } = await supabase
+      let visitaQuery = supabase
         .from('registro_visitas')
         .select(`
           id, qr_code, conjunto_id, estado, fecha_visita, hora_inicio, hora_fin, visitante_id,
           visitantes (nombre, documento, residente_id)
         `)
-        .or(visita_id ? `id.eq.${visita_id}` : `qr_code.eq.${qr_code}`)
-        .single();
+        .or(visita_id ? `id.eq.${visita_id}` : `qr_code.eq.${qr_code}`);
+
+      if (usuarioConjuntoId) {
+        visitaQuery = visitaQuery.eq('conjunto_id', usuarioConjuntoId);
+      }
+
+      const { data: visita, error } = await visitaQuery.single();
 
       if (error || !visita) {
         await registrarIntentoQRInvalido({ qrRaw: text, usuarioApp });
