@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
-import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, syncOfflineQueue } from '../services/porteriaService';
+import { calcularSLA, enqueueOfflineAction, esErrorConectividad, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, registrarIngresoVisitaRPC, registrarSalidaVisitaRPC, syncOfflineQueue } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
@@ -279,13 +279,25 @@ export default function PanelVigilancia({ usuarioApp }) {
         }
 
         const timestamp = toBogotaTimestamp();
-        const { error } = await supabase
-            .from('registro_visitas')
-            .update({ estado: 'ingresado', hora_ingreso: timestamp })
-            .eq('id', visitaObjetivo.id);
+        const { error } = await registrarIngresoVisitaRPC({
+            qrCode: visitaObjetivo.qr_code,
+            vigilanteId: usuarioApp?.id
+        });
 
         if (error) {
-            toast.error('No fue posible registrar el ingreso');
+            if (esErrorConectividad(error)) {
+                enqueueOfflineAction({
+                    type: 'visita_estado',
+                    visita_id: visitaObjetivo.id,
+                    qr_code: visitaObjetivo.qr_code,
+                    vigilante_id: usuarioApp?.id || null,
+                    payload: { estado: 'ingresado', hora_ingreso: timestamp }
+                });
+                setOfflinePendientes((prev) => prev + 1);
+                toast.error('Sin conexión estable. El ingreso quedó en cola de contingencia.');
+                return;
+            }
+            toast.error(error.message || 'No fue posible registrar el ingreso');
             return;
         }
 
@@ -302,10 +314,24 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const registrarSalida = async (id) => {
         const timestamp = toBogotaTimestamp();
-        const { error } = await supabase.from('registro_visitas').update({ estado: 'salido', hora_salida: timestamp }).eq('id', id);
+        const { error } = await registrarSalidaVisitaRPC({
+            registroId: id,
+            vigilanteId: usuarioApp?.id
+        });
 
         if (error) {
-            toast.error('Error al registrar salida');
+            if (esErrorConectividad(error)) {
+                enqueueOfflineAction({
+                    type: 'visita_estado',
+                    visita_id: id,
+                    vigilante_id: usuarioApp?.id || null,
+                    payload: { estado: 'salido', hora_salida: timestamp }
+                });
+                setOfflinePendientes((prev) => prev + 1);
+                toast.error('Sin conexión estable. La salida quedó en cola de contingencia.');
+                return;
+            }
+            toast.error(error.message || 'Error al registrar salida');
             return;
         }
 

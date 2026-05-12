@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
-import { enqueueOfflineAction, registrarBitacora, registrarIntentoQRInvalido, validarReglasAcceso } from '../services/porteriaService';
+import { enqueueOfflineAction, esErrorConectividad, registrarBitacora, registrarIngresoVisitaRPC, registrarIntentoQRInvalido, validarReglasAcceso } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 export default function EscanearQR({ usuarioApp }) {
@@ -102,24 +102,28 @@ export default function EscanearQR({ usuarioApp }) {
       }
 
       // 🔥 registrar ingreso
-      const { error: updateError } = await supabase
-        .from('registro_visitas')
-        .update({
-          estado: 'ingresado',
-          hora_ingreso: new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ')
-        })
-        .eq('id', visitaNormalizada.id);
+      const horaIngresoLocal = new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ');
+      const { error: ingresoError } = await registrarIngresoVisitaRPC({
+        qrCode: visitaNormalizada.qr_code,
+        vigilanteId: usuarioApp?.id
+      });
 
-      if (updateError) {
-        enqueueOfflineAction({
-          type: 'visita_estado',
-          visita_id: visitaNormalizada.id,
-          payload: {
-            estado: 'ingresado',
-            hora_ingreso: new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ')
-          }
-        });
-        toast.error("Sin conexión estable. El ingreso quedó en cola de contingencia.");
+      if (ingresoError) {
+        if (esErrorConectividad(ingresoError)) {
+          enqueueOfflineAction({
+            type: 'visita_estado',
+            visita_id: visitaNormalizada.id,
+            qr_code: visitaNormalizada.qr_code,
+            vigilante_id: usuarioApp?.id || null,
+            payload: {
+              estado: 'ingresado',
+              hora_ingreso: horaIngresoLocal
+            }
+          });
+          toast.error("Sin conexión estable. El ingreso quedó en cola de contingencia.");
+        } else {
+          toast.error(ingresoError.message || "No fue posible registrar el ingreso");
+        }
       } else {
         // 🔔 resolver usuario real del residente y notificar sin romper el ingreso
         if (!visitaNormalizada.residente_id) {

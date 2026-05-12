@@ -58,6 +58,29 @@ const saveLocalAudit = (entry) => {
   localStorage.setItem(BITACORA_LOCAL_KEY, JSON.stringify([{ ...entry, local_only: true }, ...actual].slice(0, 200)));
 };
 
+
+export const esErrorConectividad = (error) => {
+  const message = String(error?.message || error?.details || error || '').toLowerCase();
+  return error?.name === 'TypeError'
+    || message.includes('failed to fetch')
+    || message.includes('fetch failed')
+    || message.includes('network')
+    || message.includes('networkerror')
+    || message.includes('load failed')
+    || message.includes('timeout')
+    || message.includes('offline');
+};
+
+export const registrarIngresoVisitaRPC = async ({ qrCode, vigilanteId }) => supabase.rpc('fn_registrar_ingreso_visita', {
+  p_qr_code: qrCode,
+  p_vigilante_id: vigilanteId || null
+});
+
+export const registrarSalidaVisitaRPC = async ({ registroId, vigilanteId }) => supabase.rpc('fn_registrar_salida_visita', {
+  p_registro_id: registroId,
+  p_vigilante_id: vigilanteId || null
+});
+
 export const registrarBitacora = async ({ usuarioApp, visitaId, accion, detalle, metadata = {} }) => {
   const evento = {
     visita_id: visitaId || null,
@@ -172,10 +195,42 @@ export const syncOfflineQueue = async (usuarioApp) => {
   for (const item of queue) {
     try {
       if (item.type === 'visita_estado') {
-        const { error } = await supabase
-          .from('registro_visitas')
-          .update(item.payload)
-          .eq('id', item.visita_id);
+        const estado = item.payload?.estado;
+        let error = null;
+
+        if (estado === 'ingresado') {
+          let qrCode = item.qr_code;
+
+          if (!qrCode && item.visita_id) {
+            const { data: visita, error: visitaError } = await supabase
+              .from('registro_visitas')
+              .select('id, qr_code')
+              .eq('id', item.visita_id)
+              .maybeSingle();
+
+            if (visitaError) throw visitaError;
+            qrCode = visita?.qr_code;
+          }
+
+          if (!qrCode) {
+            throw new Error('No se pudo resolver el QR de la visita offline');
+          }
+
+          ({ error } = await registrarIngresoVisitaRPC({
+            qrCode,
+            vigilanteId: item.vigilante_id || usuarioApp?.id
+          }));
+        } else if (estado === 'salido') {
+          ({ error } = await registrarSalidaVisitaRPC({
+            registroId: item.visita_id,
+            vigilanteId: item.vigilante_id || usuarioApp?.id
+          }));
+        } else {
+          ({ error } = await supabase
+            .from('registro_visitas')
+            .update(item.payload)
+            .eq('id', item.visita_id));
+        }
 
         if (error) throw error;
 
@@ -183,7 +238,7 @@ export const syncOfflineQueue = async (usuarioApp) => {
           usuarioApp,
           visitaId: item.visita_id,
           accion: 'sync_offline_visita',
-          detalle: `Sincronizado estado ${item.payload.estado}`,
+          detalle: `Sincronizado estado ${estado}`,
           metadata: { queued_at: item.queued_at }
         });
       }
