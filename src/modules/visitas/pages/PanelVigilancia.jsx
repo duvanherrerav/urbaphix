@@ -260,9 +260,6 @@ export default function PanelVigilancia({ usuarioApp }) {
             const conjuntoId = await resolverConjuntoId();
             if (!mounted || !conjuntoId) return;
 
-            await cargar(conjuntoId);
-            if (!mounted) return;
-
             channel = supabase
                 .channel(`registro-visitas-vigilancia-${conjuntoId}`)
                 .on(
@@ -271,10 +268,16 @@ export default function PanelVigilancia({ usuarioApp }) {
                     () => scheduleCargar(conjuntoId)
                 )
                 .subscribe((status) => {
+                    if (!mounted) return;
+                    if (status === 'SUBSCRIBED') {
+                        scheduleCargar(conjuntoId);
+                    }
                     if (status === 'CHANNEL_ERROR') {
                         console.warn('PanelVigilancia: error en subscription realtime de registro_visitas', { conjuntoId });
                     }
                 });
+
+            cargar(conjuntoId);
         };
 
         iniciar();
