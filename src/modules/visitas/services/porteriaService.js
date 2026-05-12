@@ -199,8 +199,25 @@ export const syncOfflineQueue = async (usuarioApp) => {
         let error = null;
 
         if (estado === 'ingresado') {
+          let qrCode = item.qr_code;
+
+          if (!qrCode && item.visita_id) {
+            const { data: visita, error: visitaError } = await supabase
+              .from('registro_visitas')
+              .select('id, qr_code')
+              .eq('id', item.visita_id)
+              .maybeSingle();
+
+            if (visitaError) throw visitaError;
+            qrCode = visita?.qr_code;
+          }
+
+          if (!qrCode) {
+            throw new Error('No se pudo resolver el QR de la visita offline');
+          }
+
           ({ error } = await registrarIngresoVisitaRPC({
-            qrCode: item.qr_code,
+            qrCode,
             vigilanteId: item.vigilante_id || usuarioApp?.id
           }));
         } else if (estado === 'salido') {
