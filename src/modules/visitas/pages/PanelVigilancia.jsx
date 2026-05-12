@@ -156,104 +156,110 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const cargar = useCallback(async (conjuntoId, { isActive } = {}) => {
         if (!conjuntoId) return;
+
+        const requestIsActive = () => !isActive || isActive();
         setLoading(true);
 
-        const [registroResp, seguridadResp] = await Promise.all([
-            supabase
-                .from('registro_visitas')
-                .select(`
-                    id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
-                    apartamentos (
-                        id,
-                        numero,
-                        torres (
-                            nombre
+        try {
+            const [registroResp, seguridadResp] = await Promise.all([
+                supabase
+                    .from('registro_visitas')
+                    .select(`
+                        id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
+                        apartamentos (
+                            id,
+                            numero,
+                            torres (
+                                nombre
+                            )
                         )
-                    )
-                `)
-                .eq('conjunto_id', conjuntoId)
-                .order('fecha_visita', { ascending: false }),
-            obtenerSeguridadConsolidada(conjuntoId)
-        ]);
+                    `)
+                    .eq('conjunto_id', conjuntoId)
+                    .order('fecha_visita', { ascending: false }),
+                obtenerSeguridadConsolidada(conjuntoId)
+            ]);
 
-        if (isActive && !isActive()) return;
-        if (registroResp.error) {
-            toast.error('No se pudo cargar el registro de visitas');
-            setLoading(false);
-            return;
-        }
+            if (!requestIsActive()) return;
+            if (registroResp.error) {
+                toast.error('No se pudo cargar el registro de visitas');
+                return;
+            }
 
-        const registros = registroResp.data || [];
-        const { data: residentes } = await supabase
-            .from('residentes')
-            .select('id')
-            .eq('conjunto_id', conjuntoId);
-        const idsResidentes = (residentes || []).map((r) => r.id);
-        const { data: visitantesConjunto } = idsResidentes.length
-            ? await supabase
-                .from('visitantes')
+            const registros = registroResp.data || [];
+            const { data: residentes } = await supabase
+                .from('residentes')
                 .select('id')
-                .in('residente_id', idsResidentes)
-            : { data: [] };
+                .eq('conjunto_id', conjuntoId);
+            const idsResidentes = (residentes || []).map((r) => r.id);
+            const { data: visitantesConjunto } = idsResidentes.length
+                ? await supabase
+                    .from('visitantes')
+                    .select('id')
+                    .in('residente_id', idsResidentes)
+                : { data: [] };
 
-        const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
-        const { data: registrosFallback } = idsVisitantesConjunto.length
-            ? await supabase
-                .from('registro_visitas')
-                .select(`
-                    id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
-                    apartamentos (
-                        id,
-                        numero,
-                        torres (
-                            nombre
+            const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
+            const { data: registrosFallback } = idsVisitantesConjunto.length
+                ? await supabase
+                    .from('registro_visitas')
+                    .select(`
+                        id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
+                        apartamentos (
+                            id,
+                            numero,
+                            torres (
+                                nombre
+                            )
                         )
-                    )
-                `)
-                .in('visitante_id', idsVisitantesConjunto)
-                .order('fecha_visita', { ascending: false })
-            : { data: [] };
+                    `)
+                    .in('visitante_id', idsVisitantesConjunto)
+                    .order('fecha_visita', { ascending: false })
+                : { data: [] };
 
-        if (isActive && !isActive()) return;
+            if (!requestIsActive()) return;
 
-        const dedupe = new Map();
-        [...registros, ...(registrosFallback || [])].forEach((row) => {
-            if (row?.id) dedupe.set(row.id, row);
-        });
-        const registrosUsables = Array.from(dedupe.values());
-        const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
-        const { data: visitantesData } = visitanteIds.length
-            ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
-            : { data: [] };
+            const dedupe = new Map();
+            [...registros, ...(registrosFallback || [])].forEach((row) => {
+                if (row?.id) dedupe.set(row.id, row);
+            });
+            const registrosUsables = Array.from(dedupe.values());
+            const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
+            const { data: visitantesData } = visitanteIds.length
+                ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
+                : { data: [] };
 
-        if (isActive && !isActive()) return;
+            if (!requestIsActive()) return;
 
-        const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
+            const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
 
-        const mappedRegistro = registrosUsables.map((v) => {
-            const visitante = visitantesMap.get(v.visitante_id);
-            return {
-                id: v.id,
-                fecha_visita: normalizeFecha(v.fecha_visita),
-                estado: v.estado,
-                estado_normalizado: normalizeEstado(v.estado),
-                qr_code: v.qr_code,
-                hora_ingreso: v.hora_ingreso,
-                hora_salida: v.hora_salida,
-                created_at: v.created_at,
-                nombre_visitante: visitante?.nombre,
-                documento: visitante?.documento,
-                placa: visitante?.placa,
-                torre: v.apartamentos?.torres?.nombre || null,
-                apartamento: v.apartamentos?.numero || null,
-                ubicacion: formatUbicacion(v.apartamentos?.torres?.nombre, v.apartamentos?.numero)
-            };
-        });
-        setVisitas(mappedRegistro);
-        setSeguridad(seguridadResp);
-        const cola = getOfflineQueue();
-        setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
-        setLoading(false);
+            const mappedRegistro = registrosUsables.map((v) => {
+                const visitante = visitantesMap.get(v.visitante_id);
+                return {
+                    id: v.id,
+                    fecha_visita: normalizeFecha(v.fecha_visita),
+                    estado: v.estado,
+                    estado_normalizado: normalizeEstado(v.estado),
+                    qr_code: v.qr_code,
+                    hora_ingreso: v.hora_ingreso,
+                    hora_salida: v.hora_salida,
+                    created_at: v.created_at,
+                    nombre_visitante: visitante?.nombre,
+                    documento: visitante?.documento,
+                    placa: visitante?.placa,
+                    torre: v.apartamentos?.torres?.nombre || null,
+                    apartamento: v.apartamentos?.numero || null,
+                    ubicacion: formatUbicacion(v.apartamentos?.torres?.nombre, v.apartamentos?.numero)
+                };
+            });
+            setVisitas(mappedRegistro);
+            setSeguridad(seguridadResp);
+            const cola = getOfflineQueue();
+            setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
+        } finally {
+            if (requestIsActive()) {
+                setLoading(false);
+            }
+        }
     }, []);
 
     useRealtimeConjuntoChannel({
