@@ -125,19 +125,29 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     useEffect(() => {
         let mounted = true;
+        let channel = null;
+        let refreshTimeout = null;
+        let requestVersion = 0;
 
-        const cargar = async () => {
-            let conjuntoId = usuarioApp?.conjunto_id;
-            if (!conjuntoId) {
-                const { data: authData } = await supabase.auth.getUser();
-                const { data: usuarioDb } = await supabase
-                    .from('usuarios_app')
-                    .select('conjunto_id')
-                    .eq('id', authData?.user?.id)
-                    .single();
-                conjuntoId = usuarioDb?.conjunto_id || null;
-            }
+        const resolverConjuntoId = async () => {
+            if (usuarioApp?.conjunto_id) return usuarioApp.conjunto_id;
+
+            const { data: authData } = await supabase.auth.getUser();
+            const userId = authData?.user?.id;
+            if (!userId) return null;
+
+            const { data: usuarioDb } = await supabase
+                .from('usuarios_app')
+                .select('conjunto_id')
+                .eq('id', userId)
+                .maybeSingle();
+
+            return usuarioDb?.conjunto_id || null;
+        };
+
+        const cargar = async (conjuntoId) => {
             if (!conjuntoId) return;
+            const currentRequest = ++requestVersion;
             setLoading(true);
 
             const [registroResp, seguridadResp] = await Promise.all([
@@ -158,7 +168,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                 obtenerSeguridadConsolidada(conjuntoId)
             ]);
 
-            if (!mounted) return;
+            if (!mounted || currentRequest !== requestVersion) return;
             if (registroResp.error) {
                 toast.error('No se pudo cargar el registro de visitas');
                 setLoading(false);
@@ -196,6 +206,8 @@ export default function PanelVigilancia({ usuarioApp }) {
                     .order('fecha_visita', { ascending: false })
                 : { data: [] };
 
+            if (!mounted || currentRequest !== requestVersion) return;
+
             const dedupe = new Map();
             [...registros, ...(registrosFallback || [])].forEach((row) => {
                 if (row?.id) dedupe.set(row.id, row);
@@ -205,6 +217,9 @@ export default function PanelVigilancia({ usuarioApp }) {
             const { data: visitantesData } = visitanteIds.length
                 ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
                 : { data: [] };
+
+            if (!mounted || currentRequest !== requestVersion) return;
+
             const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
 
             const mappedRegistro = registrosUsables.map((v) => {
@@ -233,16 +248,42 @@ export default function PanelVigilancia({ usuarioApp }) {
             setLoading(false);
         };
 
-        cargar();
+        const scheduleCargar = (conjuntoId) => {
+            if (refreshTimeout) clearTimeout(refreshTimeout);
+            refreshTimeout = setTimeout(() => {
+                refreshTimeout = null;
+                cargar(conjuntoId);
+            }, 250);
+        };
 
-        const channel = supabase
-            .channel(`registro-visitas-vigilancia-${usuarioApp?.conjunto_id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas' }, cargar)
-            .subscribe();
+        const iniciar = async () => {
+            const conjuntoId = await resolverConjuntoId();
+            if (!mounted || !conjuntoId) return;
+
+            await cargar(conjuntoId);
+            if (!mounted) return;
+
+            channel = supabase
+                .channel(`registro-visitas-vigilancia-${conjuntoId}`)
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'registro_visitas', filter: `conjunto_id=eq.${conjuntoId}` },
+                    () => scheduleCargar(conjuntoId)
+                )
+                .subscribe((status) => {
+                    if (status === 'CHANNEL_ERROR') {
+                        console.warn('PanelVigilancia: error en subscription realtime de registro_visitas', { conjuntoId });
+                    }
+                });
+        };
+
+        iniciar();
 
         return () => {
             mounted = false;
-            supabase.removeChannel(channel);
+            requestVersion += 1;
+            if (refreshTimeout) clearTimeout(refreshTimeout);
+            if (channel) supabase.removeChannel(channel);
         };
     }, [usuarioApp?.conjunto_id]);
 
