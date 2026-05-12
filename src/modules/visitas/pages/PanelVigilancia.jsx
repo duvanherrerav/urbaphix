@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { calcularSLA, enqueueOfflineAction, esErrorConectividad, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, registrarIngresoVisitaRPC, registrarSalidaVisitaRPC, syncOfflineQueue } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
+import { useRealtimeConjuntoChannel } from '../../../hooks/useRealtimeConjuntoChannel';
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
@@ -123,11 +124,10 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const [modalIngreso, setModalIngreso] = useState({ open: false, visita: null, manualQR: '' });
 
+    const [realtimeConjuntoId, setRealtimeConjuntoId] = useState(usuarioApp?.conjunto_id || null);
+
     useEffect(() => {
         let mounted = true;
-        let channel = null;
-        let refreshTimeout = null;
-        let requestVersion = 0;
 
         const resolverConjuntoId = async () => {
             if (usuarioApp?.conjunto_id) return usuarioApp.conjunto_id;
@@ -145,150 +145,124 @@ export default function PanelVigilancia({ usuarioApp }) {
             return usuarioDb?.conjunto_id || null;
         };
 
-        const cargar = async (conjuntoId) => {
-            if (!conjuntoId) return;
-            const currentRequest = ++requestVersion;
-            setLoading(true);
-
-            const [registroResp, seguridadResp] = await Promise.all([
-                supabase
-                    .from('registro_visitas')
-                    .select(`
-                        id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
-                        apartamentos (
-                            id,
-                            numero,
-                            torres (
-                                nombre
-                            )
-                        )
-                    `)
-                    .eq('conjunto_id', conjuntoId)
-                    .order('fecha_visita', { ascending: false }),
-                obtenerSeguridadConsolidada(conjuntoId)
-            ]);
-
-            if (!mounted || currentRequest !== requestVersion) return;
-            if (registroResp.error) {
-                toast.error('No se pudo cargar el registro de visitas');
-                setLoading(false);
-                return;
-            }
-
-            const registros = registroResp.data || [];
-            const { data: residentes } = await supabase
-                .from('residentes')
-                .select('id')
-                .eq('conjunto_id', conjuntoId);
-            const idsResidentes = (residentes || []).map((r) => r.id);
-            const { data: visitantesConjunto } = idsResidentes.length
-                ? await supabase
-                    .from('visitantes')
-                    .select('id')
-                    .in('residente_id', idsResidentes)
-                : { data: [] };
-
-            const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
-            const { data: registrosFallback } = idsVisitantesConjunto.length
-                ? await supabase
-                    .from('registro_visitas')
-                    .select(`
-                        id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
-                        apartamentos (
-                            id,
-                            numero,
-                            torres (
-                                nombre
-                            )
-                        )
-                    `)
-                    .in('visitante_id', idsVisitantesConjunto)
-                    .order('fecha_visita', { ascending: false })
-                : { data: [] };
-
-            if (!mounted || currentRequest !== requestVersion) return;
-
-            const dedupe = new Map();
-            [...registros, ...(registrosFallback || [])].forEach((row) => {
-                if (row?.id) dedupe.set(row.id, row);
-            });
-            const registrosUsables = Array.from(dedupe.values());
-            const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
-            const { data: visitantesData } = visitanteIds.length
-                ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
-                : { data: [] };
-
-            if (!mounted || currentRequest !== requestVersion) return;
-
-            const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
-
-            const mappedRegistro = registrosUsables.map((v) => {
-                const visitante = visitantesMap.get(v.visitante_id);
-                return {
-                    id: v.id,
-                    fecha_visita: normalizeFecha(v.fecha_visita),
-                    estado: v.estado,
-                    estado_normalizado: normalizeEstado(v.estado),
-                    qr_code: v.qr_code,
-                    hora_ingreso: v.hora_ingreso,
-                    hora_salida: v.hora_salida,
-                    created_at: v.created_at,
-                    nombre_visitante: visitante?.nombre,
-                    documento: visitante?.documento,
-                    placa: visitante?.placa,
-                    torre: v.apartamentos?.torres?.nombre || null,
-                    apartamento: v.apartamentos?.numero || null,
-                    ubicacion: formatUbicacion(v.apartamentos?.torres?.nombre, v.apartamentos?.numero)
-                };
-            });
-            setVisitas(mappedRegistro);
-            setSeguridad(seguridadResp);
-            const cola = getOfflineQueue();
-            setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
-            setLoading(false);
-        };
-
-        const scheduleCargar = (conjuntoId) => {
-            if (refreshTimeout) clearTimeout(refreshTimeout);
-            refreshTimeout = setTimeout(() => {
-                refreshTimeout = null;
-                cargar(conjuntoId);
-            }, 250);
-        };
-
-        const iniciar = async () => {
-            const conjuntoId = await resolverConjuntoId();
-            if (!mounted || !conjuntoId) return;
-
-            channel = supabase
-                .channel(`registro-visitas-vigilancia-${conjuntoId}`)
-                .on(
-                    'postgres_changes',
-                    { event: '*', schema: 'public', table: 'registro_visitas', filter: `conjunto_id=eq.${conjuntoId}` },
-                    () => scheduleCargar(conjuntoId)
-                )
-                .subscribe((status) => {
-                    if (!mounted) return;
-                    if (status === 'SUBSCRIBED') {
-                        scheduleCargar(conjuntoId);
-                    }
-                    if (status === 'CHANNEL_ERROR') {
-                        console.warn('PanelVigilancia: error en subscription realtime de registro_visitas', { conjuntoId });
-                    }
-                });
-
-            cargar(conjuntoId);
-        };
-
-        iniciar();
+        resolverConjuntoId().then((conjuntoId) => {
+            if (mounted) setRealtimeConjuntoId(conjuntoId);
+        });
 
         return () => {
             mounted = false;
-            requestVersion += 1;
-            if (refreshTimeout) clearTimeout(refreshTimeout);
-            if (channel) supabase.removeChannel(channel);
         };
     }, [usuarioApp?.conjunto_id]);
+
+    const cargar = useCallback(async (conjuntoId, { isActive } = {}) => {
+        if (!conjuntoId) return;
+        setLoading(true);
+
+        const [registroResp, seguridadResp] = await Promise.all([
+            supabase
+                .from('registro_visitas')
+                .select(`
+                    id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
+                    apartamentos (
+                        id,
+                        numero,
+                        torres (
+                            nombre
+                        )
+                    )
+                `)
+                .eq('conjunto_id', conjuntoId)
+                .order('fecha_visita', { ascending: false }),
+            obtenerSeguridadConsolidada(conjuntoId)
+        ]);
+
+        if (isActive && !isActive()) return;
+        if (registroResp.error) {
+            toast.error('No se pudo cargar el registro de visitas');
+            setLoading(false);
+            return;
+        }
+
+        const registros = registroResp.data || [];
+        const { data: residentes } = await supabase
+            .from('residentes')
+            .select('id')
+            .eq('conjunto_id', conjuntoId);
+        const idsResidentes = (residentes || []).map((r) => r.id);
+        const { data: visitantesConjunto } = idsResidentes.length
+            ? await supabase
+                .from('visitantes')
+                .select('id')
+                .in('residente_id', idsResidentes)
+            : { data: [] };
+
+        const idsVisitantesConjunto = (visitantesConjunto || []).map((v) => v.id);
+        const { data: registrosFallback } = idsVisitantesConjunto.length
+            ? await supabase
+                .from('registro_visitas')
+                .select(`
+                    id, visitante_id, fecha_visita, estado, qr_code, hora_ingreso, hora_salida, created_at, apartamento_id,
+                    apartamentos (
+                        id,
+                        numero,
+                        torres (
+                            nombre
+                        )
+                    )
+                `)
+                .in('visitante_id', idsVisitantesConjunto)
+                .order('fecha_visita', { ascending: false })
+            : { data: [] };
+
+        if (isActive && !isActive()) return;
+
+        const dedupe = new Map();
+        [...registros, ...(registrosFallback || [])].forEach((row) => {
+            if (row?.id) dedupe.set(row.id, row);
+        });
+        const registrosUsables = Array.from(dedupe.values());
+        const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
+        const { data: visitantesData } = visitanteIds.length
+            ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
+            : { data: [] };
+
+        if (isActive && !isActive()) return;
+
+        const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
+
+        const mappedRegistro = registrosUsables.map((v) => {
+            const visitante = visitantesMap.get(v.visitante_id);
+            return {
+                id: v.id,
+                fecha_visita: normalizeFecha(v.fecha_visita),
+                estado: v.estado,
+                estado_normalizado: normalizeEstado(v.estado),
+                qr_code: v.qr_code,
+                hora_ingreso: v.hora_ingreso,
+                hora_salida: v.hora_salida,
+                created_at: v.created_at,
+                nombre_visitante: visitante?.nombre,
+                documento: visitante?.documento,
+                placa: visitante?.placa,
+                torre: v.apartamentos?.torres?.nombre || null,
+                apartamento: v.apartamentos?.numero || null,
+                ubicacion: formatUbicacion(v.apartamentos?.torres?.nombre, v.apartamentos?.numero)
+            };
+        });
+        setVisitas(mappedRegistro);
+        setSeguridad(seguridadResp);
+        const cola = getOfflineQueue();
+        setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
+        setLoading(false);
+    }, []);
+
+    useRealtimeConjuntoChannel({
+        conjuntoId: realtimeConjuntoId,
+        channelName: realtimeConjuntoId ? `registro-visitas-vigilancia-${realtimeConjuntoId}` : null,
+        table: 'registro_visitas',
+        onRefresh: cargar,
+        warningMessage: 'PanelVigilancia: error en subscription realtime de registro_visitas'
+    });
 
     const finalizarIngresoConQR = async (rawValue) => {
         const visitaObjetivo = modalIngreso.visita;
