@@ -109,6 +109,7 @@ export const validarReglasAcceso = (visita, ahora = new Date()) => {
 
   if (visita.estado === 'ingresado') return { ok: false, error: 'Esta visita ya fue utilizada' };
   if (visita.estado === 'salido') return { ok: false, error: 'La visita ya fue finalizada' };
+  if (visita.estado === 'cancelado') return { ok: false, error: 'La visita fue cancelada' };
 
   const hhmm = ahora.toLocaleTimeString('sv-SE', { timeZone: 'America/Bogota' }).slice(0, 5);
   if (visita.hora_inicio && hhmm < visita.hora_inicio) {
