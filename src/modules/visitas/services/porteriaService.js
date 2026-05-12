@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { validarEstadoParaIngresoQR } from './estadosVisita';
 
 const QUEUE_KEY = 'urbaphix_porteria_queue_v1';
 const BITACORA_LOCAL_KEY = 'urbaphix_porteria_bitacora_local_v1';
@@ -102,14 +103,15 @@ export const calcularSLA = (visitas) => {
 };
 
 export const validarReglasAcceso = (visita, ahora = new Date()) => {
+  const reglaEstado = validarEstadoParaIngresoQR(visita.estado);
+  if (!reglaEstado.ok) {
+    return { ok: false, error: reglaEstado.error };
+  }
+
   const hoy = ahora.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
   if (visita.fecha_visita !== hoy) {
     return { ok: false, error: 'La visita no corresponde al día actual' };
   }
-
-  if (visita.estado === 'ingresado') return { ok: false, error: 'Esta visita ya fue utilizada' };
-  if (visita.estado === 'salido') return { ok: false, error: 'La visita ya fue finalizada' };
-  if (visita.estado === 'cancelado') return { ok: false, error: 'La visita fue cancelada' };
 
   const hhmm = ahora.toLocaleTimeString('sv-SE', { timeZone: 'America/Bogota' }).slice(0, 5);
   if (visita.hora_inicio && hhmm < visita.hora_inicio) {
