@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { calcularSLA, enqueueOfflineAction, esErrorConectividad, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, registrarIngresoVisitaRPC, registrarSalidaVisitaRPC, syncOfflineQueue } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
+import { useRealtimeConjuntoChannel } from '../../../hooks/useRealtimeConjuntoChannel';
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
@@ -123,11 +124,10 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const [modalIngreso, setModalIngreso] = useState({ open: false, visita: null, manualQR: '' });
 
+    const [realtimeConjuntoId, setRealtimeConjuntoId] = useState(usuarioApp?.conjunto_id || null);
+
     useEffect(() => {
         let mounted = true;
-        let channel = null;
-        let refreshTimeout = null;
-        let requestVersion = 0;
 
         const resolverConjuntoId = async () => {
             if (usuarioApp?.conjunto_id) return usuarioApp.conjunto_id;
@@ -145,11 +145,22 @@ export default function PanelVigilancia({ usuarioApp }) {
             return usuarioDb?.conjunto_id || null;
         };
 
-        const cargar = async (conjuntoId) => {
-            if (!conjuntoId) return;
-            const currentRequest = ++requestVersion;
-            setLoading(true);
+        resolverConjuntoId().then((conjuntoId) => {
+            if (mounted) setRealtimeConjuntoId(conjuntoId);
+        });
 
+        return () => {
+            mounted = false;
+        };
+    }, [usuarioApp?.conjunto_id]);
+
+    const cargar = useCallback(async (conjuntoId, { isActive } = {}) => {
+        if (!conjuntoId) return;
+
+        const requestIsActive = () => !isActive || isActive();
+        setLoading(true);
+
+        try {
             const [registroResp, seguridadResp] = await Promise.all([
                 supabase
                     .from('registro_visitas')
@@ -168,10 +179,9 @@ export default function PanelVigilancia({ usuarioApp }) {
                 obtenerSeguridadConsolidada(conjuntoId)
             ]);
 
-            if (!mounted || currentRequest !== requestVersion) return;
+            if (!requestIsActive()) return;
             if (registroResp.error) {
                 toast.error('No se pudo cargar el registro de visitas');
-                setLoading(false);
                 return;
             }
 
@@ -206,7 +216,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                     .order('fecha_visita', { ascending: false })
                 : { data: [] };
 
-            if (!mounted || currentRequest !== requestVersion) return;
+            if (!requestIsActive()) return;
 
             const dedupe = new Map();
             [...registros, ...(registrosFallback || [])].forEach((row) => {
@@ -218,7 +228,7 @@ export default function PanelVigilancia({ usuarioApp }) {
                 ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
                 : { data: [] };
 
-            if (!mounted || currentRequest !== requestVersion) return;
+            if (!requestIsActive()) return;
 
             const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
 
@@ -245,50 +255,20 @@ export default function PanelVigilancia({ usuarioApp }) {
             setSeguridad(seguridadResp);
             const cola = getOfflineQueue();
             setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
-            setLoading(false);
-        };
+        } finally {
+            if (requestIsActive()) {
+                setLoading(false);
+            }
+        }
+    }, []);
 
-        const scheduleCargar = (conjuntoId) => {
-            if (refreshTimeout) clearTimeout(refreshTimeout);
-            refreshTimeout = setTimeout(() => {
-                refreshTimeout = null;
-                cargar(conjuntoId);
-            }, 250);
-        };
-
-        const iniciar = async () => {
-            const conjuntoId = await resolverConjuntoId();
-            if (!mounted || !conjuntoId) return;
-
-            channel = supabase
-                .channel(`registro-visitas-vigilancia-${conjuntoId}`)
-                .on(
-                    'postgres_changes',
-                    { event: '*', schema: 'public', table: 'registro_visitas', filter: `conjunto_id=eq.${conjuntoId}` },
-                    () => scheduleCargar(conjuntoId)
-                )
-                .subscribe((status) => {
-                    if (!mounted) return;
-                    if (status === 'SUBSCRIBED') {
-                        scheduleCargar(conjuntoId);
-                    }
-                    if (status === 'CHANNEL_ERROR') {
-                        console.warn('PanelVigilancia: error en subscription realtime de registro_visitas', { conjuntoId });
-                    }
-                });
-
-            cargar(conjuntoId);
-        };
-
-        iniciar();
-
-        return () => {
-            mounted = false;
-            requestVersion += 1;
-            if (refreshTimeout) clearTimeout(refreshTimeout);
-            if (channel) supabase.removeChannel(channel);
-        };
-    }, [usuarioApp?.conjunto_id]);
+    useRealtimeConjuntoChannel({
+        conjuntoId: realtimeConjuntoId,
+        channelName: realtimeConjuntoId ? `registro-visitas-vigilancia-${realtimeConjuntoId}` : null,
+        table: 'registro_visitas',
+        onRefresh: cargar,
+        warningMessage: 'PanelVigilancia: error en subscription realtime de registro_visitas'
+    });
 
     const finalizarIngresoConQR = async (rawValue) => {
         const visitaObjetivo = modalIngreso.visita;
