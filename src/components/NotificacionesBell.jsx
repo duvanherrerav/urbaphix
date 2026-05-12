@@ -1,44 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 
 export default function NotificacionesBell({ usuarioApp }) {
 
     const [notificaciones, setNotificaciones] = useState([]);
     const [abierto, setAbierto] = useState(false);
+    const usuarioId = usuarioApp?.id;
+
+    const obtenerNotificaciones = useCallback(async () => {
+        if (!usuarioId) {
+            setNotificaciones([]);
+            return;
+        }
+
+        const { data } = await supabase
+            .from('notificaciones')
+            .select('*')
+            .eq('usuario_id', usuarioId)
+            .order('created_at', { ascending: false });
+
+        setNotificaciones(data || []);
+    }, [usuarioId]);
 
     useEffect(() => {
-        obtenerNotificaciones();
+        if (!usuarioId) return undefined;
+
+        Promise.resolve().then(() => obtenerNotificaciones());
 
         const channel = supabase
-            .channel('notificaciones')
+            .channel(`notificaciones-${usuarioId}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'INSERT',
                     schema: 'public',
-                    table: 'notificaciones'
+                    table: 'notificaciones',
+                    filter: `usuario_id=eq.${usuarioId}`
                 },
-                (payload) => {
-                    if (payload.new.usuario_id === usuarioApp.id) {
-                        obtenerNotificaciones();
-                    }
-                }
+                () => obtenerNotificaciones()
             )
             .subscribe();
 
         return () => supabase.removeChannel(channel);
 
-    }, []);
-
-    const obtenerNotificaciones = async () => {
-        const { data } = await supabase
-            .from('notificaciones')
-            .select('*')
-            .eq('usuario_id', usuarioApp.id)
-            .order('created_at', { ascending: false });
-
-        setNotificaciones(data || []);
-    };
+    }, [obtenerNotificaciones, usuarioId]);
 
     const marcarComoLeidas = async () => {
 
@@ -97,9 +102,7 @@ export default function NotificacionesBell({ usuarioApp }) {
                     <h4>Notificaciones</h4>
 
                     {notificaciones.length === 0 && (
-                        <p><small style={{ color: '#888' }}>
-                            {new Date(n.created_at).toLocaleString()}
-                        </small>No hay notificaciones</p>
+                        <p>No hay notificaciones</p>
                     )}
 
                     {notificaciones.map(n => (

@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 
 export default function KPIsAdmin({ usuarioApp, setKpis, visitasTotal = 0 }) {
-  const cargarKPIs = async (conjuntoId, totalVisitasRango) => {
+  const cargarKPIs = useCallback(async (conjuntoId, totalVisitasRango) => {
     if (!conjuntoId) return;
     try {
       const [paquetesRes, apartamentosRes] = await Promise.all([
@@ -79,12 +79,12 @@ export default function KPIsAdmin({ usuarioApp, setKpis, visitasTotal = 0 }) {
         visitasRango: totalVisitasRango
       }));
     }
-  };
+  }, [setKpis]);
 
   useEffect(() => {
     if (!usuarioApp?.conjunto_id) return;
     cargarKPIs(usuarioApp.conjunto_id, visitasTotal);
-  }, [usuarioApp?.conjunto_id, visitasTotal]);
+  }, [cargarKPIs, usuarioApp?.conjunto_id, visitasTotal]);
 
   return null;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import { entregarPaquete as entregarPaqueteService, listarPaquetesConDetalle } from '../services/paquetesService';
@@ -27,13 +27,15 @@ export default function PanelPaquetes({ usuarioApp }) {
   const [paginaPendientes, setPaginaPendientes] = useState(1);
   const [paginaEntregados, setPaginaEntregados] = useState(1);
   const [mostrarEntregadosRecientes, setMostrarEntregadosRecientes] = useState(false);
+  const conjuntoId = usuarioApp?.conjunto_id;
 
-  const obtenerPaquetes = async () => {
-    if (!usuarioApp?.conjunto_id) return;
+  const obtenerPaquetes = useCallback(async () => {
+    if (!conjuntoId) return;
+    await Promise.resolve();
     setLoading(true);
     const [result, recientesResult] = await Promise.all([
-      listarPaquetesConDetalle({ conjunto_id: usuarioApp.conjunto_id, estado: filtroEstado, busqueda }),
-      listarPaquetesConDetalle({ conjunto_id: usuarioApp.conjunto_id, estado: 'entregado', busqueda: '' })
+      listarPaquetesConDetalle({ conjunto_id: conjuntoId, estado: filtroEstado, busqueda }),
+      listarPaquetesConDetalle({ conjunto_id: conjuntoId, estado: 'entregado', busqueda: '' })
     ]);
     setLoading(false);
 
@@ -41,20 +43,15 @@ export default function PanelPaquetes({ usuarioApp }) {
     if (!recientesResult.ok) return toast.error(recientesResult.error || 'No se pudieron cargar entregados recientes');
     setPaquetes(result.data || []);
     setEntregadosRecientes((recientesResult.data || []).slice(0, ENTREGADOS_RECIENTES));
-  };
+  }, [busqueda, conjuntoId, filtroEstado]);
 
+  useEffect(() => { Promise.resolve().then(() => obtenerPaquetes()); }, [obtenerPaquetes]);
   useEffect(() => {
-    setPaginaPendientes(1);
-    setPaginaEntregados(1);
-  }, [filtroEstado, busqueda]);
-
-  useEffect(() => { obtenerPaquetes(); }, [usuarioApp?.conjunto_id, filtroEstado]);
-  useEffect(() => {
-    if (!usuarioApp?.conjunto_id) return undefined;
+    if (!conjuntoId) return undefined;
 
     const channel = supabase
-      .channel(`paqueteria-panel-${usuarioApp.conjunto_id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'paquetes', filter: `conjunto_id=eq.${usuarioApp.conjunto_id}` }, () => obtenerPaquetes())
+      .channel(`paqueteria-panel-${conjuntoId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'paquetes', filter: `conjunto_id=eq.${conjuntoId}` }, () => obtenerPaquetes())
       .subscribe();
 
     const onChanged = () => obtenerPaquetes();
@@ -64,7 +61,20 @@ export default function PanelPaquetes({ usuarioApp }) {
       window.removeEventListener('paqueteria:changed', onChanged);
       supabase.removeChannel(channel);
     };
-  }, [usuarioApp?.conjunto_id, filtroEstado, busqueda]);
+  }, [conjuntoId, obtenerPaquetes]);
+
+
+  const seleccionarFiltro = (estado) => {
+    setFiltroEstado(estado);
+    setPaginaPendientes(1);
+    setPaginaEntregados(1);
+  };
+
+  const cambiarBusqueda = (value) => {
+    setBusqueda(value);
+    setPaginaPendientes(1);
+    setPaginaEntregados(1);
+  };
 
   const entregables = useMemo(() => paquetes.filter((p) => p.estado === 'pendiente'), [paquetes]);
   const entregados = useMemo(() => paquetes.filter((p) => p.estado === 'entregado'), [paquetes]);
@@ -134,13 +144,13 @@ export default function PanelPaquetes({ usuarioApp }) {
 
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
-          <button className={`app-btn text-xs ${filtroEstado === 'pendiente' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('pendiente')}>Pendientes</button>
-          <button className={`app-btn text-xs ${filtroEstado === 'entregado' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('entregado')}>Entregados</button>
-          <button className={`app-btn text-xs ${filtroEstado === 'todos' ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => setFiltroEstado('todos')}>Todos</button>
+          <button className={`app-btn text-xs ${filtroEstado === 'pendiente' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro('pendiente')}>Pendientes</button>
+          <button className={`app-btn text-xs ${filtroEstado === 'entregado' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro('entregado')}>Entregados</button>
+          <button className={`app-btn text-xs ${filtroEstado === 'todos' ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro('todos')}>Todos</button>
         </div>
 
         <div className="grid md:grid-cols-[1fr_auto] gap-2">
-          <input className="app-input" placeholder="Buscar por descripción, torre o apartamento" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          <input className="app-input" placeholder="Buscar por descripción, torre o apartamento" value={busqueda} onChange={(e) => cambiarBusqueda(e.target.value)} />
           <button className="app-btn-ghost" onClick={obtenerPaquetes}>Buscar</button>
         </div>
       </div>
@@ -199,7 +209,7 @@ export default function PanelPaquetes({ usuarioApp }) {
           )}
           {entregadosRecientes.length >= ENTREGADOS_RECIENTES && (
             <div className="pt-1">
-              <button className="app-btn-ghost text-xs" onClick={() => setFiltroEstado('entregado')}>Ver historial completo</button>
+              <button className="app-btn-ghost text-xs" onClick={() => seleccionarFiltro('entregado')}>Ver historial completo</button>
             </div>
           )}
         </div>

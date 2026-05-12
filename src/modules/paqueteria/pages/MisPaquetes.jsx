@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { parsearCategoriaDesdeDescripcion } from '../services/paquetesService';
 import PaqueteCard from '../components/PaqueteCard';
@@ -13,8 +13,9 @@ export default function MisPaquetes({ usuarioApp }) {
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
 
-  const obtenerPaquetes = async (usuarioId) => {
+  const obtenerPaquetes = useCallback(async (usuarioId) => {
     if (!usuarioId) return;
+    await Promise.resolve();
     setLoading(true);
 
     const { data: residentesRows } = await supabase
@@ -38,12 +39,12 @@ export default function MisPaquetes({ usuarioApp }) {
 
     setPaquetes(data || []);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (!usuarioApp?.id) return;
-    obtenerPaquetes(usuarioApp.id);
-  }, [usuarioApp?.id]);
+    Promise.resolve().then(() => obtenerPaquetes(usuarioApp.id));
+  }, [obtenerPaquetes, usuarioApp?.id]);
 
   useEffect(() => {
     if (!usuarioApp?.id) return undefined;
@@ -77,7 +78,7 @@ export default function MisPaquetes({ usuarioApp }) {
       window.removeEventListener('paqueteria:changed', onChanged);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [usuarioApp?.id]);
+  }, [obtenerPaquetes, usuarioApp?.id]);
 
   const paquetesNormalizados = useMemo(
     () => paquetes.map((raw) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
     cambiarEstadoReserva,
@@ -22,13 +22,15 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
     const [hasNextHistorial, setHasNextHistorial] = useState(false);
     const [accionesLoading, setAccionesLoading] = useState({});
     const [highlightReservaId, setHighlightReservaId] = useState(null);
+    const conjuntoId = usuarioApp?.conjunto_id;
 
-    const cargarOperativas = async () => {
-        if (!usuarioApp?.conjunto_id) return;
+    const cargarOperativas = useCallback(async () => {
+        if (!conjuntoId) return;
+        await Promise.resolve();
         setLoadingOperativas(true);
 
         const resp = await listarReservas({
-            conjunto_id: usuarioApp.conjunto_id,
+            conjunto_id: conjuntoId,
             estados: ['aprobada', 'en_curso'],
             limit: 80
         });
@@ -38,15 +40,16 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
 
         setReservas(resp.data || []);
         setHasNextHistorial(false);
-    };
+    }, [conjuntoId]);
 
-    const cargarHistorico = async (pagina) => {
-        if (!usuarioApp?.conjunto_id) return;
+    const cargarHistorico = useCallback(async (pagina) => {
+        if (!conjuntoId) return;
+        await Promise.resolve();
         setLoadingHistorial(true);
 
         const offset = (pagina - 1) * HISTORIAL_PAGE_SIZE;
         const resp = await listarReservas({
-            conjunto_id: usuarioApp.conjunto_id,
+            conjunto_id: conjuntoId,
             estados: ['aprobada', 'en_curso', 'finalizada', 'no_show'],
             limit: HISTORIAL_PAGE_SIZE + 1,
             offset
@@ -59,23 +62,23 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         const haySiguiente = data.length > HISTORIAL_PAGE_SIZE;
         setReservas(haySiguiente ? data.slice(0, HISTORIAL_PAGE_SIZE) : data);
         setHasNextHistorial(haySiguiente);
-    };
+    }, [conjuntoId]);
 
     useEffect(() => {
-        if (!usuarioApp?.conjunto_id) return;
+        if (!conjuntoId) return;
 
         if (filtroEstado === 'operativas') {
-            cargarOperativas();
+            Promise.resolve().then(() => cargarOperativas());
             return;
         }
 
-        cargarHistorico(paginaHistorial);
-    }, [usuarioApp?.conjunto_id, filtroEstado, paginaHistorial]);
+        Promise.resolve().then(() => cargarHistorico(paginaHistorial));
+    }, [cargarHistorico, cargarOperativas, conjuntoId, filtroEstado, paginaHistorial]);
 
     useEffect(() => {
-        if (!usuarioApp?.conjunto_id || filtroEstado !== 'operativas') return undefined;
-        return subscribeReservasConjunto(usuarioApp.conjunto_id, () => cargarOperativas());
-    }, [usuarioApp?.conjunto_id, filtroEstado]);
+        if (!conjuntoId || filtroEstado !== 'operativas') return undefined;
+        return subscribeReservasConjunto(conjuntoId, () => cargarOperativas());
+    }, [cargarOperativas, conjuntoId, filtroEstado]);
 
     const estadoLabel = (estado) => {
         if (estado === 'aprobada') return 'Lista para ingreso';
@@ -126,7 +129,7 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
             return;
         }
 
-        cargarHistorico(paginaHistorial);
+        Promise.resolve().then(() => cargarHistorico(paginaHistorial));
     };
 
     const cambiarVista = (vista) => {

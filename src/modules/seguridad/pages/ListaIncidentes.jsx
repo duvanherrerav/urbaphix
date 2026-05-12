@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
 import {
@@ -48,7 +48,10 @@ export default function ListaIncidentes({ usuarioApp }) {
   const [editFieldErrors, setEditFieldErrors] = useState({});
   const PAGE_SIZE = 5;
 
-  const getEstadoVisible = (incidente) => incidente.estado || getEstadoActual(estadosLocal, incidente.id);
+  const getEstadoVisible = useCallback(
+    (incidente) => incidente.estado || getEstadoActual(estadosLocal, incidente.id),
+    [estadosLocal]
+  );
 
   useEffect(() => {
     const cargar = async () => {
@@ -185,7 +188,7 @@ export default function ListaIncidentes({ usuarioApp }) {
       const db = new Date(b.created_at || 0).getTime();
       return db - da;
     });
-  }, [incidentes, estadosLocal, filtroEstado, busqueda]);
+  }, [incidentes, getEstadoVisible, filtroEstado, busqueda]);
 
   const totalPaginas = Math.max(1, Math.ceil(lista.length / PAGE_SIZE));
   const paginaActual = Math.min(pagina, totalPaginas);

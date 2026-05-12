@@ -7,7 +7,8 @@ export default function NotificacionesPaquetes({ usuarioApp }) {
 
   useEffect(() => {
 
-    if (!usuarioApp) return;
+    const usuarioId = usuarioApp?.id;
+    if (!usuarioId) return;
 
     let channel = null;
 
@@ -17,15 +18,13 @@ export default function NotificacionesPaquetes({ usuarioApp }) {
       const { data: residentesRows } = await supabase
         .from('residentes')
         .select('id')
-        .eq('usuario_id', usuarioApp.id)
+        .eq('usuario_id', usuarioId)
         .limit(1);
       const residente = residentesRows?.[0] || null;
 
       if (!residente) return;
 
       const residenteId = residente.id;
-
-      console.log("👤 Residente ID:", residenteId);
 
       channel = supabase
         .channel('paquetes-realtime')
@@ -37,8 +36,6 @@ export default function NotificacionesPaquetes({ usuarioApp }) {
             table: 'paquetes'
           },
           (payload) => {
-
-            console.log("📦 EVENTO:", payload);
 
             const paquete = payload.new;
 
