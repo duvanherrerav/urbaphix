@@ -284,6 +284,7 @@ Uso frontend:
 - Fallback de panel deriva residentes por `conjunto_id` antes de consultar visitantes/registros.
 - Notificación push de `EscanearQR` reconsulta residente con `residente_id` y `conjunto_id` de la visita.
 - RLS de `registro_visitas_update_vigilancia_admin` fue endurecida en migración QA para exigir rol `vigilancia|admin` y mismo `conjunto_id`.
+- El rol oficial para el panel de vigilancia es `vigilancia`; `vigilante` es drift histórico/legacy y no debe usarse porque no satisface las políticas/RBAC que evalúan `fn_auth_rol() = 'vigilancia'`.
 
 ### Riesgos
 

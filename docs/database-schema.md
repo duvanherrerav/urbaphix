@@ -701,6 +701,14 @@ Tablas detectadas en `public`:
 - `id` (text, NOT NULL)
 - `nombre` (text, NOT NULL)
 
+### Valores oficiales
+- `admin`: administración del conjunto.
+- `residente`: usuario residente.
+- `vigilancia`: operación de accesos, paquetes, visitas, reservas e incidentes. Es el único valor válido para el rol de vigilancia en RBAC/RLS.
+
+### Valores legacy/no válidos
+- `vigilante`: drift histórico/legacy observado en seeds/ambientes. No debe usarse como rol válido; si existe en datos, debe normalizarse a `vigilancia` mediante migración revisable.
+
 ### Relaciones
 - `usuarios_app.rol_id` → `roles.id`
 
@@ -937,6 +945,8 @@ Patrones de control vistos en las políticas:
 - `residente`
 - `authenticated`
 - `public`
+
+`vigilancia` es el identificador canónico para el personal de portería/vigilancia. `vigilante` no es un rol válido; corresponde a drift histórico y debe migrarse a `vigilancia` si aparece en `roles.id` o `usuarios_app.rol_id`.
 
 ## Funciones usadas en políticas
 - `auth.uid()`
