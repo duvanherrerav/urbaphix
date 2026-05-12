@@ -67,6 +67,8 @@ Esto duplica vocabulario técnico. La recomendación es usar `fn_auth_*` como AP
 
 No hay una definición versionada local que establezca `administrador` como rol oficial. El uso de `administrador` observado en QA debe tratarse como drift a corregir, no como nuevo estándar.
 
+El rol operativo de vigilancia sí debe quedar estandarizado como `vigilancia`. El valor `vigilante` fue detectado como drift histórico/legacy en seeds/ambientes y no debe aceptarse como rol válido para RBAC/RLS.
+
 ### Estructura de `roles`
 
 La tabla `public.roles` tiene:
@@ -82,7 +84,8 @@ El drift se origina por tres inconsistencias:
 
 1. **RLS de `conjuntos` no alineado:** dev no tiene RLS activo y QA sí. Esto significa que el frontend puede depender involuntariamente de lecturas amplias en dev que fallan en QA.
 2. **Rol administrador no unificado:** dev usa `admin`; QA usa `administrador` en políticas de `torres` y `apartamentos`. Como los helpers retornan `usuarios_app.rol_id`, cualquier usuario con `rol_id = 'admin'` fallará contra políticas que esperan `'administrador'`.
-3. **Helpers duplicados:** `fn_auth_*` y `get_user_*` retornan la misma información, pero mezclar ambos aumenta la probabilidad de políticas divergentes.
+3. **Rol vigilancia no unificado en seeds:** el frontend/RBAC y las políticas usan `vigilancia`, pero el seed local creaba `vigilante`. Ese valor legacy provoca que usuarios de portería no pasen las validaciones basadas en `fn_auth_rol() = 'vigilancia'`.
+4. **Helpers duplicados:** `fn_auth_*` y `get_user_*` retornan la misma información, pero mezclar ambos aumenta la probabilidad de políticas divergentes.
 
 ## Modelo oficial recomendado para roles
 
@@ -106,6 +109,8 @@ Razones:
 | `vigilancia` | Operación de accesos, paquetes, visitas e incidentes según políticas existentes. |
 
 `administrador` debe quedar como alias histórico no recomendado. Si existen filas con `usuarios_app.rol_id = 'administrador'`, deben normalizarse a `admin` mediante script validado y con respaldo antes de endurecer políticas.
+
+`vigilante` debe quedar como valor legacy/incorrecto, no como alias funcional. Si existen filas con `usuarios_app.rol_id = 'vigilante'` o un registro `roles.id = 'vigilante'`, deben normalizarse a `vigilancia`; el catálogo legacy puede eliminarse solo cuando no esté referenciado.
 
 ## Políticas RLS recomendadas
 
@@ -251,10 +256,12 @@ commit;
 
 Se agregó la migración revisable `supabase/migrations/20260511120000_normalizar_rls_roles_core.sql` para convertir la propuesta documentada en SQL versionado. Debe revisarse y validarse manualmente antes de aplicarla en cualquier ambiente remoto.
 
+También se agregó `supabase/migrations/20260512120000_normalizar_rol_vigilancia.sql` para asegurar `roles.id = 'vigilancia'`, migrar usuarios con `rol_id = 'vigilante'` y eliminar el rol legacy solo si queda sin referencias.
+
 ## Riesgos de aplicar la migración
 
 1. **Ruptura por RLS sin políticas suficientes:** si se activa RLS en `conjuntos` o `roles` sin políticas compatibles con el frontend, las consultas pueden dejar de devolver filas.
-2. **Usuarios con rol histórico:** si existen usuarios con `rol_id = 'administrador'`, al estandarizar políticas en `admin` perderán permisos hasta normalizar datos.
+2. **Usuarios con rol histórico:** si existen usuarios con `rol_id = 'administrador'`, al estandarizar políticas en `admin` perderán permisos hasta normalizar datos. Si existen usuarios con `rol_id = 'vigilante'`, no tendrán acceso operativo hasta migrarlos a `vigilancia`.
 3. **Dependencias frontend no inventariadas:** formularios o pantallas que lean `roles` o `conjuntos` antes de que exista `usuarios_app` pueden fallar.
 4. **Policies `FOR ALL`:** aunque simplifican, combinan `SELECT/INSERT/UPDATE/DELETE`. Para producción conviene separar por operación si se requiere auditoría fina.
 5. **Grants amplios existentes:** la migración base concede `ALL` sobre tablas a `anon`/`authenticated` en varios casos. RLS mitiga acceso por fila, pero no sustituye una revisión de grants.
@@ -269,6 +276,7 @@ Ejecutar consultas read-only en cada ambiente:
 ```sql
 select id, nombre from public.roles order by id;
 select rol_id, count(*) from public.usuarios_app group by rol_id order by rol_id;
+select id, email, rol_id from public.usuarios_app where rol_id in ('administrador', 'vigilante') order by created_at, id;
 select count(*) as usuarios_sin_conjunto from public.usuarios_app where conjunto_id is null;
 select count(*) as torres_sin_conjunto from public.torres where conjunto_id is null;
 select count(*) as apartamentos_sin_conjunto from public.apartamentos where conjunto_id is null;
@@ -279,7 +287,7 @@ Criterio para avanzar: no debe haber roles inesperados ni filas críticas sin `c
 ### Fase 1: dev
 
 1. Confirmar que `admin`, `residente` y `vigilancia` existen en `public.roles`.
-2. Normalizar datos de prueba si aparece `administrador`.
+2. Normalizar datos de prueba si aparece `administrador` o `vigilante`.
 3. Aplicar la migración propuesta en dev.
 4. Validar pantallas de estructura: carga de conjunto, torres y apartamentos; creación/edición por admin; lectura por residente/vigilancia si aplica.
 5. Validar que usuarios de un conjunto no vean datos de otro conjunto.

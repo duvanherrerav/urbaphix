@@ -7,7 +7,7 @@ insert into public.roles (id, nombre)
 values ('superadmin', 'Super Administrador'),
   ('admin', 'Administrador'),
   ('residente', 'Residente'),
-  ('vigilante', 'Vigilancia'),
+  ('vigilancia', 'Vigilancia'),
   ('contador', 'Contador'),
   ('auditor', 'Auditor') on conflict (id) do
 update
