@@ -261,29 +261,45 @@ export const listarPaquetesConDetalle = async ({ conjunto_id, estado = 'todos', 
   }
 };
 
-export const entregarPaquete = async (paquete_id) => {
+export const entregarPaquete = async (paquete_id, contexto = {}) => {
   try {
     if (!paquete_id) {
       throw new Error('Paquete inválido');
     }
 
-    const { data: paquete, error: errorPaquete } = await supabase
+    const conjuntoId = contexto?.conjunto_id || null;
+    if (!conjuntoId) {
+      console.warn('entregarPaquete: conjunto_id no disponible; se mantiene respaldo por RLS', { paquete_id });
+    }
+
+    let paqueteQuery = supabase
       .from('paquetes')
       .select('*')
-      .eq('id', paquete_id)
-      .single();
+      .eq('id', paquete_id);
+
+    if (conjuntoId) {
+      paqueteQuery = paqueteQuery.eq('conjunto_id', conjuntoId);
+    }
+
+    const { data: paquete, error: errorPaquete } = await paqueteQuery.single();
 
     if (errorPaquete || !paquete) {
       throw new Error(errorMessage(errorPaquete, 'No se encontró el paquete'));
     }
 
-    const { error: errorUpdate } = await supabase
+    let updateQuery = supabase
       .from('paquetes')
       .update({
         estado: 'entregado',
         fecha_entrega: new Date().toISOString()
       })
       .eq('id', paquete_id);
+
+    if (conjuntoId) {
+      updateQuery = updateQuery.eq('conjunto_id', conjuntoId);
+    }
+
+    const { error: errorUpdate } = await updateQuery;
 
     if (errorUpdate) {
       throw new Error(errorMessage(errorUpdate, 'No se pudo actualizar el estado del paquete'));
