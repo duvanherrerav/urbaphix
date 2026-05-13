@@ -67,6 +67,26 @@ const resolverApartamentoId = async ({ apartamento_id, apartamento_numero, torre
   return matches[0]?.id || null;
 };
 
+const crearNotificacionPaquete = async ({ contexto, usuarioId, notificacion, sinUsuarioMeta = {} }) => {
+  if (!usuarioId) {
+    console.warn(`${contexto}: residente sin usuario_id para notificación`, sinUsuarioMeta);
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from('notificaciones').insert([{
+      usuario_id: usuarioId,
+      ...notificacion
+    }]);
+
+    if (error) {
+      console.warn(`${contexto}: no se pudo crear notificación`, error);
+    }
+  } catch (error) {
+    console.warn(`${contexto}: error inesperado al crear notificación`, error);
+  }
+};
+
 const resolverUsuarioResidente = async ({ residente_id, apartamento_id }) => {
   if (residente_id) {
     const { data: residente, error } = await supabase
@@ -149,18 +169,21 @@ export const registrarPaquete = async (data, user) => {
     }
 
     // 🔔 Notificación
-    const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
-      usuario_id: residenteTarget.usuario_id,
-      tipo: categoria === 'servicio_publico' ? 'servicio_publico_recibido' : 'paquete_recibido',
-      titulo: categoria === 'servicio_publico' ? 'Tienes un servicio público por reclamar' : 'Tienes un paquete',
-      mensaje: categoria === 'servicio_publico'
-        ? `Llegó un servicio público (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'}) a portería`
-        : `Un paquete ha llegado a portería (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'})`
-    }]);
-
-    if (errorNotificacion) {
-      console.warn('registrarPaquete: no se pudo crear notificación', errorNotificacion);
-    }
+    await crearNotificacionPaquete({
+      contexto: 'registrarPaquete',
+      usuarioId: residenteTarget.usuario_id,
+      sinUsuarioMeta: {
+        residente_id: residenteTarget.id,
+        paquete_id: paquete.id
+      },
+      notificacion: {
+        tipo: categoria === 'servicio_publico' ? 'servicio_publico_recibido' : 'paquete_recibido',
+        titulo: categoria === 'servicio_publico' ? 'Tienes un servicio público por reclamar' : 'Tienes un paquete',
+        mensaje: categoria === 'servicio_publico'
+          ? `Llegó un servicio público (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'}) a portería`
+          : `Un paquete ha llegado a portería (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'})`
+      }
+    });
 
     return { ok: true, paquete, error: null };
   } catch (error) {
@@ -281,21 +304,20 @@ export const entregarPaquete = async (paquete_id) => {
 
       if (errorResidente) {
         console.warn('entregarPaquete: no se pudo consultar residente para notificación', errorResidente);
-      } else if (!residente?.usuario_id) {
-        console.warn('entregarPaquete: residente sin usuario_id para notificación', {
-          residente_id: paquete.residente_id
-        });
       } else {
-        const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
-          usuario_id: residente.usuario_id,
-          tipo: 'paquete_entregado',
-          titulo: 'Paquete entregado',
-          mensaje: 'Tu paquete fue entregado correctamente'
-        }]);
-
-        if (errorNotificacion) {
-          console.warn('entregarPaquete: no se pudo crear notificación', errorNotificacion);
-        }
+        await crearNotificacionPaquete({
+          contexto: 'entregarPaquete',
+          usuarioId: residente?.usuario_id,
+          sinUsuarioMeta: {
+            residente_id: paquete.residente_id,
+            paquete_id
+          },
+          notificacion: {
+            tipo: 'paquete_entregado',
+            titulo: 'Paquete entregado',
+            mensaje: 'Tu paquete fue entregado correctamente'
+          }
+        });
       }
     } else {
       console.warn('entregarPaquete: paquete sin residente_id para notificación', { paquete_id });
