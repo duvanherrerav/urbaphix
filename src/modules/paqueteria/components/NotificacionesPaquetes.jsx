@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import toast from 'react-hot-toast';
 import { parsearCategoriaDesdeDescripcion } from '../services/paquetesService';
+import { ESTADOS_PAQUETE } from '../services/estadosPaquete';
 
 const NOTIFICATION_DEBOUNCE_MS = 250;
 
@@ -104,8 +105,8 @@ export default function NotificacionesPaquetes({ usuarioApp }) {
             // 🔵 PAQUETE ENTREGADO
             if (
               payload.eventType === 'UPDATE' &&
-              payload.old?.estado !== 'entregado' &&
-              paquete.estado === 'entregado'
+              payload.old?.estado !== ESTADOS_PAQUETE.ENTREGADO &&
+              paquete.estado === ESTADOS_PAQUETE.ENTREGADO
             ) {
               scheduleNotification(`entregado-${paquete.id}`, () => {
                 if (puedeMostrarNotificacionNavegador()) {

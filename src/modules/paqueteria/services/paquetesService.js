@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { ESTADOS_PAQUETE, FILTROS_PAQUETE, normalizarEstadoPaquete } from './estadosPaquete';
 
 const errorMessage = (error, fallback) => error?.message || fallback;
 const TAG_SERVICIO_PUBLICO = '[SERVICIO_PUBLICO]';
@@ -159,7 +160,7 @@ export const registrarPaquete = async (data, user) => {
         residente_id: residenteTarget.id,
         descripcion: descripcionPersistida,
         recibido_por: user.id,
-        estado: 'pendiente'
+        estado: ESTADOS_PAQUETE.PENDIENTE
       }])
       .select()
       .single();
@@ -192,7 +193,7 @@ export const registrarPaquete = async (data, user) => {
   }
 };
 
-export const listarPaquetesConDetalle = async ({ conjunto_id, estado = 'todos', busqueda = '' }) => {
+export const listarPaquetesConDetalle = async ({ conjunto_id, estado = FILTROS_PAQUETE.TODOS, busqueda = '' }) => {
   try {
     if (!conjunto_id) throw new Error('Conjunto no especificado');
 
@@ -202,8 +203,8 @@ export const listarPaquetesConDetalle = async ({ conjunto_id, estado = 'todos', 
       .eq('conjunto_id', conjunto_id)
       .order('fecha_recibido', { ascending: false });
 
-    const estadoNormalizado = String(estado || 'todos').toLowerCase();
-    if (estadoNormalizado !== 'todos') {
+    const estadoNormalizado = normalizarEstadoPaquete(estado || FILTROS_PAQUETE.TODOS);
+    if (estadoNormalizado !== FILTROS_PAQUETE.TODOS) {
       query = query.eq('estado', estadoNormalizado);
     }
 
@@ -290,7 +291,7 @@ export const entregarPaquete = async (paquete_id, contexto = {}) => {
     let updateQuery = supabase
       .from('paquetes')
       .update({
-        estado: 'entregado',
+        estado: ESTADOS_PAQUETE.ENTREGADO,
         fecha_entrega: new Date().toISOString()
       })
       .eq('id', paquete_id);
