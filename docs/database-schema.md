@@ -94,7 +94,18 @@ Tablas detectadas en `public`:
 - `torre_id` → `torres.id`
 
 ### RLS
-- No visible en los TXT cargados
+- `apartamentos_select_conjunto`
+  - comando: `SELECT`
+  - condición: `conjunto_id = fn_auth_conjunto_id()`
+- `apartamentos_admin_insert`
+  - comando: `INSERT`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `apartamentos_admin_update`
+  - comando: `UPDATE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `apartamentos_admin_delete`
+  - comando: `DELETE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
 
 ---
 
@@ -177,7 +188,10 @@ Tablas detectadas en `public`:
 - tabla padre de múltiples módulos
 
 ### RLS
-- No visible en los TXT cargados
+- `conjuntos_select_conjunto`
+  - comando: `SELECT`
+  - condición: `id = fn_auth_conjunto_id()`
+- Sin políticas de escritura para clientes `anon`/`authenticated`; las escrituras deben realizarse por `service_role` o backend administrativo aprobado.
 
 ---
 
@@ -687,11 +701,22 @@ Tablas detectadas en `public`:
 - `id` (text, NOT NULL)
 - `nombre` (text, NOT NULL)
 
+### Valores oficiales
+- `admin`: administración del conjunto.
+- `residente`: usuario residente.
+- `vigilancia`: operación de accesos, paquetes, visitas, reservas e incidentes. Es el único valor válido para el rol de vigilancia en RBAC/RLS.
+
+### Valores legacy/no válidos
+- `vigilante`: drift histórico/legacy observado en seeds/ambientes. No debe usarse como rol válido; si existe en datos, debe normalizarse a `vigilancia` mediante migración revisable.
+
 ### Relaciones
 - `usuarios_app.rol_id` → `roles.id`
 
 ### RLS
-- No visible en los TXT cargados
+- `roles_select_authenticated`
+  - comando: `SELECT`
+  - condición: `true` para usuarios autenticados
+- Sin políticas de escritura para clientes `anon`/`authenticated`; el catálogo se administra por migraciones o consola protegida.
 
 ---
 
@@ -728,7 +753,18 @@ Tablas detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- No visible en los TXT cargados
+- `torres_select_conjunto`
+  - comando: `SELECT`
+  - condición: `conjunto_id = fn_auth_conjunto_id()`
+- `torres_admin_insert`
+  - comando: `INSERT`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `torres_admin_update`
+  - comando: `UPDATE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
+- `torres_admin_delete`
+  - comando: `DELETE`
+  - condición: rol `admin` y mismo `conjunto_id` vía `fn_auth_rol()` y `fn_auth_conjunto_id()`
 
 ---
 
@@ -909,6 +945,8 @@ Patrones de control vistos en las políticas:
 - `residente`
 - `authenticated`
 - `public`
+
+`vigilancia` es el identificador canónico para el personal de portería/vigilancia. `vigilante` no es un rol válido; corresponde a drift histórico y debe migrarse a `vigilancia` si aparece en `roles.id` o `usuarios_app.rol_id`.
 
 ## Funciones usadas en políticas
 - `auth.uid()`

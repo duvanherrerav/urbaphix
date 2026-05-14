@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { ESTADOS_PAQUETE, normalizarEstadoPaquete } from '../services/estadosPaquete';
 
 const formatFechaCO = (value) => {
   if (!value) return null;
@@ -12,9 +13,9 @@ const formatFechaCO = (value) => {
 };
 
 const mapEstado = (estado) => {
-  const key = String(estado || '').toLowerCase();
+  const key = normalizarEstadoPaquete(estado);
 
-  if (key === 'pendiente') {
+  if (key === ESTADOS_PAQUETE.PENDIENTE) {
     return {
       key,
       label: 'Pendiente',
@@ -23,7 +24,7 @@ const mapEstado = (estado) => {
     };
   }
 
-  if (key === 'entregado') {
+  if (key === ESTADOS_PAQUETE.ENTREGADO) {
     return {
       key,
       label: 'Entregado',
@@ -43,14 +44,14 @@ const mapEstado = (estado) => {
 const buildDetalleTimeline = ({ estadoKey, recibido, entregado }) => {
   const recibidoDescription = recibido ? `Recibido el ${recibido}` : 'Recepción sin fecha registrada';
 
-  if (estadoKey === 'pendiente') {
+  if (estadoKey === ESTADOS_PAQUETE.PENDIENTE) {
     return [
       { title: 'Paquete registrado', description: recibidoDescription, state: 'done' },
       { title: 'Pendiente de entrega', description: 'Esperando confirmación', state: 'current' }
     ];
   }
 
-  if (estadoKey === 'entregado') {
+  if (estadoKey === ESTADOS_PAQUETE.ENTREGADO) {
     return [
       { title: 'Paquete registrado', description: recibidoDescription, state: 'done' },
       {

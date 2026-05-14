@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { ESTADOS_PAQUETE, FILTROS_PAQUETE, normalizarEstadoPaquete } from './estadosPaquete';
 
 const errorMessage = (error, fallback) => error?.message || fallback;
 const TAG_SERVICIO_PUBLICO = '[SERVICIO_PUBLICO]';
@@ -65,6 +66,26 @@ const resolverApartamentoId = async ({ apartamento_id, apartamento_numero, torre
   const matches = fallbackAptos.filter((a) => normalizarTokenApto(a.numero) === token);
   if (matches.length > 1) throw new Error('Apartamento ambiguo. Ajusta torre o escribe mejor el número.');
   return matches[0]?.id || null;
+};
+
+const crearNotificacionPaquete = async ({ contexto, usuarioId, notificacion, sinUsuarioMeta = {} }) => {
+  if (!usuarioId) {
+    console.warn(`${contexto}: residente sin usuario_id para notificación`, sinUsuarioMeta);
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from('notificaciones').insert([{
+      usuario_id: usuarioId,
+      ...notificacion
+    }]);
+
+    if (error) {
+      console.warn(`${contexto}: no se pudo crear notificación`, error);
+    }
+  } catch (error) {
+    console.warn(`${contexto}: error inesperado al crear notificación`, error);
+  }
 };
 
 const resolverUsuarioResidente = async ({ residente_id, apartamento_id }) => {
@@ -139,7 +160,7 @@ export const registrarPaquete = async (data, user) => {
         residente_id: residenteTarget.id,
         descripcion: descripcionPersistida,
         recibido_por: user.id,
-        estado: 'pendiente'
+        estado: ESTADOS_PAQUETE.PENDIENTE
       }])
       .select()
       .single();
@@ -149,18 +170,21 @@ export const registrarPaquete = async (data, user) => {
     }
 
     // 🔔 Notificación
-    const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
-      usuario_id: residenteTarget.usuario_id,
-      tipo: categoria === 'servicio_publico' ? 'servicio_publico_recibido' : 'paquete_recibido',
-      titulo: categoria === 'servicio_publico' ? 'Tienes un servicio público por reclamar' : 'Tienes un paquete',
-      mensaje: categoria === 'servicio_publico'
-        ? `Llegó un servicio público (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'}) a portería`
-        : `Un paquete ha llegado a portería (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'})`
-    }]);
-
-    if (errorNotificacion) {
-      console.warn('registrarPaquete: no se pudo crear notificación', errorNotificacion);
-    }
+    await crearNotificacionPaquete({
+      contexto: 'registrarPaquete',
+      usuarioId: residenteTarget.usuario_id,
+      sinUsuarioMeta: {
+        residente_id: residenteTarget.id,
+        paquete_id: paquete.id
+      },
+      notificacion: {
+        tipo: categoria === 'servicio_publico' ? 'servicio_publico_recibido' : 'paquete_recibido',
+        titulo: categoria === 'servicio_publico' ? 'Tienes un servicio público por reclamar' : 'Tienes un paquete',
+        mensaje: categoria === 'servicio_publico'
+          ? `Llegó un servicio público (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'}) a portería`
+          : `Un paquete ha llegado a portería (${parsearCategoriaDesdeDescripcion(descripcionPersistida).descripcion || 'sin descripción'})`
+      }
+    });
 
     return { ok: true, paquete, error: null };
   } catch (error) {
@@ -169,7 +193,7 @@ export const registrarPaquete = async (data, user) => {
   }
 };
 
-export const listarPaquetesConDetalle = async ({ conjunto_id, estado = 'todos', busqueda = '' }) => {
+export const listarPaquetesConDetalle = async ({ conjunto_id, estado = FILTROS_PAQUETE.TODOS, busqueda = '' }) => {
   try {
     if (!conjunto_id) throw new Error('Conjunto no especificado');
 
@@ -179,8 +203,8 @@ export const listarPaquetesConDetalle = async ({ conjunto_id, estado = 'todos', 
       .eq('conjunto_id', conjunto_id)
       .order('fecha_recibido', { ascending: false });
 
-    const estadoNormalizado = String(estado || 'todos').toLowerCase();
-    if (estadoNormalizado !== 'todos') {
+    const estadoNormalizado = normalizarEstadoPaquete(estado || FILTROS_PAQUETE.TODOS);
+    if (estadoNormalizado !== FILTROS_PAQUETE.TODOS) {
       query = query.eq('estado', estadoNormalizado);
     }
 
@@ -238,44 +262,82 @@ export const listarPaquetesConDetalle = async ({ conjunto_id, estado = 'todos', 
   }
 };
 
-export const entregarPaquete = async (paquete_id) => {
+export const entregarPaquete = async (paquete_id, contexto = {}) => {
   try {
     if (!paquete_id) {
       throw new Error('Paquete inválido');
     }
 
-    const { data: paquete, error: errorPaquete } = await supabase
+    const conjuntoId = contexto?.conjunto_id || null;
+    if (!conjuntoId) {
+      console.warn('entregarPaquete: conjunto_id no disponible; se mantiene respaldo por RLS', { paquete_id });
+    }
+
+    let paqueteQuery = supabase
       .from('paquetes')
       .select('*')
-      .eq('id', paquete_id)
-      .single();
+      .eq('id', paquete_id);
+
+    if (conjuntoId) {
+      paqueteQuery = paqueteQuery.eq('conjunto_id', conjuntoId);
+    }
+
+    const { data: paquete, error: errorPaquete } = await paqueteQuery.single();
 
     if (errorPaquete || !paquete) {
       throw new Error(errorMessage(errorPaquete, 'No se encontró el paquete'));
     }
 
-    const { error: errorUpdate } = await supabase
+    let updateQuery = supabase
       .from('paquetes')
       .update({
-        estado: 'entregado',
+        estado: ESTADOS_PAQUETE.ENTREGADO,
         fecha_entrega: new Date().toISOString()
       })
       .eq('id', paquete_id);
+
+    if (conjuntoId) {
+      updateQuery = updateQuery.eq('conjunto_id', conjuntoId);
+    }
+
+    const { error: errorUpdate } = await updateQuery;
 
     if (errorUpdate) {
       throw new Error(errorMessage(errorUpdate, 'No se pudo actualizar el estado del paquete'));
     }
 
     // 🔔 Notificación
-    const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
-      usuario_id: paquete.residente_id,
-      tipo: 'paquete_entregado',
-      titulo: 'Paquete entregado',
-      mensaje: 'Tu paquete fue entregado correctamente'
-    }]);
+    if (paquete.residente_id) {
+      let residenteQuery = supabase
+        .from('residentes')
+        .select('id, usuario_id')
+        .eq('id', paquete.residente_id);
 
-    if (errorNotificacion) {
-      console.warn('entregarPaquete: no se pudo crear notificación', errorNotificacion);
+      if (paquete.conjunto_id) {
+        residenteQuery = residenteQuery.eq('conjunto_id', paquete.conjunto_id);
+      }
+
+      const { data: residente, error: errorResidente } = await residenteQuery.maybeSingle();
+
+      if (errorResidente) {
+        console.warn('entregarPaquete: no se pudo consultar residente para notificación', errorResidente);
+      } else {
+        await crearNotificacionPaquete({
+          contexto: 'entregarPaquete',
+          usuarioId: residente?.usuario_id,
+          sinUsuarioMeta: {
+            residente_id: paquete.residente_id,
+            paquete_id
+          },
+          notificacion: {
+            tipo: 'paquete_entregado',
+            titulo: 'Paquete entregado',
+            mensaje: 'Tu paquete fue entregado correctamente'
+          }
+        });
+      }
+    } else {
+      console.warn('entregarPaquete: paquete sin residente_id para notificación', { paquete_id });
     }
 
     return { ok: true, paquete, error: null };

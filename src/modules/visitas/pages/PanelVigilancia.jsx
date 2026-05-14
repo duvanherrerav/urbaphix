@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
-import { calcularSLA, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, syncOfflineQueue } from '../services/porteriaService';
+import { calcularSLA, enqueueOfflineAction, esErrorConectividad, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, registrarIngresoVisitaRPC, registrarSalidaVisitaRPC, syncOfflineQueue } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
+import { useRealtimeConjuntoChannel } from '../../../hooks/useRealtimeConjuntoChannel';
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
@@ -123,23 +124,43 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const [modalIngreso, setModalIngreso] = useState({ open: false, visita: null, manualQR: '' });
 
+    const [realtimeConjuntoId, setRealtimeConjuntoId] = useState(usuarioApp?.conjunto_id || null);
+
     useEffect(() => {
         let mounted = true;
 
-        const cargar = async () => {
-            let conjuntoId = usuarioApp?.conjunto_id;
-            if (!conjuntoId) {
-                const { data: authData } = await supabase.auth.getUser();
-                const { data: usuarioDb } = await supabase
-                    .from('usuarios_app')
-                    .select('conjunto_id')
-                    .eq('id', authData?.user?.id)
-                    .single();
-                conjuntoId = usuarioDb?.conjunto_id || null;
-            }
-            if (!conjuntoId) return;
-            setLoading(true);
+        const resolverConjuntoId = async () => {
+            if (usuarioApp?.conjunto_id) return usuarioApp.conjunto_id;
 
+            const { data: authData } = await supabase.auth.getUser();
+            const userId = authData?.user?.id;
+            if (!userId) return null;
+
+            const { data: usuarioDb } = await supabase
+                .from('usuarios_app')
+                .select('conjunto_id')
+                .eq('id', userId)
+                .maybeSingle();
+
+            return usuarioDb?.conjunto_id || null;
+        };
+
+        resolverConjuntoId().then((conjuntoId) => {
+            if (mounted) setRealtimeConjuntoId(conjuntoId);
+        });
+
+        return () => {
+            mounted = false;
+        };
+    }, [usuarioApp?.conjunto_id]);
+
+    const cargar = useCallback(async (conjuntoId, { isActive } = {}) => {
+        if (!conjuntoId) return;
+
+        const requestIsActive = () => !isActive || isActive();
+        setLoading(true);
+
+        try {
             const [registroResp, seguridadResp] = await Promise.all([
                 supabase
                     .from('registro_visitas')
@@ -158,10 +179,9 @@ export default function PanelVigilancia({ usuarioApp }) {
                 obtenerSeguridadConsolidada(conjuntoId)
             ]);
 
-            if (!mounted) return;
+            if (!requestIsActive()) return;
             if (registroResp.error) {
                 toast.error('No se pudo cargar el registro de visitas');
-                setLoading(false);
                 return;
             }
 
@@ -196,6 +216,8 @@ export default function PanelVigilancia({ usuarioApp }) {
                     .order('fecha_visita', { ascending: false })
                 : { data: [] };
 
+            if (!requestIsActive()) return;
+
             const dedupe = new Map();
             [...registros, ...(registrosFallback || [])].forEach((row) => {
                 if (row?.id) dedupe.set(row.id, row);
@@ -205,6 +227,9 @@ export default function PanelVigilancia({ usuarioApp }) {
             const { data: visitantesData } = visitanteIds.length
                 ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
                 : { data: [] };
+
+            if (!requestIsActive()) return;
+
             const visitantesMap = new Map((visitantesData || []).map((v) => [v.id, v]));
 
             const mappedRegistro = registrosUsables.map((v) => {
@@ -230,21 +255,20 @@ export default function PanelVigilancia({ usuarioApp }) {
             setSeguridad(seguridadResp);
             const cola = getOfflineQueue();
             setOfflinePendientes(Array.isArray(cola) ? cola.length : 0);
-            setLoading(false);
-        };
+        } finally {
+            if (requestIsActive()) {
+                setLoading(false);
+            }
+        }
+    }, []);
 
-        cargar();
-
-        const channel = supabase
-            .channel(`registro-visitas-vigilancia-${usuarioApp?.conjunto_id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_visitas' }, cargar)
-            .subscribe();
-
-        return () => {
-            mounted = false;
-            supabase.removeChannel(channel);
-        };
-    }, [usuarioApp?.conjunto_id]);
+    useRealtimeConjuntoChannel({
+        conjuntoId: realtimeConjuntoId,
+        channelName: realtimeConjuntoId ? `registro-visitas-vigilancia-${realtimeConjuntoId}` : null,
+        table: 'registro_visitas',
+        onRefresh: cargar,
+        warningMessage: 'PanelVigilancia: error en subscription realtime de registro_visitas'
+    });
 
     const finalizarIngresoConQR = async (rawValue) => {
         const visitaObjetivo = modalIngreso.visita;
@@ -279,13 +303,25 @@ export default function PanelVigilancia({ usuarioApp }) {
         }
 
         const timestamp = toBogotaTimestamp();
-        const { error } = await supabase
-            .from('registro_visitas')
-            .update({ estado: 'ingresado', hora_ingreso: timestamp })
-            .eq('id', visitaObjetivo.id);
+        const { error } = await registrarIngresoVisitaRPC({
+            qrCode: visitaObjetivo.qr_code,
+            vigilanteId: usuarioApp?.id
+        });
 
         if (error) {
-            toast.error('No fue posible registrar el ingreso');
+            if (esErrorConectividad(error)) {
+                enqueueOfflineAction({
+                    type: 'visita_estado',
+                    visita_id: visitaObjetivo.id,
+                    qr_code: visitaObjetivo.qr_code,
+                    vigilante_id: usuarioApp?.id || null,
+                    payload: { estado: 'ingresado', hora_ingreso: timestamp }
+                });
+                setOfflinePendientes((prev) => prev + 1);
+                toast.error('Sin conexión estable. El ingreso quedó en cola de contingencia.');
+                return;
+            }
+            toast.error(error.message || 'No fue posible registrar el ingreso');
             return;
         }
 
@@ -302,10 +338,24 @@ export default function PanelVigilancia({ usuarioApp }) {
 
     const registrarSalida = async (id) => {
         const timestamp = toBogotaTimestamp();
-        const { error } = await supabase.from('registro_visitas').update({ estado: 'salido', hora_salida: timestamp }).eq('id', id);
+        const { error } = await registrarSalidaVisitaRPC({
+            registroId: id,
+            vigilanteId: usuarioApp?.id
+        });
 
         if (error) {
-            toast.error('Error al registrar salida');
+            if (esErrorConectividad(error)) {
+                enqueueOfflineAction({
+                    type: 'visita_estado',
+                    visita_id: id,
+                    vigilante_id: usuarioApp?.id || null,
+                    payload: { estado: 'salido', hora_salida: timestamp }
+                });
+                setOfflinePendientes((prev) => prev + 1);
+                toast.error('Sin conexión estable. La salida quedó en cola de contingencia.');
+                return;
+            }
+            toast.error(error.message || 'Error al registrar salida');
             return;
         }
 
