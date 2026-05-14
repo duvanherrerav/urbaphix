@@ -5,6 +5,7 @@ import { supabase } from '../../../services/supabaseClient';
 import { calcularSLA, enqueueOfflineAction, esErrorConectividad, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, registrarIngresoVisitaRPC, registrarSalidaVisitaRPC, syncOfflineQueue } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import { useRealtimeConjuntoChannel } from '../../../hooks/useRealtimeConjuntoChannel';
+import { formatFechaHoraBogota, parseUtcTimestampToDate } from '../../../utils/dateFormatters';
 
 const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
@@ -35,23 +36,11 @@ const formatDateLabel = (value) => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) {
         return formatearFechaVisitaLocal(value);
     }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
+    const parsed = parseUtcTimestampToDate(value);
+    if (!parsed) return String(value);
     return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: 'short', year: 'numeric' });
 };
-const formatDateTimeLabel = (value) => {
-    if (!value) return '—';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-    return parsed.toLocaleString('es-CO', {
-        timeZone: 'America/Bogota',
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    });
-};
+const formatDateTimeLabel = (value) => formatFechaHoraBogota(value, '—');
 const formatUbicacion = (torre, apartamento) => {
     if (!torre || !apartamento) return 'Ubicación no disponible';
     const torreDigits = String(torre).replace(/\D/g, '');
@@ -61,14 +50,14 @@ const formatUbicacion = (torre, apartamento) => {
 };
 const minutesDiff = (value) => {
     if (!value) return 0;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return 0;
+    const parsed = parseUtcTimestampToDate(value);
+    if (!parsed) return 0;
     return Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 60000));
 };
 const bogotaDateOnlyFromTimestamp = (value) => {
     if (!value) return '';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '';
+    const parsed = parseUtcTimestampToDate(value);
+    if (!parsed) return '';
     return parsed.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 };
 const getBaseTimeForPendiente = (visita) => visita.created_at || (visita.fecha_visita ? `${visita.fecha_visita}T00:00:00-05:00` : null);
