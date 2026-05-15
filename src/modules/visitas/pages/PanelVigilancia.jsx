@@ -51,13 +51,14 @@ const getApartamentoUbicacion = (apartamento) => {
         apartamento: apto?.numero || null
     };
 };
+const extractDigits = (value) => String(value || '').replace(/\D/g, '');
 const formatUbicacion = (torre, apartamento) => {
-    const torreLabel = String(torre || '').trim();
-    const apartamentoLabel = String(apartamento || '').trim();
+    const torreDigits = extractDigits(torre);
+    const apartamentoDigits = extractDigits(apartamento);
 
-    if (!torreLabel || !apartamentoLabel) return 'Ubicación no disponible';
+    if (!torreDigits || !apartamentoDigits) return 'Ubicación no disponible';
 
-    return `${torreLabel} · Apto ${apartamentoLabel}`;
+    return `Torre y Apto: ${torreDigits}${apartamentoDigits}`;
 };
 const minutesDiff = (value) => {
     if (!value) return 0;
