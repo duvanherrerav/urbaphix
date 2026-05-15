@@ -1,16 +1,8 @@
 import { useId, useState } from 'react';
+import { formatFechaHoraBogota } from '../../../utils/dateFormatters';
 import { ESTADOS_PAQUETE, normalizarEstadoPaquete } from '../services/estadosPaquete';
 
-const formatFechaCO = (value) => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Intl.DateTimeFormat('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  }).format(parsed);
-};
+const formatFechaHoraPaquete = (value) => formatFechaHoraBogota(value, null);
 
 const mapEstado = (estado) => {
   const key = normalizarEstadoPaquete(estado);
@@ -72,8 +64,8 @@ export default function PaqueteCard({ paquete }) {
   const [detalleVisible, setDetalleVisible] = useState(false);
   const detalleId = useId();
   const estado = mapEstado(paquete.estado);
-  const recibido = formatFechaCO(paquete.fecha_recibido);
-  const entregado = formatFechaCO(paquete.fecha_entrega);
+  const recibido = formatFechaHoraPaquete(paquete.fecha_recibido);
+  const entregado = formatFechaHoraPaquete(paquete.fecha_entrega);
   const isServicio = paquete.categoria === 'servicio_publico';
   const tipoLabel = isServicio ? 'Servicio público' : 'Paquete';
   const descripcion = paquete.descripcion_visible || 'Paquete sin descripción';

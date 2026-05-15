@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
+import { formatFechaHoraBogota } from '../../../utils/dateFormatters';
 import { entregarPaquete as entregarPaqueteService, listarPaquetesConDetalle } from '../services/paquetesService';
 import { ESTADOS_PAQUETE, FILTROS_PAQUETE } from '../services/estadosPaquete';
 
 const ITEMS_POR_PAGINA = 10;
 const ENTREGADOS_RECIENTES = 3;
 
-const formatDateTime = (value) => {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '-';
-  return parsed.toLocaleString();
-};
+const formatDateTime = (value) => formatFechaHoraBogota(value, '-');
 
 const formatearUbicacion = (torre, apto) => {
   if (!torre || !apto) return 'Ubicación no disponible';
