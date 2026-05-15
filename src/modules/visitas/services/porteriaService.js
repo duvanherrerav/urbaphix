@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { parseUtcTimestampToDate } from '../../../utils/dateFormatters';
 import { validarEstadoParaIngresoQR } from './estadosVisita';
 
 const QUEUE_KEY = 'urbaphix_porteria_queue_v1';
@@ -110,12 +111,17 @@ export const calcularSLA = (visitas) => {
   }
 
   const minutos = muestras.map((v) => {
-    const fechaProgramada = v.fecha_visita || new Date(v.created_at).toISOString().slice(0, 10);
+    const createdAt = parseUtcTimestampToDate(v.created_at);
+    const horaIngreso = parseUtcTimestampToDate(v.hora_ingreso);
+
+    if (!createdAt || !horaIngreso) return 0;
+
+    const fechaProgramada = v.fecha_visita || createdAt.toISOString().slice(0, 10);
     const horaProgramada = v.hora_inicio || '00:00';
-    const inicioProgramado = new Date(`${fechaProgramada}T${horaProgramada}:00`).getTime();
-    const inicioCreacion = new Date(v.created_at).getTime();
+    const inicioProgramado = new Date(`${fechaProgramada}T${horaProgramada}:00-05:00`).getTime();
+    const inicioCreacion = createdAt.getTime();
     const inicio = Math.max(inicioCreacion, inicioProgramado);
-    const ingreso = new Date(v.hora_ingreso).getTime();
+    const ingreso = horaIngreso.getTime();
     return Math.max(0, Math.round((ingreso - inicio) / 60000));
   });
 
