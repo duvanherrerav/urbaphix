@@ -37,6 +37,7 @@ La estrategia se basa en la configuración versionada actual:
 - `.gitignore` excluye `.env` y `.env.*`, permitiendo versionar únicamente `.env.example`.
 - `vite.config.js` usa la salida estándar de Vite para build (`dist/`) porque no define `build.outDir` personalizado.
 - `docs/environments-hardening.md` define la separación esperada de ambientes DEV, QA y PROD.
+- `docs/release-candidate-checklist.md` define el checklist operativo RC-1 que debe cumplirse antes de abrir el PR futuro `qa` → `main`.
 
 ## Flujo de ramas
 
