@@ -5,9 +5,9 @@ import { supabase } from '../../../services/supabaseClient';
 import { calcularSLA, enqueueOfflineAction, esErrorConectividad, getOfflineQueue, obtenerSeguridadConsolidada, registrarBitacora, registrarIngresoVisitaRPC, registrarSalidaVisitaRPC, syncOfflineQueue } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import { useRealtimeConjuntoChannel } from '../../../hooks/useRealtimeConjuntoChannel';
-import { formatFechaHoraBogota, parseUtcTimestampToDate } from '../../../utils/dateFormatters';
+import { formatFechaHoraBogota, parseUtcTimestampToDate, toBogotaTimestampWithOffset } from '../../../utils/dateFormatters';
 
-const toBogotaTimestamp = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(' ', ' ');
+const toBogotaTimestamp = () => toBogotaTimestampWithOffset();
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
 const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
 const normalizeEstado = (estado) => {

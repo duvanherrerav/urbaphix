@@ -15,6 +15,26 @@ export const parseUtcTimestampToDate = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+
+export const toBogotaTimestampWithOffset = (date = new Date()) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: BOGOTA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+    .formatToParts(date)
+    .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {});
+
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}-05:00`;
+};
+
 export const formatFechaBogota = (value) => {
   const parsed = parseUtcTimestampToDate(value);
 
