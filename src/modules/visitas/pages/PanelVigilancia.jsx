@@ -41,12 +41,23 @@ const formatDateLabel = (value) => {
     return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: 'short', year: 'numeric' });
 };
 const formatDateTimeLabel = (value) => formatFechaHoraBogota(value, '—');
+const getRelatedOne = (value) => (Array.isArray(value) ? value[0] : value);
+const getApartamentoUbicacion = (apartamento) => {
+    const apto = getRelatedOne(apartamento);
+    const torre = getRelatedOne(apto?.torres);
+
+    return {
+        torre: torre?.nombre || null,
+        apartamento: apto?.numero || null
+    };
+};
 const formatUbicacion = (torre, apartamento) => {
-    if (!torre || !apartamento) return 'Ubicación no disponible';
-    const torreDigits = String(torre).replace(/\D/g, '');
-    const aptoDigits = String(apartamento).replace(/\D/g, '');
-    if (!torreDigits || !aptoDigits) return 'Ubicación no disponible';
-    return `Torre y Apto: ${torreDigits}${aptoDigits}`;
+    const torreLabel = String(torre || '').trim();
+    const apartamentoLabel = String(apartamento || '').trim();
+
+    if (!torreLabel || !apartamentoLabel) return 'Ubicación no disponible';
+
+    return `${torreLabel} · Apto ${apartamentoLabel}`;
 };
 const minutesDiff = (value) => {
     if (!value) return 0;
@@ -214,7 +225,21 @@ export default function PanelVigilancia({ usuarioApp }) {
             const registrosUsables = Array.from(dedupe.values());
             const visitanteIds = [...new Set(registrosUsables.map((r) => r.visitante_id).filter(Boolean))];
             const { data: visitantesData } = visitanteIds.length
-                ? await supabase.from('visitantes').select('id, nombre, documento, placa').in('id', visitanteIds)
+                ? await supabase
+                    .from('visitantes')
+                    .select(`
+                        id, nombre, documento, placa,
+                        residentes (
+                            apartamentos (
+                                id,
+                                numero,
+                                torres (
+                                    nombre
+                                )
+                            )
+                        )
+                    `)
+                    .in('id', visitanteIds)
                 : { data: [] };
 
             if (!requestIsActive()) return;
@@ -223,6 +248,12 @@ export default function PanelVigilancia({ usuarioApp }) {
 
             const mappedRegistro = registrosUsables.map((v) => {
                 const visitante = visitantesMap.get(v.visitante_id);
+                const ubicacionRegistro = getApartamentoUbicacion(v.apartamentos);
+                const residente = getRelatedOne(visitante?.residentes);
+                const ubicacionResidente = getApartamentoUbicacion(residente?.apartamentos);
+                const torre = ubicacionRegistro.torre || ubicacionResidente.torre;
+                const apartamento = ubicacionRegistro.apartamento || ubicacionResidente.apartamento;
+
                 return {
                     id: v.id,
                     fecha_visita: normalizeFecha(v.fecha_visita),
@@ -235,9 +266,9 @@ export default function PanelVigilancia({ usuarioApp }) {
                     nombre_visitante: visitante?.nombre,
                     documento: visitante?.documento,
                     placa: visitante?.placa,
-                    torre: v.apartamentos?.torres?.nombre || null,
-                    apartamento: v.apartamentos?.numero || null,
-                    ubicacion: formatUbicacion(v.apartamentos?.torres?.nombre, v.apartamentos?.numero)
+                    torre,
+                    apartamento,
+                    ubicacion: formatUbicacion(torre, apartamento)
                 };
             });
             setVisitas(mappedRegistro);
