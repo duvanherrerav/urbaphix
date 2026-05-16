@@ -1,4 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
+import { parseUtcTimestampToDate } from '../../../utils/dateFormatters';
+import { validarEstadoParaIngresoQR } from './estadosVisita';
 
 const QUEUE_KEY = 'urbaphix_porteria_queue_v1';
 const BITACORA_LOCAL_KEY = 'urbaphix_porteria_bitacora_local_v1';
@@ -57,6 +59,29 @@ const saveLocalAudit = (entry) => {
   localStorage.setItem(BITACORA_LOCAL_KEY, JSON.stringify([{ ...entry, local_only: true }, ...actual].slice(0, 200)));
 };
 
+
+export const esErrorConectividad = (error) => {
+  const message = String(error?.message || error?.details || error || '').toLowerCase();
+  return error?.name === 'TypeError'
+    || message.includes('failed to fetch')
+    || message.includes('fetch failed')
+    || message.includes('network')
+    || message.includes('networkerror')
+    || message.includes('load failed')
+    || message.includes('timeout')
+    || message.includes('offline');
+};
+
+export const registrarIngresoVisitaRPC = async ({ qrCode, vigilanteId }) => supabase.rpc('fn_registrar_ingreso_visita', {
+  p_qr_code: qrCode,
+  p_vigilante_id: vigilanteId || null
+});
+
+export const registrarSalidaVisitaRPC = async ({ registroId, vigilanteId }) => supabase.rpc('fn_registrar_salida_visita', {
+  p_registro_id: registroId,
+  p_vigilante_id: vigilanteId || null
+});
+
 export const registrarBitacora = async ({ usuarioApp, visitaId, accion, detalle, metadata = {} }) => {
   const evento = {
     visita_id: visitaId || null,
@@ -86,12 +111,17 @@ export const calcularSLA = (visitas) => {
   }
 
   const minutos = muestras.map((v) => {
-    const fechaProgramada = v.fecha_visita || new Date(v.created_at).toISOString().slice(0, 10);
+    const createdAt = parseUtcTimestampToDate(v.created_at);
+    const horaIngreso = parseUtcTimestampToDate(v.hora_ingreso);
+
+    if (!createdAt || !horaIngreso) return 0;
+
+    const fechaProgramada = v.fecha_visita || createdAt.toISOString().slice(0, 10);
     const horaProgramada = v.hora_inicio || '00:00';
-    const inicioProgramado = new Date(`${fechaProgramada}T${horaProgramada}:00`).getTime();
-    const inicioCreacion = new Date(v.created_at).getTime();
+    const inicioProgramado = new Date(`${fechaProgramada}T${horaProgramada}:00-05:00`).getTime();
+    const inicioCreacion = createdAt.getTime();
     const inicio = Math.max(inicioCreacion, inicioProgramado);
-    const ingreso = new Date(v.hora_ingreso).getTime();
+    const ingreso = horaIngreso.getTime();
     return Math.max(0, Math.round((ingreso - inicio) / 60000));
   });
 
@@ -102,13 +132,15 @@ export const calcularSLA = (visitas) => {
 };
 
 export const validarReglasAcceso = (visita, ahora = new Date()) => {
+  const reglaEstado = validarEstadoParaIngresoQR(visita.estado);
+  if (!reglaEstado.ok) {
+    return { ok: false, error: reglaEstado.error };
+  }
+
   const hoy = ahora.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
   if (visita.fecha_visita !== hoy) {
     return { ok: false, error: 'La visita no corresponde al día actual' };
   }
-
-  if (visita.estado === 'ingresado') return { ok: false, error: 'Esta visita ya fue utilizada' };
-  if (visita.estado === 'salido') return { ok: false, error: 'La visita ya fue finalizada' };
 
   const hhmm = ahora.toLocaleTimeString('sv-SE', { timeZone: 'America/Bogota' }).slice(0, 5);
   if (visita.hora_inicio && hhmm < visita.hora_inicio) {
@@ -169,10 +201,42 @@ export const syncOfflineQueue = async (usuarioApp) => {
   for (const item of queue) {
     try {
       if (item.type === 'visita_estado') {
-        const { error } = await supabase
-          .from('registro_visitas')
-          .update(item.payload)
-          .eq('id', item.visita_id);
+        const estado = item.payload?.estado;
+        let error = null;
+
+        if (estado === 'ingresado') {
+          let qrCode = item.qr_code;
+
+          if (!qrCode && item.visita_id) {
+            const { data: visita, error: visitaError } = await supabase
+              .from('registro_visitas')
+              .select('id, qr_code')
+              .eq('id', item.visita_id)
+              .maybeSingle();
+
+            if (visitaError) throw visitaError;
+            qrCode = visita?.qr_code;
+          }
+
+          if (!qrCode) {
+            throw new Error('No se pudo resolver el QR de la visita offline');
+          }
+
+          ({ error } = await registrarIngresoVisitaRPC({
+            qrCode,
+            vigilanteId: item.vigilante_id || usuarioApp?.id
+          }));
+        } else if (estado === 'salido') {
+          ({ error } = await registrarSalidaVisitaRPC({
+            registroId: item.visita_id,
+            vigilanteId: item.vigilante_id || usuarioApp?.id
+          }));
+        } else {
+          ({ error } = await supabase
+            .from('registro_visitas')
+            .update(item.payload)
+            .eq('id', item.visita_id));
+        }
 
         if (error) throw error;
 
@@ -180,7 +244,7 @@ export const syncOfflineQueue = async (usuarioApp) => {
           usuarioApp,
           visitaId: item.visita_id,
           accion: 'sync_offline_visita',
-          detalle: `Sincronizado estado ${item.payload.estado}`,
+          detalle: `Sincronizado estado ${estado}`,
           metadata: { queued_at: item.queued_at }
         });
       }

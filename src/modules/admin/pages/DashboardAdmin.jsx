@@ -10,8 +10,12 @@ import DashboardResumen from '../components/DashboardResumen';
 import CarteraResumen from '../../contabilidad/components/CarteraResumen';
 import GraficaCartera from '../../contabilidad/components/GraficaCartera';
 import { ESTADOS_PAGO, getResumenEstadosPago, getResumenFinancieroEjecutivo } from '../../contabilidad/utils/pagosEstados';
+import { formatFechaBogota, formatFechaHoraBogota } from '../../../utils/dateFormatters';
+import { formatDateTimeBogota } from '../../reservas/utils/dateTimeBogota';
 
 const ESTADOS_VISITA_VALIDOS = ['pendiente', 'ingresado', 'salido'];
+const DATE_ONLY_VISITA_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 
 export default function DashboardAdmin({ usuarioApp }) {
   const VISITAS_PREVIEW_LIMIT = 4;
@@ -242,6 +246,34 @@ export default function DashboardAdmin({ usuarioApp }) {
     }
   }, [paginaVisitasModal, totalPaginasVisitas]);
 
+
+  function formatFechaVisitaBogota(value) {
+    if (!value) return '-';
+
+    const fechaTexto = String(value).trim();
+    const fechaSoloMatch = fechaTexto.match(DATE_ONLY_VISITA_REGEX);
+
+    if (fechaSoloMatch) {
+      const [, year, month, day] = fechaSoloMatch;
+      const fechaBogota = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
+
+      if (!Number.isNaN(fechaBogota.getTime())) {
+        return fechaBogota.toLocaleDateString('es-CO', {
+          timeZone: 'America/Bogota',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+      }
+    }
+
+    return formatFechaBogota(value);
+  }
+
+  function obtenerFechaHoraVisitaBogota(value) {
+    return formatFechaHoraBogota(value, 'Pendiente');
+  }
+
   function obtenerPlacaVisita(visita) {
     const posiblesPlacas = [
       visita?.placa,
@@ -400,7 +432,7 @@ export default function DashboardAdmin({ usuarioApp }) {
             <p className="text-app-text-secondary">Reservas por revisar</p>
             <p className="text-2xl font-bold text-state-info">{atencionInmediata.reservasPendientes}</p>
             <p className="text-xs text-app-text-secondary mt-1">
-              Próxima: {atencionInmediata.proximaReserva?.fecha_inicio ? new Date(atencionInmediata.proximaReserva.fecha_inicio).toLocaleString('es-CO') : 'sin programación cercana'}.
+              Próxima: {atencionInmediata.proximaReserva?.fecha_inicio ? formatDateTimeBogota(atencionInmediata.proximaReserva.fecha_inicio) : 'sin programación cercana'}.
             </p>
           </div>
         </div>
@@ -487,7 +519,7 @@ export default function DashboardAdmin({ usuarioApp }) {
                   </div>
                   <p className="text-sm text-app-text-secondary">Placa: {obtenerPlacaVisita(v)}</p>
                   <p className="text-xs text-app-text-secondary">
-                    Fecha: {v.fecha_visita || '-'} · Ingreso: {v.hora_ingreso || 'Pendiente'} · Salida: {v.hora_salida || 'Pendiente'}
+                    Fecha: {formatFechaVisitaBogota(v.fecha_visita)} · Ingreso: {obtenerFechaHoraVisitaBogota(v.hora_ingreso)} · Salida: {obtenerFechaHoraVisitaBogota(v.hora_salida)}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -559,7 +591,7 @@ export default function DashboardAdmin({ usuarioApp }) {
                       </div>
                       <p className="text-sm text-app-text-secondary">Placa: {obtenerPlacaVisita(v)}</p>
                       <p className="text-xs text-app-text-secondary">
-                        Fecha: {v.fecha_visita || '-'} · Ingreso: {v.hora_ingreso || 'Pendiente'} · Salida: {v.hora_salida || 'Pendiente'}
+                        Fecha: {formatFechaVisitaBogota(v.fecha_visita)} · Ingreso: {obtenerFechaHoraVisitaBogota(v.hora_ingreso)} · Salida: {obtenerFechaHoraVisitaBogota(v.hora_salida)}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">

@@ -1,11 +1,59 @@
-export const formatFechaBogota = (value) => {
-  if (!value) return '-';
+const BOGOTA_TIME_ZONE = 'America/Bogota';
+const OFFSET_SUFFIX_REGEX = /(Z|[+-]\d{2}:\d{2})$/;
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+export const parseUtcTimestampToDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
 
   const raw = String(value).trim().replace(' ', 'T');
-  const hasZone = /Z$|[+-]\d{2}:\d{2}$/.test(raw);
-  const parsed = new Date(hasZone ? raw : `${raw}Z`);
+  const isoUtcValue = OFFSET_SUFFIX_REGEX.test(raw)
+    ? raw
+    : `${raw}${DATE_ONLY_REGEX.test(raw) ? 'T00:00:00' : ''}Z`;
+  const parsed = new Date(isoUtcValue);
 
-  if (Number.isNaN(parsed.getTime())) return '-';
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
-  return parsed.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+
+export const toBogotaTimestampWithOffset = (date = new Date()) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: BOGOTA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+    .formatToParts(date)
+    .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {});
+
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}-05:00`;
+};
+
+export const formatFechaBogota = (value) => {
+  const parsed = parseUtcTimestampToDate(value);
+
+  if (!parsed) return '-';
+
+  return parsed.toLocaleDateString('es-CO', { timeZone: BOGOTA_TIME_ZONE });
+};
+
+export const formatFechaHoraBogota = (value, fallback = '—') => {
+  const parsed = parseUtcTimestampToDate(value);
+
+  if (!parsed) return fallback;
+
+  return parsed.toLocaleString('es-CO', {
+    timeZone: BOGOTA_TIME_ZONE,
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 };

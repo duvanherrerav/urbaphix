@@ -1,3 +1,5 @@
+import { ESTADOS_PAQUETE, FILTROS_PAQUETE } from '../services/estadosPaquete';
+
 const chipBase = 'app-btn text-xs rounded-full px-3 py-1.5';
 
 export default function PaquetesFiltros({ filtroEstado, setFiltroEstado, resumen, busqueda, setBusqueda, onResetPagina }) {
@@ -9,13 +11,13 @@ export default function PaquetesFiltros({ filtroEstado, setFiltroEstado, resumen
   return (
     <section className="app-surface-primary border border-brand-primary/10 rounded-xl p-3 space-y-3">
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={`${chipBase} ${filtroEstado === 'todos' ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro('todos')}>
+        <button type="button" className={`${chipBase} ${filtroEstado === FILTROS_PAQUETE.TODOS ? 'app-btn-primary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro(FILTROS_PAQUETE.TODOS)}>
           Todos <span className="opacity-80">({resumen.total})</span>
         </button>
-        <button type="button" className={`${chipBase} ${filtroEstado === 'pendiente' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro('pendiente')}>
+        <button type="button" className={`${chipBase} ${filtroEstado === ESTADOS_PAQUETE.PENDIENTE ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro(ESTADOS_PAQUETE.PENDIENTE)}>
           Pendientes <span className="opacity-80">({resumen.pendientes})</span>
         </button>
-        <button type="button" className={`${chipBase} ${filtroEstado === 'entregado' ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro('entregado')}>
+        <button type="button" className={`${chipBase} ${filtroEstado === ESTADOS_PAQUETE.ENTREGADO ? 'app-btn-secondary' : 'app-btn-ghost'}`} onClick={() => seleccionarFiltro(ESTADOS_PAQUETE.ENTREGADO)}>
           Entregados <span className="opacity-80">({resumen.entregados})</span>
         </button>
       </div>

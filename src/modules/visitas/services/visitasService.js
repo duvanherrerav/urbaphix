@@ -75,16 +75,15 @@ export const validarQR = async (qr_code) => {
             throw new Error('QR inválido o visita no encontrada');
         }
 
-        const { error: errorUpdate } = await supabase
-            .from('registro_visitas')
-            .update({
-                estado: 'ingresado',
-                hora_ingreso: new Date().toISOString()
-            })
-            .eq('id', visita.id);
+        // Función legacy sin contexto de portería: conserva la firma pública,
+        // pero delega el cambio de estado a la RPC oficial.
+        const { error: errorIngreso } = await supabase.rpc('fn_registrar_ingreso_visita', {
+            p_qr_code: qr_code,
+            p_vigilante_id: null
+        });
 
-        if (errorUpdate) {
-            throw new Error(errorMessage(errorUpdate, 'No se pudo actualizar el estado de la visita'));
+        if (errorIngreso) {
+            throw new Error(errorMessage(errorIngreso, 'No se pudo registrar el ingreso de la visita'));
         }
 
         const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{

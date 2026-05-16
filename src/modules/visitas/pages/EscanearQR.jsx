@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
-import { enqueueOfflineAction, registrarBitacora, registrarIntentoQRInvalido, validarReglasAcceso } from '../services/porteriaService';
+import { enqueueOfflineAction, esErrorConectividad, registrarBitacora, registrarIngresoVisitaRPC, registrarIntentoQRInvalido, validarReglasAcceso } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
 export default function EscanearQR({ usuarioApp }) {
@@ -39,23 +39,35 @@ export default function EscanearQR({ usuarioApp }) {
       }
 
       const { visita_id, conjunto_id, qr_code } = parsed;
+      const usuarioConjuntoId = usuarioApp?.conjunto_id;
+
+      if (!usuarioConjuntoId) {
+        console.warn('EscanearQR: usuario sin conjunto_id; búsqueda QR depende de RLS', {
+          usuario_id: usuarioApp?.id
+        });
+      }
 
       // 🔥 validar conjunto
-      if (conjunto_id && conjunto_id !== usuarioApp.conjunto_id) {
+      if (conjunto_id && usuarioConjuntoId && conjunto_id !== usuarioConjuntoId) {
         await registrarIntentoQRInvalido({ qrRaw: text, usuarioApp });
         toast.error("QR no pertenece a este conjunto");
         return;
       }
 
       // 🔥 buscar visita
-      const { data: visita, error } = await supabase
+      let visitaQuery = supabase
         .from('registro_visitas')
         .select(`
           id, qr_code, conjunto_id, estado, fecha_visita, hora_inicio, hora_fin, visitante_id,
           visitantes (nombre, documento, residente_id)
         `)
-        .or(visita_id ? `id.eq.${visita_id}` : `qr_code.eq.${qr_code}`)
-        .single();
+        .or(visita_id ? `id.eq.${visita_id}` : `qr_code.eq.${qr_code}`);
+
+      if (usuarioConjuntoId) {
+        visitaQuery = visitaQuery.eq('conjunto_id', usuarioConjuntoId);
+      }
+
+      const { data: visita, error } = await visitaQuery.single();
 
       if (error || !visita) {
         await registrarIntentoQRInvalido({ qrRaw: text, usuarioApp });
@@ -90,52 +102,95 @@ export default function EscanearQR({ usuarioApp }) {
       }
 
       // 🔥 registrar ingreso
-      const { error: updateError } = await supabase
-        .from('registro_visitas')
-        .update({
-          estado: 'ingresado',
-          hora_ingreso: new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ')
-        })
-        .eq('id', visitaNormalizada.id);
-
-      // 🔥 buscar token del usuario
-      const { data: usuario } = await supabase
-        .from('usuarios_app')
-        .select('fcm_token')
-        .eq('id', visitaNormalizada.residente_id)
-        .single();
-
-      // 🔥 enviar push
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enviar-notificacion`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          token: usuario.fcm_token,
-          titulo: '🚗 Visita ingresó',
-          mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
-        })
+      const horaIngresoLocal = new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ');
+      const { error: ingresoError } = await registrarIngresoVisitaRPC({
+        qrCode: visitaNormalizada.qr_code,
+        vigilanteId: usuarioApp?.id
       });
 
-      if (updateError) {
-        enqueueOfflineAction({
-          type: 'visita_estado',
-          visita_id: visitaNormalizada.id,
-          payload: {
-            estado: 'ingresado',
-            hora_ingreso: new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" }).replace(' ', ' ')
-          }
-        });
-        toast.error("Sin conexión estable. El ingreso quedó en cola de contingencia.");
+      if (ingresoError) {
+        if (esErrorConectividad(ingresoError)) {
+          enqueueOfflineAction({
+            type: 'visita_estado',
+            visita_id: visitaNormalizada.id,
+            qr_code: visitaNormalizada.qr_code,
+            vigilante_id: usuarioApp?.id || null,
+            payload: {
+              estado: 'ingresado',
+              hora_ingreso: horaIngresoLocal
+            }
+          });
+          toast.error("Sin conexión estable. El ingreso quedó en cola de contingencia.");
+        } else {
+          toast.error(ingresoError.message || "No fue posible registrar el ingreso");
+        }
       } else {
-        // 🔥 guardar notificación
-        await supabase.from('notificaciones').insert([{
-          usuario_id: visitaNormalizada.residente_id,
-          tipo: 'visita_ingreso',
-          titulo: "Visita ingresó",
-          mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
-        }]);
+        // 🔔 resolver usuario real del residente y notificar sin romper el ingreso
+        if (!visitaNormalizada.residente_id) {
+          console.warn('EscanearQR: visita sin residente_id para notificación', {
+            visita_id: visitaNormalizada.id
+          });
+        } else {
+          let residenteQuery = supabase
+            .from('residentes')
+            .select('id, usuario_id')
+            .eq('id', visitaNormalizada.residente_id);
+
+          if (visitaNormalizada.conjunto_id) {
+            residenteQuery = residenteQuery.eq('conjunto_id', visitaNormalizada.conjunto_id);
+          }
+
+          const { data: residente, error: errorResidente } = await residenteQuery.maybeSingle();
+
+          if (errorResidente) {
+            console.warn('EscanearQR: no se pudo consultar residente para notificación', errorResidente);
+          } else if (!residente?.usuario_id) {
+            console.warn('EscanearQR: residente sin usuario_id para notificación', {
+              residente_id: visitaNormalizada.residente_id
+            });
+          } else {
+            const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
+              usuario_id: residente.usuario_id,
+              tipo: 'visita_ingreso',
+              titulo: "Visita ingresó",
+              mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
+            }]);
+
+            if (errorNotificacion) {
+              console.warn('EscanearQR: no se pudo crear notificación de ingreso', errorNotificacion);
+            }
+
+            const { data: usuario, error: errorUsuario } = await supabase
+              .from('usuarios_app')
+              .select('fcm_token')
+              .eq('id', residente.usuario_id)
+              .maybeSingle();
+
+            if (errorUsuario) {
+              console.warn('EscanearQR: no se pudo consultar fcm_token del usuario', errorUsuario);
+            } else if (!usuario?.fcm_token) {
+              console.warn('EscanearQR: usuario sin fcm_token para push de visita', {
+                usuario_id: residente.usuario_id
+              });
+            } else {
+              try {
+                await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enviar-notificacion`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    token: usuario.fcm_token,
+                    titulo: '🚗 Visita ingresó',
+                    mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
+                  })
+                });
+              } catch (errorPush) {
+                console.warn('EscanearQR: no se pudo enviar push de ingreso', errorPush);
+              }
+            }
+          }
+        }
 
         setResultado(visitaNormalizada);
         toast.success('Ingreso autorizado');
