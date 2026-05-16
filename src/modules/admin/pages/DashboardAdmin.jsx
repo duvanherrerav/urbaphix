@@ -10,7 +10,7 @@ import DashboardResumen from '../components/DashboardResumen';
 import CarteraResumen from '../../contabilidad/components/CarteraResumen';
 import GraficaCartera from '../../contabilidad/components/GraficaCartera';
 import { ESTADOS_PAGO, getResumenEstadosPago, getResumenFinancieroEjecutivo } from '../../contabilidad/utils/pagosEstados';
-import { formatFechaHoraBogota } from '../../../utils/dateFormatters';
+import { formatDateTimeBogota } from '../../reservas/utils/dateTimeBogota';
 
 const ESTADOS_VISITA_VALIDOS = ['pendiente', 'ingresado', 'salido'];
 
@@ -401,7 +401,7 @@ export default function DashboardAdmin({ usuarioApp }) {
             <p className="text-app-text-secondary">Reservas por revisar</p>
             <p className="text-2xl font-bold text-state-info">{atencionInmediata.reservasPendientes}</p>
             <p className="text-xs text-app-text-secondary mt-1">
-              Próxima: {atencionInmediata.proximaReserva?.fecha_inicio ? formatFechaHoraBogota(atencionInmediata.proximaReserva.fecha_inicio) : 'sin programación cercana'}.
+              Próxima: {atencionInmediata.proximaReserva?.fecha_inicio ? formatDateTimeBogota(atencionInmediata.proximaReserva.fecha_inicio) : 'sin programación cercana'}.
             </p>
           </div>
         </div>
