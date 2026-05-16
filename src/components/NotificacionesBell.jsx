@@ -1,13 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { formatFechaHoraBogota } from '../utils/dateFormatters';
 
 export default function NotificacionesBell({ usuarioApp }) {
 
     const [notificaciones, setNotificaciones] = useState([]);
     const [abierto, setAbierto] = useState(false);
 
+    const obtenerNotificaciones = useCallback(async () => {
+        const { data } = await supabase
+            .from('notificaciones')
+            .select('*')
+            .eq('usuario_id', usuarioApp.id)
+            .order('created_at', { ascending: false });
+
+        setNotificaciones(data || []);
+    }, [usuarioApp.id]);
+
     useEffect(() => {
-        obtenerNotificaciones();
+        const refreshTimeoutId = window.setTimeout(() => {
+            obtenerNotificaciones();
+        }, 0);
 
         const channel = supabase
             .channel('notificaciones')
@@ -26,19 +39,12 @@ export default function NotificacionesBell({ usuarioApp }) {
             )
             .subscribe();
 
-        return () => supabase.removeChannel(channel);
+        return () => {
+            window.clearTimeout(refreshTimeoutId);
+            supabase.removeChannel(channel);
+        };
 
-    }, []);
-
-    const obtenerNotificaciones = async () => {
-        const { data } = await supabase
-            .from('notificaciones')
-            .select('*')
-            .eq('usuario_id', usuarioApp.id)
-            .order('created_at', { ascending: false });
-
-        setNotificaciones(data || []);
-    };
+    }, [obtenerNotificaciones, usuarioApp.id]);
 
     const marcarComoLeidas = async () => {
 
@@ -97,9 +103,7 @@ export default function NotificacionesBell({ usuarioApp }) {
                     <h4>Notificaciones</h4>
 
                     {notificaciones.length === 0 && (
-                        <p><small style={{ color: '#888' }}>
-                            {new Date(n.created_at).toLocaleString()}
-                        </small>No hay notificaciones</p>
+                        <p>No hay notificaciones</p>
                     )}
 
                     {notificaciones.map(n => (
@@ -115,7 +119,7 @@ export default function NotificacionesBell({ usuarioApp }) {
                         >
                             <b>{n.titulo}</b>
                             <p><small style={{ color: '#888' }}>
-                                {new Date(n.created_at).toLocaleString()}
+                                {formatFechaHoraBogota(n.created_at)}
                             </small>{n.mensaje}</p>
                         </div>
                     ))}
