@@ -6,6 +6,7 @@ import { calcularSLA, enqueueOfflineAction, esErrorConectividad, getOfflineQueue
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import { useRealtimeConjuntoChannel } from '../../../hooks/useRealtimeConjuntoChannel';
 import { formatFechaHoraBogota, parseUtcTimestampToDate, toBogotaTimestampWithOffset } from '../../../utils/dateFormatters';
+import { logger } from '../../../utils/logger';
 
 const toBogotaTimestamp = () => toBogotaTimestampWithOffset();
 const toDateOnly = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
@@ -342,7 +343,8 @@ export default function PanelVigilancia({ usuarioApp }) {
                 toast.error('Sin conexión estable. El ingreso quedó en cola de contingencia.');
                 return;
             }
-            toast.error(error.message || 'No fue posible registrar el ingreso');
+            logger.error('PanelVigilancia: no se pudo registrar ingreso', error);
+            toast.error('No fue posible registrar el ingreso. Intenta nuevamente.');
             return;
         }
 
@@ -376,7 +378,8 @@ export default function PanelVigilancia({ usuarioApp }) {
                 toast.error('Sin conexión estable. La salida quedó en cola de contingencia.');
                 return;
             }
-            toast.error(error.message || 'Error al registrar salida');
+            logger.error('PanelVigilancia: no se pudo registrar salida', error);
+            toast.error('No fue posible registrar la salida. Intenta nuevamente.');
             return;
         }
 

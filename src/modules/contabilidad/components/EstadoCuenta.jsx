@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { logger } from '../../../utils/logger';
 import jsPDF from 'jspdf';
 import AppDatePicker from '../../../components/ui/AppDatePicker';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
@@ -92,8 +93,8 @@ export default function EstadoCuenta({ usuarioApp }) {
     setLoading(false);
 
     if (error) {
-      console.log(error);
-      alert('Error generando reporte');
+      logger.error('No se pudo generar estado de cuenta', error);
+      alert('No fue posible generar el reporte. Intenta nuevamente.');
       return;
     }
 

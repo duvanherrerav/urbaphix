@@ -6,6 +6,7 @@ import ModuleIcon from './components/ui/ModuleIcon';
 import Login from './modules/auth/Login';
 import { pedirPermiso } from './utils/push';
 import { migrarStoragePorteria } from './modules/visitas/services/porteriaService';
+import { logger } from './utils/logger';
 
 const MisPagos = lazy(() => import('./modules/contabilidad/pages/MisPagos'));
 const CrearCobro = lazy(() => import('./modules/contabilidad/pages/CrearCobro'));
@@ -67,6 +68,7 @@ function App() {
         .single();
 
       if (error) {
+        logger.error('No se pudo cargar perfil de usuario', error);
         if (isMounted) {
           setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
           setUsuarioApp(null);
@@ -94,7 +96,8 @@ function App() {
           migrarStoragePorteria();
           await obtenerUsuario(data.user.id);
         }
-      } catch {
+      } catch (error) {
+        logger.error('No se pudo verificar sesión', error);
         if (isMounted) {
           setErrorPerfil('No pudimos verificar tu sesión. Revisa tu conexión e intenta nuevamente.');
           setUser(null);
@@ -286,6 +289,31 @@ function App() {
             </div>
           </section>
         </main>
+      </div>
+    );
+  }
+
+  if (user && !usuarioApp) {
+    return (
+      <div className="app-shell flex items-center justify-center p-6">
+        <div className="app-surface-primary flex max-w-md flex-col items-center gap-4 px-8 py-7 text-center shadow-app">
+          <BrandLogo variant="loading" decorative />
+          {errorPerfil ? (
+            <>
+              <p className="text-sm font-medium text-app-text-primary">No fue posible cargar tu perfil.</p>
+              <p className="text-sm text-app-text-secondary">{errorPerfil}</p>
+              <button
+                type="button"
+                onClick={() => supabase.auth.signOut()}
+                className="app-btn app-btn-secondary"
+              >
+                Cerrar sesión
+              </button>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-app-text-secondary">Validando perfil y permisos...</p>
+          )}
+        </div>
       </div>
     );
   }

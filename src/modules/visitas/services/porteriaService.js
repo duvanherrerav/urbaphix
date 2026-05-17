@@ -1,6 +1,8 @@
 import { supabase } from '../../../services/supabaseClient';
 import { parseUtcTimestampToDate } from '../../../utils/dateFormatters';
 import { validarEstadoParaIngresoQR } from './estadosVisita';
+import { logger } from '../../../utils/logger';
+import { getErrorMessage } from '../../../utils/errorMessages';
 
 const QUEUE_KEY = 'urbaphix_porteria_queue_v1';
 const BITACORA_LOCAL_KEY = 'urbaphix_porteria_bitacora_local_v1';
@@ -36,8 +38,8 @@ export const migrarStoragePorteria = () => {
     sanitizeObjectStorage(INVALID_QR_KEY);
     return { ok: true };
   } catch (error) {
-    console.error('migrarStoragePorteria error:', error);
-    return { ok: false, error: error?.message || 'No se pudo migrar el storage local de portería' };
+    logger.error('migrarStoragePorteria error', error);
+    return { ok: false, error: getErrorMessage(error, 'No se pudo preparar el modo portería. Intenta nuevamente.') };
   }
 };
 

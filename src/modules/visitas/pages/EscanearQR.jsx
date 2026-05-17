@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import toast from 'react-hot-toast';
 import { supabase } from '../../../services/supabaseClient';
+import { logger } from '../../../utils/logger';
 import { enqueueOfflineAction, esErrorConectividad, registrarBitacora, registrarIngresoVisitaRPC, registrarIntentoQRInvalido, validarReglasAcceso } from '../services/porteriaService';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 
@@ -42,7 +43,7 @@ export default function EscanearQR({ usuarioApp }) {
       const usuarioConjuntoId = usuarioApp?.conjunto_id;
 
       if (!usuarioConjuntoId) {
-        console.warn('EscanearQR: usuario sin conjunto_id; búsqueda QR depende de RLS', {
+        logger.warn('EscanearQR: usuario sin conjunto_id; búsqueda QR depende de RLS', {
           usuario_id: usuarioApp?.id
         });
       }
@@ -122,12 +123,13 @@ export default function EscanearQR({ usuarioApp }) {
           });
           toast.error("Sin conexión estable. El ingreso quedó en cola de contingencia.");
         } else {
-          toast.error(ingresoError.message || "No fue posible registrar el ingreso");
+          logger.error('EscanearQR: no se pudo registrar ingreso', ingresoError);
+          toast.error('No fue posible registrar el ingreso. Intenta nuevamente.');
         }
       } else {
         // 🔔 resolver usuario real del residente y notificar sin romper el ingreso
         if (!visitaNormalizada.residente_id) {
-          console.warn('EscanearQR: visita sin residente_id para notificación', {
+          logger.warn('EscanearQR: visita sin residente_id para notificación', {
             visita_id: visitaNormalizada.id
           });
         } else {
@@ -143,9 +145,9 @@ export default function EscanearQR({ usuarioApp }) {
           const { data: residente, error: errorResidente } = await residenteQuery.maybeSingle();
 
           if (errorResidente) {
-            console.warn('EscanearQR: no se pudo consultar residente para notificación', errorResidente);
+            logger.warn('EscanearQR: no se pudo consultar residente para notificación', errorResidente);
           } else if (!residente?.usuario_id) {
-            console.warn('EscanearQR: residente sin usuario_id para notificación', {
+            logger.warn('EscanearQR: residente sin usuario_id para notificación', {
               residente_id: visitaNormalizada.residente_id
             });
           } else {
@@ -157,7 +159,7 @@ export default function EscanearQR({ usuarioApp }) {
             }]);
 
             if (errorNotificacion) {
-              console.warn('EscanearQR: no se pudo crear notificación de ingreso', errorNotificacion);
+              logger.warn('EscanearQR: no se pudo crear notificación de ingreso', errorNotificacion);
             }
 
             const { data: usuario, error: errorUsuario } = await supabase
@@ -167,9 +169,9 @@ export default function EscanearQR({ usuarioApp }) {
               .maybeSingle();
 
             if (errorUsuario) {
-              console.warn('EscanearQR: no se pudo consultar fcm_token del usuario', errorUsuario);
+              logger.warn('EscanearQR: no se pudo consultar fcm_token del usuario', errorUsuario);
             } else if (!usuario?.fcm_token) {
-              console.warn('EscanearQR: usuario sin fcm_token para push de visita', {
+              logger.warn('EscanearQR: usuario sin fcm_token para push de visita', {
                 usuario_id: residente.usuario_id
               });
             } else {
@@ -186,7 +188,7 @@ export default function EscanearQR({ usuarioApp }) {
                   })
                 });
               } catch (errorPush) {
-                console.warn('EscanearQR: no se pudo enviar push de ingreso', errorPush);
+                logger.warn('EscanearQR: no se pudo enviar push de ingreso', errorPush);
               }
             }
           }
@@ -204,7 +206,7 @@ export default function EscanearQR({ usuarioApp }) {
       }
 
     } catch (err) {
-      console.log(err);
+      logger.error('EscanearQR: error validando QR', err);
       await registrarIntentoQRInvalido({ qrRaw: text, usuarioApp });
       toast.error("QR inválido");
     }

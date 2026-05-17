@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { logger } from '../../utils/logger';
+import { getAuthErrorMessage } from '../../utils/errorMessages';
 
 export default function Register() {
 
@@ -16,10 +18,11 @@ export default function Register() {
     });
 
     if (error) {
-      alert(error.message);
+      logger.error('Register: no se pudo crear usuario', error);
+      alert(getAuthErrorMessage(error.message));
     } else {
       alert('Usuario creado');
-      console.log(data);
+      logger.info('Register: usuario creado', { user_id: data?.user?.id });
     }
   };
 

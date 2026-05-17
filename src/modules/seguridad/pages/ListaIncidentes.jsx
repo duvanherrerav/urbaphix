@@ -185,7 +185,7 @@ export default function ListaIncidentes({ usuarioApp }) {
       const db = new Date(b.created_at || 0).getTime();
       return db - da;
     });
-  }, [incidentes, estadosLocal, filtroEstado, busqueda]);
+  }, [incidentes, estadosLocal, filtroEstado, busqueda, getEstadoVisible]);
 
   const totalPaginas = Math.max(1, Math.ceil(lista.length / PAGE_SIZE));
   const paginaActual = Math.min(pagina, totalPaginas);

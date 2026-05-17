@@ -1,8 +1,9 @@
 import { supabase } from '../../../services/supabaseClient';
 import { esEstadoReservaValido, puedeTransicionarReserva } from '../domain/reservaStateMachine';
 import { isColombiaHoliday } from '../utils/colombiaHolidays';
+import { getErrorMessage } from '../../../utils/errorMessages';
 
-const err = (error, fallback) => error?.message || fallback;
+const err = (error, fallback) => getErrorMessage(error, fallback);
 
 const BASE_RESERVA_SELECT = `
   id,
@@ -358,7 +359,7 @@ export const humanizeReservaError = (error, fallback = 'No se pudo completar la 
         return 'No hay conexión disponible. Intenta nuevamente.';
     }
 
-    return message;
+    return getErrorMessage(message, fallback);
 };
 
 const normalizarPoliticaConfirmacion = (recurso = null) => {

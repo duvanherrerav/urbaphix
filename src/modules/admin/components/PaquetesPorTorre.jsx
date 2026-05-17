@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { logger } from '../../../utils/logger';
 
 export default function PaquetesPorTorre({ usuarioApp }) {
 
@@ -24,7 +25,7 @@ export default function PaquetesPorTorre({ usuarioApp }) {
       .eq('conjunto_id', conjuntoId);
 
     if (error) {
-      console.log(error);
+      logger.error('No se pudo cargar paquetes por torre', error);
       return;
     }
 
