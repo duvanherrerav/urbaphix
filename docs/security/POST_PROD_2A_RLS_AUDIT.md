@@ -119,7 +119,7 @@ Esta auditoría documenta el estado inicial de seguridad Supabase/RLS para prepa
 |---|---|---|---|---|---|
 | `usuarios_app` | Activa en uso por frontend | auth, shell App, visitas, pagos, paquetería, seguridad | admin, residente, vigilancia | `src/App.jsx`, `src/modules/auth/Login.jsx`, varios services | Tabla crítica para perfil, rol y `conjunto_id`. |
 | `residentes` | Activa en uso por frontend | visitas, pagos, reservas, paquetería | admin, residente, vigilancia | `CrearVisita`, `MisPagos`, `reservasService`, `paquetesService` | Crítica para `residente_id` y relaciones con apartamento. |
-| `roles` | Parcialmente implementada | auth/perfil indirecto | admin, residente, vigilancia | `src/App.jsx` consulta relación `roles` dentro de residente | Validar si se usa como catálogo o si rol vive en `usuarios_app`. |
+| `roles` | Parcialmente implementada o catálogo/base de permisos documentado, sin evidencia de consumo frontend directo | Sin consumo frontend directo confirmado | admin, residente, vigilancia | Documentada en schema/migraciones o referenciada indirectamente por modelo de roles; no hay evidencia de queries frontend | Validar si `roles` sigue siendo catálogo activo de base de datos o si el rol operativo vive en `usuarios_app`. No diseñar permisos API para `roles` hasta confirmar necesidad real. |
 | `conjuntos` | Parcialmente implementada | auth/perfil indirecto, multitenancy | admin, residente, vigilancia | Documentada como padre; referencias por `conjunto_id` | No se vio `.from('conjuntos')` en frontend; se usa por FK/filtros. |
 | `torres` | Activa en uso por frontend | pagos, paquetería, dashboard, visitas/reservas por relaciones | admin, vigilancia | `CrearCobro`, `CrearPaquete`, `KPIsAdmin`, `paquetesService` | Catálogo estructural por conjunto. |
 | `apartamentos` | Activa en uso por frontend | pagos, paquetería, dashboard, reservas/visitas por relaciones | admin, residente, vigilancia | `CrearCobro`, `KPIsAdmin`, `paquetesService`, selects anidados | Catálogo estructural; validar filters por conjunto. |
@@ -216,18 +216,20 @@ Esta auditoría documenta el estado inicial de seguridad Supabase/RLS para prepa
 ### Confirmados en repo
 
 - El frontend consulta directamente `usuarios_app` para bootstrap de sesión.
+- `roles` tiene evidencia de repositorio/documentación/migraciones como catálogo o base de permisos, pero no evidencia de consumo frontend directo confirmado.
 - Visitas depende de RPC críticas y de `registro_visitas`.
 - Pagos depende de `pagos`, `pagos_eventos`, `config_pagos` y storage `comprobantes`.
 - Reservas depende de `recursos_comunes`, `reservas_zonas`, `reservas_bloqueos`, `reservas_eventos` y `reservas_documentos`.
 - Paquetería depende de `paquetes`, `residentes`, `apartamentos`, `torres`, `usuarios_app` y `notificaciones`.
 - Incidentes depende de `incidentes`, `usuarios_app` y `notificaciones`.
-- No se encontró consumo frontend directo de `accesos`, `trasteos`, `zonas_comunes`, `archivos`, `pqr` o `comunicados`.
+- No se encontró consumo frontend directo de `roles`, `accesos`, `trasteos`, `zonas_comunes`, `archivos`, `pqr` o `comunicados`.
 
 ### Pendientes por confirmar en PRD/QA
 
 - Policies efectivas actuales por tabla.
 - Grants efectivos actuales por rol `anon`/`authenticated`.
 - Si `vehiculos` y `trasteos` no tienen policies en PRD.
+- Si `roles` sigue siendo catálogo activo de base de datos o si el rol operativo vigente vive únicamente en `usuarios_app`.
 - Funciones `SECURITY DEFINER` ejecutables por roles públicos.
 - Funciones sin `search_path` fijo.
 - Si `reservas` y `reservas_zonas` coexisten con datos productivos o si una es legado.
