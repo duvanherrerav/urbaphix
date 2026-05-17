@@ -42,7 +42,7 @@ export default function MisPaquetes({ usuarioApp }) {
 
   useEffect(() => {
     if (!usuarioApp?.id) return;
-    obtenerPaquetes(usuarioApp.id);
+    void Promise.resolve().then(() => obtenerPaquetes(usuarioApp.id));
   }, [usuarioApp?.id]);
 
   useEffect(() => {

@@ -1,7 +1,9 @@
 import { supabase } from '../../../services/supabaseClient';
 import { ESTADOS_PAQUETE, FILTROS_PAQUETE, normalizarEstadoPaquete } from './estadosPaquete';
+import { logger } from '../../../utils/logger';
+import { GENERIC_SAVE_ERROR, getErrorMessage } from '../../../utils/errorMessages';
 
-const errorMessage = (error, fallback) => error?.message || fallback;
+const errorMessage = (error, fallback) => getErrorMessage(error, fallback);
 const TAG_SERVICIO_PUBLICO = '[SERVICIO_PUBLICO]';
 const normalizarTokenApto = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -70,7 +72,7 @@ const resolverApartamentoId = async ({ apartamento_id, apartamento_numero, torre
 
 const crearNotificacionPaquete = async ({ contexto, usuarioId, notificacion, sinUsuarioMeta = {} }) => {
   if (!usuarioId) {
-    console.warn(`${contexto}: residente sin usuario_id para notificación`, sinUsuarioMeta);
+    logger.warn(`${contexto}: residente sin usuario_id para notificación`, sinUsuarioMeta);
     return;
   }
 
@@ -81,10 +83,10 @@ const crearNotificacionPaquete = async ({ contexto, usuarioId, notificacion, sin
     }]);
 
     if (error) {
-      console.warn(`${contexto}: no se pudo crear notificación`, error);
+      logger.warn(`${contexto}: no se pudo crear notificación`, error);
     }
   } catch (error) {
-    console.warn(`${contexto}: error inesperado al crear notificación`, error);
+    logger.warn(`${contexto}: error inesperado al crear notificación`, error);
   }
 };
 
@@ -188,8 +190,8 @@ export const registrarPaquete = async (data, user) => {
 
     return { ok: true, paquete, error: null };
   } catch (error) {
-    console.error('registrarPaquete error:', error);
-    return { ok: false, paquete: null, error: errorMessage(error, 'Error al registrar paquete') };
+    logger.error('registrarPaquete error', error);
+    return { ok: false, paquete: null, error: errorMessage(error, GENERIC_SAVE_ERROR) };
   }
 };
 
@@ -270,7 +272,7 @@ export const entregarPaquete = async (paquete_id, contexto = {}) => {
 
     const conjuntoId = contexto?.conjunto_id || null;
     if (!conjuntoId) {
-      console.warn('entregarPaquete: conjunto_id no disponible; se mantiene respaldo por RLS', { paquete_id });
+      logger.warn('entregarPaquete: conjunto_id no disponible; se mantiene respaldo por RLS', { paquete_id });
     }
 
     let paqueteQuery = supabase
@@ -320,7 +322,7 @@ export const entregarPaquete = async (paquete_id, contexto = {}) => {
       const { data: residente, error: errorResidente } = await residenteQuery.maybeSingle();
 
       if (errorResidente) {
-        console.warn('entregarPaquete: no se pudo consultar residente para notificación', errorResidente);
+        logger.warn('entregarPaquete: no se pudo consultar residente para notificación', errorResidente);
       } else {
         await crearNotificacionPaquete({
           contexto: 'entregarPaquete',
@@ -337,12 +339,12 @@ export const entregarPaquete = async (paquete_id, contexto = {}) => {
         });
       }
     } else {
-      console.warn('entregarPaquete: paquete sin residente_id para notificación', { paquete_id });
+      logger.warn('entregarPaquete: paquete sin residente_id para notificación', { paquete_id });
     }
 
     return { ok: true, paquete, error: null };
   } catch (error) {
-    console.error('entregarPaquete error:', error);
-    return { ok: false, paquete: null, error: errorMessage(error, 'Error al entregar paquete') };
+    logger.error('entregarPaquete error', error);
+    return { ok: false, paquete: null, error: errorMessage(error, GENERIC_SAVE_ERROR) };
   }
 };
