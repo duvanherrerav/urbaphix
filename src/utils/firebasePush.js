@@ -1,40 +1,41 @@
 import { messaging } from '../services/firebase';
 import { getToken } from 'firebase/messaging';
+import { logger } from './logger';
 
 export const obtenerToken = async () => {
 
   try {
 
-    console.log("🔥 Registrando Service Worker...");
+    logger.info('Registrando Service Worker de notificaciones');
 
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
     // 🔥 ESTA LÍNEA ES LA SOLUCIÓN
     await navigator.serviceWorker.ready;
 
-    console.log("✅ SW LISTO");
+    logger.info('Service Worker de notificaciones listo');
 
     const permiso = await Notification.requestPermission();
 
-    console.log("PERMISO:", permiso);
+    logger.info('Permiso de notificaciones resuelto', { permiso });
 
     if (permiso !== 'granted') {
-      console.log("❌ Permiso denegado");
+      logger.info('Permiso de notificaciones denegado');
       return;
     }
 
-    console.log("🔥 Obteniendo token...");
+    logger.info('Solicitando token de notificaciones');
 
     const token = await getToken(messaging, {
       vapidKey: 'BCE5cFRKgpDqkUsodPje1ZnOcbKo7TDiNExYbMMHwa-O2iyXuLSeYhWJqO3ArjCgw3AyeJ19obbh2mX8SzdpEY8',
       serviceWorkerRegistration: registration
     });
 
-    console.log("🎯 TOKEN OBTENIDO:", token);
+    logger.info('Token de notificaciones obtenido');
 
     return token;
 
   } catch (error) {
-    console.log("❌ ERROR TOKEN:", error);
+    logger.error('No se pudo obtener token de notificaciones', error);
   }
 };

@@ -1,5 +1,7 @@
 import { supabase } from '../../../services/supabaseClient';
 import { ESTADOS_INCIDENCIA, puedeTransicionarEstado } from '../utils/incidenteUI';
+import { logger } from '../../../utils/logger';
+import { GENERIC_SAVE_ERROR, getErrorMessage } from '../../../utils/errorMessages';
 const INCIDENTE_ESTADOS_KEY = 'urbaphix_incidentes_estado_local_v1';
 const INCIDENTE_FECHAS_KEY = 'urbaphix_incidentes_fecha_local_v1';
 
@@ -101,8 +103,8 @@ export const crearIncidente = async (data, user) => {
 
         return { incidente, error: null };
     } catch (error) {
-        console.error('crearIncidente error:', error);
-        return { incidente: null, error: error?.message || 'No se pudo registrar el incidente' };
+        logger.error('crearIncidente error', error);
+        return { incidente: null, error: getErrorMessage(error, GENERIC_SAVE_ERROR) };
     }
 };
 
@@ -155,8 +157,8 @@ export const actualizarEstadoIncidente = async ({ incidenteId, estado, usuarioId
 
         return { ok: true, error: null };
     } catch (error) {
-        console.error('actualizarEstadoIncidente error:', error);
-        return { ok: false, error: error?.message || 'No se pudo actualizar el incidente' };
+        logger.error('actualizarEstadoIncidente error', error);
+        return { ok: false, error: getErrorMessage(error, GENERIC_SAVE_ERROR) };
     }
 };
 
@@ -187,8 +189,8 @@ export const actualizarGestionIncidente = async ({ incidenteId, resolucion, impa
         if (error) throw error;
         return { ok: true, error: null };
     } catch (error) {
-        console.error('actualizarGestionIncidente error:', error);
-        return { ok: false, error: error?.message || 'No se pudo actualizar la gestión del incidente' };
+        logger.error('actualizarGestionIncidente error', error);
+        return { ok: false, error: getErrorMessage(error, GENERIC_SAVE_ERROR) };
     }
 };
 

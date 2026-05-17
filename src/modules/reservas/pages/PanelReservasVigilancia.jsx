@@ -64,12 +64,14 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
     useEffect(() => {
         if (!usuarioApp?.conjunto_id) return;
 
-        if (filtroEstado === 'operativas') {
-            cargarOperativas();
-            return;
-        }
+        void Promise.resolve().then(() => {
+            if (filtroEstado === 'operativas') {
+                cargarOperativas();
+                return;
+            }
 
-        cargarHistorico(paginaHistorial);
+            cargarHistorico(paginaHistorial);
+        });
     }, [usuarioApp?.conjunto_id, filtroEstado, paginaHistorial]);
 
     useEffect(() => {
@@ -121,12 +123,14 @@ export default function PanelReservasVigilancia({ usuarioApp }) {
         setHighlightReservaId(id);
         setTimeout(() => setHighlightReservaId((prev) => (prev === id ? null : prev)), 1200);
 
-        if (filtroEstado === 'operativas') {
-            cargarOperativas();
-            return;
-        }
+        void Promise.resolve().then(() => {
+            if (filtroEstado === 'operativas') {
+                cargarOperativas();
+                return;
+            }
 
-        cargarHistorico(paginaHistorial);
+            cargarHistorico(paginaHistorial);
+        });
     };
 
     const cambiarVista = (vista) => {

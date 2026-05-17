@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { logger } from '../../utils/logger';
+import { getAuthErrorMessage } from '../../utils/errorMessages';
 
 export default function Login() {
 
@@ -10,13 +12,7 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
 
-  const traducirAuthError = (message) => {
-    const text = String(message || '').toLowerCase();
-    if (text.includes('invalid login credentials')) return 'Correo o contraseña incorrectos.';
-    if (text.includes('email not confirmed')) return 'Confirma tu correo antes de ingresar.';
-    if (text.includes('password')) return 'La contraseña no cumple los requisitos mínimos.';
-    return message || 'No fue posible completar la autenticación.';
-  };
+  const traducirAuthError = getAuthErrorMessage;
 
   const getRolLabel = (rol) => {
     if (rol === 'admin') return 'administración';
@@ -51,11 +47,12 @@ export default function Login() {
 
       const userId = data?.user?.id;
       if (userId) {
-        const { data: perfil } = await supabase
+        const { data: perfil, error: perfilError } = await supabase
           .from('usuarios_app')
           .select('rol_id')
           .eq('id', userId)
           .maybeSingle();
+        if (perfilError) logger.error('Login: no se pudo cargar rol del perfil', perfilError);
         setInfoMsg(`Acceso concedido. Redirigiendo a ${getRolLabel(perfil?.rol_id)}...`);
       }
     }

@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { logger } from '../../../utils/logger';
 
 export const EVENTOS_PAGO = {
   COBRO_CREADO: 'cobro_creado',
@@ -86,7 +87,7 @@ export const registrarPagoEvento = async ({
   }]);
 
   if (error) {
-    console.error('Error registrando evento de pago:', error);
+    logger.error('Error registrando evento de pago', error);
     return { ok: false, error };
   }
 
@@ -104,7 +105,7 @@ export const crearNotificacionPago = async ({ usuarioId, tipo, titulo, mensaje }
   }]);
 
   if (error) {
-    console.error('Error creando notificación de pago:', error);
+    logger.error('Error creando notificación de pago', error);
     return { ok: false, error };
   }
 
@@ -121,7 +122,7 @@ export const notificarAdminsPago = async ({ conjuntoId, tipo, titulo, mensaje })
     .eq('rol_id', 'admin');
 
   if (error) {
-    console.error('Error consultando admins para notificación de pago:', error);
+    logger.error('Error consultando admins para notificación de pago', error);
     return { ok: false, error };
   }
 
@@ -136,7 +137,7 @@ export const notificarAdminsPago = async ({ conjuntoId, tipo, titulo, mensaje })
 
   const { error: errorInsert } = await supabase.from('notificaciones').insert(notificaciones);
   if (errorInsert) {
-    console.error('Error notificando admins de pago:', errorInsert);
+    logger.error('Error notificando admins de pago', errorInsert);
     return { ok: false, error: errorInsert };
   }
 

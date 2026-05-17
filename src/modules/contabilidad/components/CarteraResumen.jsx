@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
+import { logger } from '../../../utils/logger';
 import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
 
 const ESTADOS_CARTERA = [
@@ -48,7 +49,7 @@ export default function CarteraResumen({ usuarioApp }) {
       .in('estado', ESTADOS_CARTERA);
 
     if (error) {
-      console.log(error);
+      logger.error('No se pudo cargar cartera', error);
       return;
     }
 
@@ -116,8 +117,8 @@ export default function CarteraResumen({ usuarioApp }) {
       alert('📩 Recordatorio enviado');
 
     } catch (err) {
-      console.log(err);
-      alert('Error enviando recordatorio');
+      logger.error('No se pudo enviar recordatorio de pago', err);
+      alert('No fue posible enviar el recordatorio. Intenta nuevamente.');
     }
   };
 

@@ -1,15 +1,17 @@
+import { logger } from './logger';
+
 export const pedirPermiso = async () => {
 
   if (!("Notification" in window)) {
-    console.log("Este navegador no soporta notificaciones");
+    logger.info('Este navegador no soporta notificaciones');
     return;
   }
 
   const permiso = await Notification.requestPermission();
 
   if (permiso === "granted") {
-    console.log("Permisos concedidos 🔥");
+    logger.info('Permisos de notificaciones concedidos');
   } else {
-    console.log("Permisos denegados ❌");
+    logger.info('Permisos de notificaciones denegados');
   }
 };
