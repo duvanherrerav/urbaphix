@@ -1,7 +1,9 @@
 import { supabase } from '../../../services/supabaseClient';
 import { EVENTOS_PAGO, crearNotificacionPago, registrarPagoEvento } from './pagosEventosService';
+import { logger } from '../../../utils/logger';
+import { GENERIC_SAVE_ERROR, getErrorMessage } from '../../../utils/errorMessages';
 
-const errorMessage = (error, fallback) => error?.message || fallback;
+const errorMessage = (error, fallback) => getErrorMessage(error, fallback);
 
 // 🔥 CREAR COBRO
 export const crearPago = async (data, user) => {
@@ -85,8 +87,8 @@ export const crearPago = async (data, user) => {
     return { pago, error: null };
 
   } catch (err) {
-    console.error('Error crearPago:', err);
-    return { pago: null, error: errorMessage(err, 'Error creando cobro') };
+    logger.error('Error crearPago', err);
+    return { pago: null, error: errorMessage(err, GENERIC_SAVE_ERROR) };
   }
 };
 
@@ -114,7 +116,7 @@ export const registrarPago = async (pago_id) => {
     return { ok: true };
 
   } catch (err) {
-    console.error('Error registrarPago:', err);
-    return { ok: false, error: errorMessage(err, 'Error registrando pago') };
+    logger.error('Error registrarPago', err);
+    return { ok: false, error: errorMessage(err, GENERIC_SAVE_ERROR) };
   }
 };

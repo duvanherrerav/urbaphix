@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { logger } from '../utils/logger';
 
 export const useRealtimeConjuntoChannel = ({
     conjuntoId,
@@ -56,7 +57,7 @@ export const useRealtimeConjuntoChannel = ({
                     scheduleRefresh();
                 }
                 if (status === 'CHANNEL_ERROR') {
-                    console.warn(warningMessage, { conjuntoId, channelName, table });
+                    logger.warn(warningMessage, { conjuntoId, channelName, table });
                 }
             });
 

@@ -4,6 +4,7 @@ import { supabase } from '../../../services/supabaseClient';
 import { crearVisita as crearVisitaService } from '../services/visitasService';
 import QRShareCard from '../components/QRShareCard';
 import { ModuleTitle } from '../../../components/ui/ModuleIcon';
+import { logger } from '../../../utils/logger';
 
 
 const formatManualIngresoCode = (qrCode) => {
@@ -83,7 +84,8 @@ export default function CrearVisita() {
       if (error || !Array.isArray(data)) {
         setTiposDocumento([]);
         if (!toastTiposShownRef.current) {
-          toast.error(`No se pudo cargar catálogo tipos_documento (${error?.message || 'sin acceso'})`);
+          logger.error('CrearVisita: no se pudo cargar catálogo tipos_documento', error);
+          toast.error('No fue posible cargar el catálogo de documentos. Intenta nuevamente.');
           toastTiposShownRef.current = true;
         }
         return;
@@ -296,7 +298,8 @@ export default function CrearVisita() {
       await navigator.clipboard.writeText(texto);
       toast.success('Código copiado');
     } catch (error) {
-      toast.error(`No se pudo compartir el QR: ${error?.message || 'error inesperado'}`);
+      logger.error('CrearVisita: no se pudo compartir QR', error);
+      toast.error('No fue posible compartir el QR. Intenta nuevamente.');
     }
   };
 
@@ -308,7 +311,8 @@ export default function CrearVisita() {
       await navigator.clipboard.writeText(texto);
       toast.success('Código copiado');
     } catch (error) {
-      toast.error(`No se pudo copiar el código: ${error?.message || 'error inesperado'}`);
+      logger.error('CrearVisita: no se pudo copiar código QR', error);
+      toast.error('No fue posible copiar el código. Intenta nuevamente.');
     }
   };
 
@@ -331,7 +335,8 @@ export default function CrearVisita() {
       a.click();
       toast.success('Imagen QR descargada');
     } catch (error) {
-      toast.error(`No se pudo compartir la imagen del QR: ${error?.message || 'error inesperado'}`);
+      logger.error('CrearVisita: no se pudo compartir imagen QR', error);
+      toast.error('No fue posible compartir la imagen del QR. Intenta nuevamente.');
     }
   };
 

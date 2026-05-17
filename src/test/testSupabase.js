@@ -1,4 +1,5 @@
 import { supabase } from '@/services/supabaseClient';
+import { logger } from '../utils/logger';
 
 export const testConexion = async () => {
 
@@ -7,6 +8,6 @@ export const testConexion = async () => {
     .select('*')
     .limit(5);
 
-  console.log('DATA:', data);
-  console.log('ERROR:', error);
+  logger.info('testConexion: pagos consultados', { count: data?.length || 0 });
+  logger.error('testConexion: error consultando pagos', error);
 };

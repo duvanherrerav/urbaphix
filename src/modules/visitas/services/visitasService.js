@@ -1,6 +1,8 @@
 import { supabase } from '../../../services/supabaseClient';
+import { logger } from '../../../utils/logger';
+import { GENERIC_SAVE_ERROR, getErrorMessage } from '../../../utils/errorMessages';
 
-const errorMessage = (error, fallback) => error?.message || fallback;
+const errorMessage = (error, fallback) => getErrorMessage(error, fallback);
 
 export const crearVisita = async (data, user) => {
     try {
@@ -46,8 +48,8 @@ export const crearVisita = async (data, user) => {
             error: null
         };
     } catch (error) {
-        console.error('crearVisita error:', error);
-        return { ok: false, visita: null, qr_code: null, error: errorMessage(error, 'Error creando visita') };
+        logger.error('crearVisita error', error);
+        return { ok: false, visita: null, qr_code: null, error: errorMessage(error, GENERIC_SAVE_ERROR) };
     }
 };
 
@@ -94,12 +96,12 @@ export const validarQR = async (qr_code) => {
         }]);
 
         if (errorNotificacion) {
-            console.warn('validarQR: no se pudo crear la notificación', errorNotificacion);
+            logger.warn('validarQR: no se pudo crear la notificación', errorNotificacion);
         }
 
         return { ok: true, visita, error: null };
     } catch (error) {
-        console.error('validarQR error:', error);
+        logger.error('validarQR error', error);
         return { ok: false, visita: null, error: errorMessage(error, 'No se pudo validar el QR') };
     }
 };
