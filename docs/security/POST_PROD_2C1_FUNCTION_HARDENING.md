@@ -1,7 +1,7 @@
 # POST-PROD 2C-1 — Hardening pasivo seguro de funciones Supabase
 
 ## Resumen ejecutivo
-En esta subfase se implementa hardening pasivo sobre funciones del schema `public` mediante `ALTER FUNCTION ... SET search_path = public, auth` con guardas defensivas por existencia. No se cambian policies RLS, grants de tablas, ni lógica funcional de RPC. El objetivo es reducir riesgo de hijacking por `search_path` implícito y preparar la fase POST-PROD 2C-2 (ajustes de permisos/ejecutabilidad con validación funcional controlada).
+En esta subfase se implementa hardening pasivo sobre funciones del schema `public` mediante `ALTER FUNCTION ... SET search_path = public, auth` con guardas defensivas por existencia. **Excepción explícita:** `rls_auto_enable()` se preserva como función especial asociada a event trigger/DDL con hardening existente `search_path = pg_catalog` (no se amplía a `public, auth`). No se cambian policies RLS, grants de tablas, ni lógica funcional de RPC. El objetivo es reducir riesgo de hijacking por `search_path` implícito y preparar la fase POST-PROD 2C-2 (ajustes de permisos/ejecutabilidad con validación funcional controlada).
 
 ## Alcance
 - Migración versionada de hardening pasivo en `supabase/migrations/`.
@@ -9,7 +9,7 @@ En esta subfase se implementa hardening pasivo sobre funciones del schema `publi
 - Documentación técnica de funciones críticas, exposición y pendientes.
 
 ## Qué cambia la migración
-- Fija `search_path = public, auth` (si la función existe) para funciones críticas de visitas/auth/helpers/trigger:
+- Fija `search_path = public, auth` (si la función existe) para funciones críticas de visitas/auth/helpers/trigger, **excepto `rls_auto_enable()`**:
   - `fn_crear_o_reutilizar_visitante_y_registro(uuid,uuid,uuid,text,text,text,text,text,date)`
   - `fn_registrar_ingreso_visita(text,uuid)`
   - `fn_registrar_salida_visita(uuid,uuid)`
@@ -24,7 +24,7 @@ En esta subfase se implementa hardening pasivo sobre funciones del schema `publi
   - `is_admin()`
   - `is_residente()`
   - `is_vigilancia()`
-  - `rls_auto_enable()`
+- Preserva `rls_auto_enable()` como caso especial de event trigger con `search_path = pg_catalog` (sin cambios en 2C-1).
 
 ## Qué NO cambia la migración
 - No hay `REVOKE` masivos ni `REVOKE SELECT ON ALL TABLES`.
@@ -62,7 +62,7 @@ Pendientes de revisión/control por criticidad (sin ejecutar en 2C-1):
 | is_admin | Helper legacy | No directo | authenticated/service_role | Fijar search_path | Definir continuidad y grants |
 | is_residente | Helper legacy | No directo | authenticated/service_role | Fijar search_path | Definir continuidad y grants |
 | is_vigilancia | Helper legacy | No directo | authenticated/service_role | Fijar search_path | Definir continuidad y grants |
-| rls_auto_enable | Event trigger helper | No directo | interno DB | Fijar search_path | Evaluar si requiere exposición a anon/authenticated |
+| rls_auto_enable | Event trigger helper (SECURITY DEFINER) | No directo | interno DB | **No tocar; preservar `search_path = pg_catalog`** | Revisar necesidad real y ejecutabilidad pública sin ampliar `search_path` |
 
 ## Riesgos mitigados
 - Reduce riesgo por resolución de objetos en `search_path` implícito.

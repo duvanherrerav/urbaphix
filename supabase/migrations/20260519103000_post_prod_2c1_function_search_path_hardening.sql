@@ -73,9 +73,5 @@ BEGIN
     SET search_path = public, auth;
   END IF;
 
-  IF to_regprocedure('public.rls_auto_enable()') IS NOT NULL THEN
-    ALTER FUNCTION public.rls_auto_enable()
-    SET search_path = public, auth;
-  END IF;
 END
 $$;

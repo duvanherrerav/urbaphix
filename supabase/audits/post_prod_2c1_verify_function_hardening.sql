@@ -50,6 +50,10 @@ ORDER BY p.proname, identity_args, r.rolname;
 SELECT
   p.proname AS function_name,
   pg_get_function_identity_arguments(p.oid) AS identity_args,
+  CASE
+    WHEN p.proname = 'rls_auto_enable' THEN 'event_trigger_special_case_preserve_pg_catalog'
+    ELSE 'standard_2c1_function'
+  END AS hardening_case,
   p.prosecdef AS is_security_definer,
   p.provolatile,
   p.proconfig
