@@ -51,6 +51,8 @@ RPC productivas (fuera de cambios en esta fase):
    - Búsqueda de `supabase.rpc(` y `.rpc(` en `src/`.
    - Búsqueda de funciones objetivo (`fn_*`, `get_user_*`, `is_*`).
 2. Construcción de script readonly para inventario exhaustivo de funciones `public` y su exposición EXECUTE por rol.
+   - `anon`, `authenticated`, `service_role` se evalúan con `has_function_privilege`.
+   - `PUBLIC` se audita por ACL/default privileges (`proacl` + `aclexplode` + `acldefault`) y **no** con `has_function_privilege('public', ...)`.
 3. Clasificación funcional por categorías de riesgo operativo.
 4. Recomendaciones sin ejecución de cambios.
 
@@ -113,3 +115,13 @@ Observación: no se encontró uso frontend directo de `fn_auth_*`, `get_user_*` 
 - Sin cambios remotos en Supabase.
 - Sin cambios de permisos.
 - Matriz clara de exposición por función/rol.
+
+
+## Nota técnica sobre PUBLIC
+En PostgreSQL, `PUBLIC` es un pseudo-rol. Para esta auditoría se evita tratarlo como usuario real.
+Por eso, la señal `public_execute`/`public_grant_detected` se calcula revisando ACL efectiva de función:
+- `aclexplode(coalesce(proacl, acldefault('f', proowner)))`
+- `grantee = 0`
+- `privilege_type = 'EXECUTE'`
+
+Esto también cubre funciones con `proacl IS NULL`, interpretando privileges por defecto del objeto para el owner/tipo de objeto dentro de la auditoría readonly.
