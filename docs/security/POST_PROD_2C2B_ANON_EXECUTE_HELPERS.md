@@ -1,7 +1,7 @@
 # POST-PROD 2C-2B-A — Revocación de EXECUTE a `PUBLIC` + `anon` en helpers RLS/auth y legacy
 
 ## Resumen ejecutivo
-Esta subfase reduce superficie pública en Supabase revocando `EXECUTE` al rol `anon` **y también a `PUBLIC`** sobre helpers de autorización/RLS (modernos y legacy). Esto evita acceso anónimo heredado por membresía implícita en `PUBLIC`. Se mantienen sin cambios los grants de `authenticated` y `service_role`, y no se modifican las RPC productivas de visitas/vigilancia. La migración ahora es drift-safe entre DEV/QA/PRD: en QA falló por ausencia de `public.get_user_residente_id()`, por lo que cada revocación se protege con `to_regprocedure(...)`.
+Esta subfase reduce superficie pública en Supabase revocando `EXECUTE` al rol `anon` **y también a `PUBLIC`** sobre helpers de autorización/RLS (modernos y legacy). Esto evita acceso anónimo heredado por membresía implícita en `PUBLIC`. Al revocar `PUBLIC`, la migración ahora otorga explícitamente `EXECUTE` a `authenticated` y `service_role` para preservar tráfico autenticado y uso interno, y no modifica las RPC productivas de visitas/vigilancia.
 
 ## Evidencia base
 - Tras 2C-2A, `anon`, `authenticated` y `service_role` conservaban `EXECUTE` en helpers RLS/auth modernos y helpers legacy.
@@ -9,9 +9,12 @@ Esta subfase reduce superficie pública en Supabase revocando `EXECUTE` al rol `
 - Las RPC productivas de visitas/vigilancia (`fn_crear_o_reutilizar_visitante_y_registro`, `fn_registrar_ingreso_visita`, `fn_registrar_salida_visita`) se mantienen fuera de alcance para evitar impacto funcional.
 
 ## Qué cambia
-- Nueva migración versionada que ejecuta, por cada helper objetivo, bloques `DO $$ ... END $$;` con `to_regprocedure(...)`:
-  - si la función existe: `REVOKE EXECUTE ... FROM PUBLIC;` y `REVOKE EXECUTE ... FROM anon;`
-  - si la función no existe en el ambiente, no falla la migración.
+- Nueva migración versionada drift-safe (`DO $$ ... END $$;` + `to_regprocedure(...)`) por cada helper objetivo.
+- Orden por función para preservar permisos explícitos de tráfico autenticado:
+  1. `GRANT EXECUTE ... TO authenticated, service_role;`
+  2. `REVOKE EXECUTE ... FROM PUBLIC;`
+  3. `REVOKE EXECUTE ... FROM anon;`
+  4. `GRANT EXECUTE ... TO authenticated, service_role;` (idempotente, estado final explícito).
 - Funciones objetivo (9):
   - `fn_auth_conjunto_id()`
   - `fn_auth_residente_id()`
