@@ -5,16 +5,19 @@ En esta fase se aplica un recorte mínimo y controlado de privilegios `EXECUTE` 
 No se tocan RPC productivas de visitas, helpers canónicos `fn_auth_*`, policies RLS, grants de tablas ni lógica funcional de frontend.
 
 ## Evidencia base
-- Esquema remoto versionado (`20260410031821_remote_schema.sql`) muestra `GRANT ALL` a `anon` y `authenticated` sobre funciones internas como `rls_auto_enable()`, `set_updated_at()` y `handle_new_user()`.
+- Esquema remoto versionado (`20260410031821_remote_schema.sql`) muestra `GRANT ALL` a `anon` y `authenticated` sobre funciones internas como `rls_auto_enable()`, `set_updated_at()` y `handle_new_user()`, además del comportamiento por defecto de ejecutabilidad heredado vía `PUBLIC` en PostgreSQL.
 - Auditorías previas de seguridad (`POST_PROD_2A`, `POST_PROD_2C-1`) ya clasifican estas funciones como candidatas de endurecimiento de ejecutabilidad externa.
 - Búsqueda de uso en frontend no muestra invocaciones RPC directas a estas tres funciones.
 
 ## Qué cambia en 2C-2A
 - Nueva migración:
   - `supabase/migrations/20260520110000_post_prod_2c2a_revoke_internal_function_execute.sql`
-- Revokes explícitos y no masivos:
+- Revokes explícitos y no masivos (incluyendo `PUBLIC` para evitar ejecutabilidad heredada):
+  - `REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC;`
   - `REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon, authenticated;`
+  - `REVOKE EXECUTE ON FUNCTION public.set_updated_at() FROM PUBLIC;`
   - `REVOKE EXECUTE ON FUNCTION public.set_updated_at() FROM anon, authenticated;`
+  - `REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;`
   - `REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;`
 - Nuevo script readonly de verificación:
   - `supabase/audits/post_prod_2c2a_verify_execute_grants.sql`
@@ -32,9 +35,9 @@ No se tocan RPC productivas de visitas, helpers canónicos `fn_auth_*`, policies
 
 | Función | Tipo | Uso frontend | Riesgo | Acción 2C-2A | Pendiente |
 |---|---|---|---|---|---|
-| `rls_auto_enable` | event trigger / internal | No | Alta exposición innecesaria | Revocar `anon`/`authenticated` | Revalidar necesidad de exposición futura |
-| `set_updated_at` | trigger helper | No | Exposición innecesaria | Revocar `anon`/`authenticated` | Validar flujos UPDATE con triggers |
-| `handle_new_user` | auth trigger | No | Exposición innecesaria | Revocar `anon`/`authenticated` | Validar alta/auth de usuario |
+| `rls_auto_enable` | event trigger / internal | No | Alta exposición innecesaria | Revocar `PUBLIC` y `anon`/`authenticated` | Revalidar necesidad de exposición futura |
+| `set_updated_at` | trigger helper | No | Exposición innecesaria | Revocar `PUBLIC` y `anon`/`authenticated` | Validar flujos UPDATE con triggers |
+| `handle_new_user` | auth trigger | No | Exposición innecesaria | Revocar `PUBLIC` y `anon`/`authenticated` | Validar alta/auth de usuario |
 | `fn_crear_o_reutilizar_visitante_y_registro` | RPC productiva visitas | Sí | Alta, pero funcional | No tocar ahora | Fase futura con pruebas E2E |
 | `fn_registrar_ingreso_visita` | RPC productiva vigilancia | Sí | Alta, pero funcional | No tocar ahora | Fase futura con pruebas E2E |
 | `fn_registrar_salida_visita` | RPC productiva vigilancia | Sí | Alta, pero funcional | No tocar ahora | Fase futura con pruebas E2E |
@@ -48,7 +51,7 @@ No se tocan RPC productivas de visitas, helpers canónicos `fn_auth_*`, policies
    - registro/login de usuario nuevo (flujo `handle_new_user` vía trigger);
    - operaciones con UPDATE que disparan `set_updated_at`;
    - rutas de visitas y portería que usan RPC productivas (sin cambios en grants).
-4. Confirmar que `anon` y `authenticated` ya no ejecutan las 3 funciones internas.
+4. Confirmar que `PUBLIC`, `anon` y `authenticated` ya no ejecutan las 3 funciones internas.
 5. Validar que `service_role`/internos conservan operación esperada.
 
 ## Plan de rollback conceptual
