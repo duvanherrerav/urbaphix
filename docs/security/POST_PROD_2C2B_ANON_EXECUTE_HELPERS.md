@@ -67,3 +67,4 @@ Si se detecta regresión, crear nueva migración de rollback explícito restaura
 ## Recomendación para POST-PROD 2C-2B-B / 2C-3
 - Ejecutar inventario de consumidores reales por rol (logs/auditoría) para confirmar ausencia de invocación anónima en helpers.
 - Diseñar fase dedicada para revisar grants `anon` de RPC productivas de visitas/vigilancia con pruebas E2E completas.
+\n- Nota PR #137: conflictos resueltos conservando únicamente la versión drift-safe sin REVOKE directos fuera de bloques DO 5765.
