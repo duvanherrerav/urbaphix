@@ -129,4 +129,5 @@ Esto también cubre funciones con `proacl IS NULL`, interpretando privileges por
 ## Nota sobre ruido por funciones de extensiones
 - El script general `supabase/audits/post_prod_2c2c_rpc_anon_execute_audit.sql` puede mostrar funciones técnicas de extensiones PostgreSQL en `public` (por ejemplo patrones `gbt_*`, `gbtreekey*`, `*_dist`).
 - Para decisiones de hardening de Urbaphix debe usarse el complemento enfocado `supabase/audits/post_prod_2c2c_rpc_anon_execute_focused.sql`.
+- El script enfocado usa filtros con regex (`~` / `!~`) en lugar de `LIKE ... ESCAPE` para evitar errores de escaping (por ejemplo en PowerShell/Supabase CLI).
 - La salida del script general no implica por sí sola riesgo funcional de Urbaphix cuando se trata de funciones de extensiones.
