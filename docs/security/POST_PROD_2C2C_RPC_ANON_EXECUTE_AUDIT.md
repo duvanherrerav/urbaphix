@@ -125,3 +125,8 @@ Por eso, la señal `public_execute`/`public_grant_detected` se calcula revisando
 - `privilege_type = 'EXECUTE'`
 
 Esto también cubre funciones con `proacl IS NULL`, interpretando privileges por defecto del objeto para el owner/tipo de objeto dentro de la auditoría readonly.
+
+## Nota sobre ruido por funciones de extensiones
+- El script general `supabase/audits/post_prod_2c2c_rpc_anon_execute_audit.sql` puede mostrar funciones técnicas de extensiones PostgreSQL en `public` (por ejemplo patrones `gbt_*`, `gbtreekey*`, `*_dist`).
+- Para decisiones de hardening de Urbaphix debe usarse el complemento enfocado `supabase/audits/post_prod_2c2c_rpc_anon_execute_focused.sql`.
+- La salida del script general no implica por sí sola riesgo funcional de Urbaphix cuando se trata de funciones de extensiones.
