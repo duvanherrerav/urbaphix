@@ -21,9 +21,9 @@ WITH urbaphix_function_base AS (
   JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public'
     AND (
-      p.proname LIKE 'fn\_%' ESCAPE '\\'
-      OR p.proname LIKE 'get_user\_%' ESCAPE '\\'
-      OR p.proname LIKE 'is\_%' ESCAPE '\\'
+      p.proname ~ '^fn_'
+      OR p.proname ~ '^get_user_'
+      OR p.proname ~ '^is_'
       OR p.proname IN (
         'handle_new_user',
         'set_updated_at',
@@ -33,9 +33,9 @@ WITH urbaphix_function_base AS (
         'fn_registrar_salida_visita'
       )
     )
-    AND p.proname NOT LIKE 'gbt\_%' ESCAPE '\\'
-    AND p.proname NOT LIKE 'gbtreekey%'
-    AND p.proname NOT LIKE '%\_dist' ESCAPE '\\'
+    AND p.proname !~ '^gbt_'
+    AND p.proname !~ '^gbtreekey'
+    AND p.proname !~ '_dist$'
 )
 SELECT
   schema_name,
