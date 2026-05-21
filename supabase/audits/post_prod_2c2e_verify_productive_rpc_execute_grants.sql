@@ -17,7 +17,14 @@ SELECT
   r.expected_signature,
   r.proc_oid::text AS resolved_signature,
   r.proc_oid IS NOT NULL AS function_exists,
-  CASE WHEN r.proc_oid IS NOT NULL THEN has_function_privilege('public', r.proc_oid, 'EXECUTE') END AS public_execute,
+  CASE
+    WHEN r.proc_oid IS NOT NULL THEN EXISTS (
+      SELECT 1
+      FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
+      WHERE acl.grantee = 0
+        AND acl.privilege_type = 'EXECUTE'
+    )
+  END AS public_execute,
   CASE WHEN r.proc_oid IS NOT NULL THEN has_function_privilege('anon', r.proc_oid, 'EXECUTE') END AS anon_execute,
   CASE WHEN r.proc_oid IS NOT NULL THEN has_function_privilege('authenticated', r.proc_oid, 'EXECUTE') END AS authenticated_execute,
   CASE WHEN r.proc_oid IS NOT NULL THEN has_function_privilege('service_role', r.proc_oid, 'EXECUTE') END AS service_role_execute,
@@ -29,7 +36,15 @@ SELECT
     WHERE cfg LIKE 'search_path=%'
     LIMIT 1
   ) AS search_path_config,
-  (r.proc_oid IS NOT NULL AND NOT has_function_privilege('public', r.proc_oid, 'EXECUTE')) AS expected_public_execute_false,
+  (
+    r.proc_oid IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1
+      FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
+      WHERE acl.grantee = 0
+        AND acl.privilege_type = 'EXECUTE'
+    )
+  ) AS expected_public_execute_false,
   (r.proc_oid IS NOT NULL AND NOT has_function_privilege('anon', r.proc_oid, 'EXECUTE')) AS expected_anon_execute_false,
   (r.proc_oid IS NOT NULL AND has_function_privilege('authenticated', r.proc_oid, 'EXECUTE')) AS expected_authenticated_execute_true,
   (r.proc_oid IS NOT NULL AND has_function_privilege('service_role', r.proc_oid, 'EXECUTE')) AS expected_service_role_execute_true
