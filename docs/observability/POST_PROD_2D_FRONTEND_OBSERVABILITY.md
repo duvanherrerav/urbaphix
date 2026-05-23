@@ -64,6 +64,19 @@ Principios:
 }
 ```
 
+
+## Ejemplos de uso compatibles
+```js
+logger.warn('mensaje', error);
+logger.warn('mensaje', { module: 'visitas', action: 'share_qr' }, error);
+logger.error('mensaje', supabaseError, { module: 'pagos', action: 'aprobar_comprobante' });
+```
+
+Notas:
+- Si el segundo argumento es `Error` o error-like (ej. Supabase con `message/code/status`), se normaliza en `event.error`.
+- Si el segundo argumento es contexto, se sanitiza en `event.context`.
+- Si existe tercer argumento, se resuelve como `context` o `error` según su forma.
+
 ## Datos permitidos y prohibidos
 ### Permitido
 - módulo, acción, severidad, timestamp, ambiente;

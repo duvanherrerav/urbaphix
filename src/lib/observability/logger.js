@@ -8,11 +8,43 @@ const truncate = (value, max = 140) => {
   return `${text.slice(0, max)}…`;
 };
 
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const isErrorLike = (value) => {
+  if (!value || typeof value !== 'object') return false;
+  if (value instanceof Error) return true;
+
+  const hasName = typeof value.name === 'string' && value.name.length > 0;
+  const hasMessage = typeof value.message === 'string' && value.message.length > 0;
+  const hasCode = typeof value.code === 'string' || typeof value.code === 'number';
+  const hasStatus = typeof value.status === 'number' || typeof value.statusCode === 'number';
+
+  return hasName || hasMessage || hasCode || hasStatus;
+};
+
 const sanitizePrimitive = (key, value) => {
   if (typeof value === 'string' && SENSITIVE_KEY_PATTERN.test(key)) return '[redacted]';
   if (typeof value === 'string') return truncate(value);
   if (typeof value === 'number' || typeof value === 'boolean' || value == null) return value;
   return `[${typeof value}]`;
+};
+
+export const normalizeError = (error) => {
+  if (!error) return { type: 'UnknownError', message: 'Unknown error', code: null, status: null };
+  if (typeof error === 'string') return { type: 'Error', message: truncate(error), code: null, status: null };
+
+  const normalized = {
+    type: error.name || 'Error',
+    message: truncate(error.message || 'Unexpected error'),
+    code: error.code ?? null,
+    status: error.status ?? error.statusCode ?? null
+  };
+
+  if (import.meta.env.DEV && typeof error.stack === 'string') {
+    normalized.stack = truncate(error.stack, 500);
+  }
+
+  return normalized;
 };
 
 export const sanitizeContext = (context = {}) => {
@@ -23,7 +55,7 @@ export const sanitizeContext = (context = {}) => {
       .slice(0, 20)
       .map(([key, value]) => {
         if (SENSITIVE_KEY_PATTERN.test(key)) return [key, '[redacted]'];
-        if (value instanceof Error) return [key, normalizeError(value)];
+        if (isErrorLike(value)) return [key, normalizeError(value)];
         if (Array.isArray(value)) return [key, `[array:${value.length}]`];
         if (value && typeof value === 'object') return [key, '[object]'];
         return [key, sanitizePrimitive(key, value)];
@@ -31,16 +63,23 @@ export const sanitizeContext = (context = {}) => {
   );
 };
 
-export const normalizeError = (error) => {
-  if (!error) return { type: 'UnknownError', message: 'Unknown error' };
-  if (typeof error === 'string') return { type: 'Error', message: truncate(error) };
+const resolveContextAndError = (arg2, arg3) => {
+  let context = {};
+  let error;
 
-  return {
-    type: error.name || 'Error',
-    message: truncate(error.message || 'Unexpected error'),
-    code: error.code || null,
-    status: error.status || error.statusCode || null
-  };
+  if (isErrorLike(arg2)) {
+    error = arg2;
+    if (isPlainObject(arg3) && !isErrorLike(arg3)) context = arg3;
+    else if (isErrorLike(arg3) && !error) error = arg3;
+    return { context, error };
+  }
+
+  if (isPlainObject(arg2)) context = arg2;
+
+  if (isErrorLike(arg3)) error = arg3;
+  else if (isPlainObject(arg3) && !Object.keys(context).length) context = arg3;
+
+  return { context, error };
 };
 
 const createEvent = ({ severity, message, error, context = {} }) => ({
@@ -65,13 +104,15 @@ export const logInfo = (message, context = {}) => {
   return event;
 };
 
-export const logWarn = (message, context = {}, error) => {
+export const logWarn = (message, arg2 = {}, arg3) => {
+  const { context, error } = resolveContextAndError(arg2, arg3);
   const event = createEvent({ severity: 'warn', message, context, error });
   emit('warn', event);
   return event;
 };
 
-export const logError = (message, error, context = {}) => {
+export const logError = (message, arg2, arg3) => {
+  const { context, error } = resolveContextAndError(arg2, arg3);
   const event = createEvent({ severity: 'error', message, context, error });
   emit('error', event);
   return event;
@@ -79,9 +120,8 @@ export const logError = (message, error, context = {}) => {
 
 export const logger = {
   info: (message, metadata) => logInfo(message, metadata),
-  warn: (message, metadata) => logWarn(message, metadata),
-  error: (message, errorOrMetadata, metadata = {}) => {
-    if (errorOrMetadata instanceof Error) return logError(message, errorOrMetadata, metadata);
-    return logError(message, null, errorOrMetadata || {});
-  }
+  warn: (message, arg2, arg3) => logWarn(message, arg2, arg3),
+  error: (message, arg2, arg3) => logError(message, arg2, arg3)
 };
+
+export { isErrorLike };
