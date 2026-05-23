@@ -1,6 +1,8 @@
 const SENSITIVE_KEY_PATTERN = /(token|session|password|secret|authorization|auth|cookie|jwt|email|telefono|phone|placa|document|comprobante|signed|url|payload|headers)/i;
 
 const ENVIRONMENT = import.meta.env.MODE || (import.meta.env.PROD ? 'production' : 'development');
+const REMOTE_ENABLED = String(import.meta.env.VITE_OBSERVABILITY_REMOTE_ENABLED || 'false').toLowerCase() === 'true';
+const REMOTE_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/observability-ingest`;
 
 const truncate = (value, max = 140) => {
   const text = String(value ?? '');
@@ -63,6 +65,42 @@ export const sanitizeContext = (context = {}) => {
   );
 };
 
+const sendRemoteEvent = async (event) => {
+  if (!REMOTE_ENABLED || !['warn', 'error'].includes(event.severity)) return;
+
+  try {
+    const token = localStorage.getItem('supabase.auth.token');
+    const accessToken = token ? JSON.parse(token)?.currentSession?.access_token : null;
+    if (!accessToken) return;
+
+    const payload = {
+      module: event.module,
+      action: event.action,
+      severity: event.severity,
+      message: event.message,
+      event_type: event.error?.type || null,
+      error_type: event.error?.type || null,
+      error_code: event.error?.code ? truncate(event.error.code, 64) : null,
+      http_status: Number.isInteger(event.error?.status) ? event.error.status : null,
+      metadata: event.context,
+      environment: event.environment,
+      source: 'frontend'
+    };
+
+    await fetch(REMOTE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(payload),
+      keepalive: true
+    });
+  } catch {
+    // no-op: observability remota nunca debe bloquear UI
+  }
+};
+
 const resolveContextAndError = (arg2, arg3) => {
   let context = {};
   let error;
@@ -96,6 +134,7 @@ const createEvent = ({ severity, message, error, context = {} }) => ({
 const emit = (method, event) => {
   const fn = console[method] || console.log;
   fn('[urbaphix-observability]', event);
+  void sendRemoteEvent(event);
 };
 
 export const logInfo = (message, context = {}) => {
