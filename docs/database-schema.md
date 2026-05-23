@@ -31,6 +31,7 @@ Tablas detectadas en `public`:
 - incidentes
 - multas
 - notificaciones
+- operational_events
 - pagos
 - pagos_eventos
 - paquetes
@@ -911,6 +912,7 @@ Tablas con FK a `usuarios_app.id`:
 - accesos
 - incidentes
 - notificaciones
+- operational_events
 - paquetes
 - pagos
 - pagos_eventos
@@ -962,6 +964,7 @@ Patrones de control vistos en las políticas:
 - incidentes
 - multas
 - notificaciones
+- operational_events
 - pagos
 - pagos_eventos
 - paquetes
@@ -1004,3 +1007,40 @@ Puede ampliarse más adelante con:
 - triggers
 - funciones SQL
 - columnas faltantes de tablas no completamente visibles en los TXT
+
+## 10. operational_events
+**Descripción:** auditoría operativa backend para eventos frontend saneados (POST-PROD 2D-1).
+
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
+- `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
+- `conjunto_id` (uuid, nullable, FK `conjuntos.id`)
+- `actor_user_id` (uuid, nullable, FK `auth.users.id`)
+- `actor_role` (text, nullable)
+- `module` (text, NOT NULL, check longitud 2..64)
+- `action` (text, NOT NULL, check longitud 2..64)
+- `severity` (text, NOT NULL, check `info|warn|error`)
+- `event_type` (text, nullable)
+- `message` (text, NOT NULL, check longitud 1..280)
+- `error_type` (text, nullable)
+- `error_code` (text, nullable)
+- `http_status` (integer, nullable)
+- `metadata` (jsonb, NOT NULL, default `'{}'::jsonb`, check objeto JSON)
+- `environment` (text, nullable)
+- `source` (text, NOT NULL, default `'frontend'`, check `frontend|edge_function`)
+
+### Relaciones
+- `conjunto_id` → `conjuntos.id`
+- `actor_user_id` → `auth.users.id`
+
+### RLS
+- RLS habilitado (`ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`).
+- `anon`: sin permisos de lectura/escritura.
+- `authenticated`: sin permisos de lectura/escritura.
+- Sin policies públicas en esta fase; inserción prevista únicamente vía Edge Function con `service_role`.
+
+### Índices
+- `operational_events_created_at_desc_idx` (`created_at desc`)
+- `operational_events_conjunto_created_at_desc_idx` (`conjunto_id`, `created_at desc`)
+- `operational_events_module_action_created_at_desc_idx` (`module`, `action`, `created_at desc`)
+- `operational_events_severity_created_at_desc_idx` (`severity`, `created_at desc`)
