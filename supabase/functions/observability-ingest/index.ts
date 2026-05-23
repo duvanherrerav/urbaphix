@@ -48,10 +48,11 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "method_not_allowed" });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const authHeader = req.headers.get("authorization") ?? "";
 
-  if (!supabaseUrl || !serviceRoleKey) return jsonResponse(500, { ok: false, error: "missing_server_env" });
+  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) return jsonResponse(500, { ok: false, error: "missing_server_env" });
   if (!authHeader.startsWith("Bearer ")) return jsonResponse(401, { ok: false, error: "missing_bearer" });
 
   let payload: Record<string, unknown>;
@@ -79,12 +80,15 @@ Deno.serve(async (req) => {
   const metadataBytes = new TextEncoder().encode(JSON.stringify(metadata)).length;
   if (metadataBytes > 4096) return jsonResponse(400, { ok: false, error: "metadata_too_large" });
 
-  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false },
     global: { headers: { Authorization: authHeader } },
   });
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
 
-  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser();
+  const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return jsonResponse(401, { ok: false, error: "invalid_user" });
 
   const actorRole = payload.actor_role == null ? null : truncate(payload.actor_role, 32).toLowerCase();
@@ -93,7 +97,7 @@ Deno.serve(async (req) => {
   const httpStatus = Number.isInteger(payload.http_status) ? payload.http_status as number : null;
   const conjuntoId = typeof payload.conjunto_id === "string" ? truncate(payload.conjunto_id, 36) : null;
 
-  const { error: insertError } = await supabaseAdmin.from("operational_events").insert({
+  const { error: insertError } = await adminClient.from("operational_events").insert({
     conjunto_id: conjuntoId,
     actor_user_id: userData.user.id,
     actor_role: actorRole,

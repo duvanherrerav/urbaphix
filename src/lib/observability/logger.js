@@ -1,3 +1,5 @@
+import { supabase } from '../../services/supabaseClient';
+
 const SENSITIVE_KEY_PATTERN = /(token|session|password|secret|authorization|auth|cookie|jwt|email|telefono|phone|placa|document|comprobante|signed|url|payload|headers)/i;
 
 const ENVIRONMENT = import.meta.env.MODE || (import.meta.env.PROD ? 'production' : 'development');
@@ -69,8 +71,8 @@ const sendRemoteEvent = async (event) => {
   if (!REMOTE_ENABLED || !['warn', 'error'].includes(event.severity)) return;
 
   try {
-    const token = localStorage.getItem('supabase.auth.token');
-    const accessToken = token ? JSON.parse(token)?.currentSession?.access_token : null;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
     if (!accessToken) return;
 
     const payload = {
