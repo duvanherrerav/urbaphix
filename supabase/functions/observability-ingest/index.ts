@@ -16,11 +16,19 @@ const ALLOWED_MODULES = new Set([
 ]);
 const ALLOWED_SEVERITIES = new Set(["info", "warn", "error"]);
 const SENSITIVE_KEY_PATTERN = /(token|session|password|secret|authorization|auth|cookie|jwt|email|telefono|phone|placa|document|comprobante|signed|url|payload|headers|fullname|full_name|name)/i;
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 const jsonResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      ...CORS_HEADERS,
+      "Content-Type": "application/json",
+    },
   });
 
 const truncate = (value: unknown, max: number) => String(value ?? "").slice(0, max);
@@ -45,6 +53,13 @@ const sanitizeMetadata = (metadata: unknown) => {
 };
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: CORS_HEADERS,
+    });
+  }
+
   if (req.method !== "POST") return jsonResponse(405, { ok: false, error: "method_not_allowed" });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
