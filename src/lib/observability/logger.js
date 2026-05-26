@@ -2,7 +2,35 @@ import { supabase } from '../../services/supabaseClient';
 
 const SENSITIVE_KEY_PATTERN = /(token|session|password|secret|authorization|auth|cookie|jwt|email|telefono|phone|placa|document|comprobante|signed|url|payload|headers)/i;
 
-const ENVIRONMENT = import.meta.env.MODE || (import.meta.env.PROD ? 'production' : 'development');
+const normalizeEnvironment = (value) => {
+  const env = String(value || '').trim().toLowerCase();
+
+  if (['dev', 'development', 'local', 'localhost'].includes(env)) return 'development';
+  if (['qa', 'test', 'testing', 'staging', 'preview'].includes(env)) return 'qa';
+  if (['prod', 'production'].includes(env)) return 'production';
+
+  return '';
+};
+
+const resolveEnvironment = () => {
+  const explicitEnvironment = normalizeEnvironment(import.meta.env.VITE_APP_ENV);
+  if (explicitEnvironment) return explicitEnvironment;
+
+  const modeEnvironment = normalizeEnvironment(import.meta.env.MODE);
+  if (modeEnvironment) return modeEnvironment;
+
+  if (typeof window !== 'undefined') {
+    const hostname = String(window.location?.hostname || '').toLowerCase();
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') return 'development';
+    if (hostname.endsWith('.vercel.app') || hostname.includes('preview') || hostname.includes('-qa')) return 'qa';
+    if (hostname === 'urbaphix.com' || hostname === 'www.urbaphix.com') return 'production';
+  }
+
+  return import.meta.env.PROD ? 'production' : 'development';
+};
+
+const ENVIRONMENT = resolveEnvironment();
 const REMOTE_ENABLED = String(import.meta.env.VITE_OBSERVABILITY_REMOTE_ENABLED || 'false').toLowerCase() === 'true';
 const REMOTE_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/observability-ingest`;
 
