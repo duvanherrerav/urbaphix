@@ -16,6 +16,9 @@ const resolveEnvironment = () => {
   const explicitEnvironment = normalizeEnvironment(import.meta.env.VITE_APP_ENV);
   if (explicitEnvironment) return explicitEnvironment;
 
+  const modeEnvironment = normalizeEnvironment(import.meta.env.MODE);
+  if (modeEnvironment) return modeEnvironment;
+
   if (typeof window !== 'undefined') {
     const hostname = String(window.location?.hostname || '').toLowerCase();
 
