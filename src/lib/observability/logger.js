@@ -128,8 +128,9 @@ export const sanitizeContext = (context = {}) => {
   );
 };
 
-const sendRemoteEvent = async (event) => {
-  if (!REMOTE_ENABLED || !['warn', 'error'].includes(event.severity) || event.skipRemote) return;
+const sendRemoteEvent = async (event, options = {}) => {
+  const { skipRemote = false } = options;
+  if (!REMOTE_ENABLED || !['warn', 'error'].includes(event.severity) || skipRemote) return;
 
   try {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -183,7 +184,7 @@ const resolveContextAndError = (arg2, arg3) => {
   return { context, error };
 };
 
-const createEvent = ({ severity, message, error, context = {}, skipRemote = false }) => ({
+const createEvent = ({ severity, message, error, context = {} }) => ({
   module: context.module || 'app',
   action: context.action || 'unknown',
   severity,
@@ -191,14 +192,13 @@ const createEvent = ({ severity, message, error, context = {}, skipRemote = fals
   environment: ENVIRONMENT,
   message: truncate(message || 'No message'),
   error: error ? normalizeError(error) : undefined,
-  context: sanitizeContext(context),
-  skipRemote
+  context: sanitizeContext(context)
 });
 
-const emit = (method, event) => {
+const emit = (method, event, options = {}) => {
   const fn = console[method] || console.log;
   fn('[urbaphix-observability]', event);
-  void sendRemoteEvent(event);
+  void sendRemoteEvent(event, options);
 };
 
 export const logInfo = (message, context = {}) => {
@@ -225,10 +225,11 @@ export const logError = (message, arg2, arg3) => {
       ...context,
       severity_reason: classification.reason || undefined
     },
-    error,
+    error
+  });
+  emit(classification.severity === 'warn' ? 'warn' : 'error', event, {
     skipRemote: classification.skipRemote
   });
-  emit(classification.severity === 'warn' ? 'warn' : 'error', event);
   return event;
 };
 
