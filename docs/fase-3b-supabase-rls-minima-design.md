@@ -173,8 +173,8 @@ create table public.tenant_memberships (
 Índices / unicidad sugerida:
 
 ```sql
-create unique index ux_tenant_memberships_user_conjunto_role_active
-  on public.tenant_memberships(user_id, conjunto_id, role_name)
+create unique index ux_tenant_memberships_user_conjunto_active
+  on public.tenant_memberships(user_id, conjunto_id)
   where status = 'active';
 
 create index ix_tenant_memberships_conjunto_status
@@ -189,6 +189,13 @@ Reglas funcionales propuestas:
 
 - `residente_id` obligatorio solo cuando `role_name='residente'` (validable con `CHECK` diferido en implementación).
 - Para roles no residentes, `residente_id` debe ser `NULL`.
+
+
+Regla de unicidad para FASE 3B:
+
+- **Un solo rol activo por usuario/conjunto** para preservar compatibilidad con frontend legacy (`usuarios_app.rol_id`) y con helpers que retornan un único rol efectivo.
+- Los cambios de rol deben modelarse como transición de estado (revocar el activo y crear el nuevo activo) sin coexistencia de dos roles activos en el mismo `conjunto_id`.
+- Si en una fase futura se habilitan roles múltiples por tenant, deberá definirse primero una regla de precedencia determinística para `fn_auth_rol()`/equivalentes antes de cambiar esta unicidad.
 
 ---
 
@@ -246,9 +253,53 @@ Estrategia por etapas:
 - DELETE:
   - prohibir delete duro; usar `status='revoked'` + `revoked_at`.
 
-### 8.3 Políticas base para tablas tenant por `conjunto_id`
+### 8.3 Clasificación de políticas RLS por tipo de tabla
 
-Patrón mínimo:
+> Importante: el patrón `fn_has_tenant_access(conjunto_id) OR fn_is_platform_superadmin()` **no** aplica como política única para todas las tablas tenant. Debe combinarse con predicados por dominio de datos.
+
+1. **Tenant general (catálogos/estructura por conjunto)**
+   - Ejemplos: `conjuntos` (lectura acotada), `torres`, `apartamentos`, `zonas_comunes`, `recursos_comunes`.
+   - SELECT base:
+
+   ```sql
+   using (
+     fn_has_tenant_access(conjunto_id)
+     or fn_is_platform_superadmin()
+   )
+   ```
+
+2. **Operativa tenant (portería/operación compartida)**
+   - Ejemplos: `registro_visitas`, `visitantes`, `accesos`, `incidentes` (según flujo), segmentos operativos de `paquetes`.
+   - SELECT/UPDATE deben requerir tenant access + rol operativo permitido (por ejemplo `vigilante`/`admin_conjunto`).
+
+3. **Residente-scoped (datos personales por residente)**
+   - Ejemplos: `reservas_zonas`, `pqr`, porciones de `paquetes`, tablas con `residente_id` propietario.
+   - Para usuarios `residente`, siempre preservar predicado de propiedad:
+
+   ```sql
+   using (
+     (fn_has_tenant_role(conjunto_id, 'residente') and residente_id = fn_auth_residente_id())
+     or fn_has_tenant_role(conjunto_id, 'admin_conjunto')
+     or fn_has_tenant_role(conjunto_id, 'vigilante') -- solo si negocio lo permite
+     or fn_is_platform_superadmin()
+   )
+   ```
+
+4. **Financiera sensible**
+   - Ejemplos: `pagos`, `pagos_eventos`, `config_pagos`, soportes/documentos financieros.
+   - Requiere separación estricta entre lectura administrativa, lectura del propio residente (`residente_id = fn_auth_residente_id()`) y operaciones de escritura altamente restringidas/auditadas.
+
+5. **Auditoría y logs**
+   - Ejemplos: `operational_events` y bitácoras de seguridad.
+   - INSERT mediante backend/RPC controlada; SELECT acotado por rol (`platform_auditor`, `superadmin`) y/o por tenant cuando corresponda.
+
+6. **Plataforma (global SaaS)**
+   - Ejemplos: `platform_memberships` y futuras entidades de gobierno de plataforma.
+   - Nunca exponer a residentes/roles tenant por defecto; acceso solo por roles de plataforma.
+
+### 8.4 Patrones base (solo referencia)
+
+Patrón tenant general mínimo:
 
 ```sql
 using (
@@ -267,7 +318,7 @@ with check (
 )
 ```
 
-### 8.4 Restricciones operativas para superadmin
+### 8.5 Restricciones operativas para superadmin
 
 - `superadmin` puede leer globalmente datos permitidos.
 - `superadmin` **no** debe tener delete/update masivo por defecto en tablas críticas.
