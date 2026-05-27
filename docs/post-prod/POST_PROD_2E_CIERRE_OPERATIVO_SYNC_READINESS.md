@@ -159,7 +159,76 @@ No hay acceso en este diagnóstico a Vercel dashboard/API para validar valores e
 
 ---
 
-## 8) Recomendación final de cierre POST-PROD
-- **POST-PROD 2E puede cerrarse condicionalmente** cuando se adjunte evidencia remota (Supabase + Vercel) que confirme alineación QA/PRD con lo auditado en repo.
-- Hasta entonces, este reporte debe tratarse como **diagnóstico técnico documental parcial (local-first)**.
-- Siguiente fase recomendada: **FASE 3A de diseño controlado de `superadmin`**, iniciando por matriz de permisos y estrategia RLS multitenant verificable.
+## 8) Recomendación final (estado real del cierre POST-PROD 2E)
+- Este documento **no constituye cierre final** de POST-PROD 2E; es un **diagnóstico preliminar local-first**.
+- El cierre definitivo queda **pendiente de validación manual externa por Duvi** en GitHub, Supabase (DEV/QA/PRD) y Vercel (Preview/Production).
+- Solo después de completar y evidenciar el checklist manual (sección 9) se puede decidir cierre operativo de POST-PROD 2E.
+- Siguiente fase recomendada tras el cierre real: **FASE 3A de diseño controlado de `superadmin`**, iniciando por matriz de permisos y estrategia RLS multitenant verificable.
+
+
+## 9) Checklist manual requerido por Duvi para cierre definitivo POST-PROD 2E
+
+> Ejecutar fuera de este entorno (con acceso válido a GitHub/Supabase/Vercel) y anexar evidencia (salida/fecha/capturas) al issue #156.
+
+### 9.1 GitHub local
+```powershell
+git fetch --all --prune
+git status
+git branch -vv
+git log --oneline main..qa
+git log --oneline qa..main
+git log --oneline main..develop
+git log --oneline develop..main
+```
+
+### 9.2 Supabase (DEV / QA / PRD)
+> Repetir el bloque por cada proyecto (`<DEV_REF>`, `<QA_REF>`, `<PRD_REF>`).
+
+```powershell
+npx supabase link --project-ref <PROJECT_REF>
+npx supabase migration list --linked
+npx supabase functions list --project-ref <PROJECT_REF>
+```
+
+Validar explícitamente presencia/aplicación de:
+- `20260521120000_post_prod_2c2e_revoke_public_anon_productive_rpcs.sql`
+- `20260523110000_post_prod_2d1_operational_events_pipeline.sql`
+
+Validaciones SQL sugeridas:
+```sql
+select *
+from supabase_migrations.schema_migrations
+order by version desc
+limit 20;
+
+select
+  c.relname as table_name,
+  c.relrowsecurity as rls_enabled,
+  c.relforcerowsecurity as rls_forced
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname in ('operational_events');
+```
+
+### 9.3 Vercel (Preview/QA y Production)
+Verificar manualmente (Dashboard o CLI con permisos) que:
+
+- Preview/QA:
+  - `VITE_SUPABASE_URL` -> Supabase QA
+  - `VITE_SUPABASE_ANON_KEY` -> Supabase QA
+  - `VITE_OBSERVABILITY_REMOTE_ENABLED=true` (o valor operativo aprobado)
+  - `VITE_APP_ENV=qa`
+
+- Production:
+  - `VITE_SUPABASE_URL` -> Supabase PRD
+  - `VITE_SUPABASE_ANON_KEY` -> Supabase PRD
+  - `VITE_APP_ENV=production` (o fallback seguro equivalente)
+  - `VITE_OBSERVABILITY_REMOTE_ENABLED=false` salvo autorización explícita
+
+### 9.4 Criterio de cierre definitivo
+Se considera cierre definitivo de POST-PROD 2E únicamente cuando Duvi confirme por evidencia:
+1. sincronización real `develop` / `qa` / `main`;
+2. alineación real de migraciones y Edge Functions entre DEV/QA/PRD;
+3. variables Vercel correctas en Preview/Production;
+4. decisión explícita de promoción (o no promoción) hacia `main`.
