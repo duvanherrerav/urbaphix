@@ -34,6 +34,39 @@ const ENVIRONMENT = resolveEnvironment();
 const REMOTE_ENABLED = String(import.meta.env.VITE_OBSERVABILITY_REMOTE_ENABLED || 'false').toLowerCase() === 'true';
 const REMOTE_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/observability-ingest`;
 
+
+const NON_CRITICAL_ERROR_NAMES = new Set(['AbortError', 'InvalidStateError']);
+
+const isBrowserExtensionNoise = (normalizedError) => {
+  const message = String(normalizedError?.message || '').toLowerCase();
+  return message.includes('a listener indicated an asynchronous response')
+    || message.includes('message channel closed before a response was received')
+    || message.includes('extension context invalidated');
+};
+
+const classifyErrorSeverity = (normalizedError, context = {}) => {
+  if (!normalizedError) return { severity: 'error', skipRemote: false, reason: null };
+
+  if (NON_CRITICAL_ERROR_NAMES.has(normalizedError.type)) {
+    return { severity: 'warn', skipRemote: false, reason: `known_non_critical:${normalizedError.type}` };
+  }
+
+  if (isBrowserExtensionNoise(normalizedError)) {
+    return { severity: 'warn', skipRemote: true, reason: 'browser_extension_noise' };
+  }
+
+  const status = normalizedError.status;
+  if (typeof status === 'number' && status >= 500) {
+    return { severity: 'error', skipRemote: false, reason: 'http_5xx' };
+  }
+
+  if (context?.forceError === true) {
+    return { severity: 'error', skipRemote: false, reason: 'forced_error' };
+  }
+
+  return { severity: 'error', skipRemote: false, reason: null };
+};
+
 const truncate = (value, max = 140) => {
   const text = String(value ?? '');
   if (text.length <= max) return text;
@@ -95,8 +128,9 @@ export const sanitizeContext = (context = {}) => {
   );
 };
 
-const sendRemoteEvent = async (event) => {
-  if (!REMOTE_ENABLED || !['warn', 'error'].includes(event.severity)) return;
+const sendRemoteEvent = async (event, options = {}) => {
+  const { skipRemote = false } = options;
+  if (!REMOTE_ENABLED || !['warn', 'error'].includes(event.severity) || skipRemote) return;
 
   try {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -161,10 +195,10 @@ const createEvent = ({ severity, message, error, context = {} }) => ({
   context: sanitizeContext(context)
 });
 
-const emit = (method, event) => {
+const emit = (method, event, options = {}) => {
   const fn = console[method] || console.log;
   fn('[urbaphix-observability]', event);
-  void sendRemoteEvent(event);
+  void sendRemoteEvent(event, options);
 };
 
 export const logInfo = (message, context = {}) => {
@@ -182,8 +216,20 @@ export const logWarn = (message, arg2 = {}, arg3) => {
 
 export const logError = (message, arg2, arg3) => {
   const { context, error } = resolveContextAndError(arg2, arg3);
-  const event = createEvent({ severity: 'error', message, context, error });
-  emit('error', event);
+  const normalizedError = error ? normalizeError(error) : null;
+  const classification = classifyErrorSeverity(normalizedError, context);
+  const event = createEvent({
+    severity: classification.severity,
+    message,
+    context: {
+      ...context,
+      severity_reason: classification.reason || undefined
+    },
+    error
+  });
+  emit(classification.severity === 'warn' ? 'warn' : 'error', event, {
+    skipRemote: classification.skipRemote
+  });
   return event;
 };
 
