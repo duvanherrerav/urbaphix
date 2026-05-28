@@ -77,14 +77,25 @@ function App() {
       return data;
     };
 
-    const traceResolverFlag = (enabled) => {
-      if (!import.meta.env.DEV) return;
+    const isQaRuntime = () => {
+      const normalizedMode = String(import.meta.env.MODE || '').trim().toLowerCase();
+      const normalizedAppEnv = String(import.meta.env.VITE_APP_ENV || '').trim().toLowerCase();
+      return ['qa', 'test', 'testing', 'staging', 'preview'].includes(normalizedMode)
+        || ['qa', 'test', 'testing', 'staging', 'preview'].includes(normalizedAppEnv);
+    };
 
-      logger.info(`Membership resolver: flag ${enabled ? 'habilitado' : 'deshabilitado'}; ${enabled ? 'usa resolución híbrida' : 'usa flujo legacy'}.`, {
+    const traceResolverFlag = (enabled) => {
+      if (!import.meta.env.DEV && !isQaRuntime()) return;
+
+      const event = logger.info(`Membership resolver: flag ${enabled ? 'habilitado' : 'deshabilitado'}; ${enabled ? 'usa resolución híbrida' : 'usa flujo legacy'}.`, {
         module: 'auth',
         action: enabled ? 'membership_resolver_enabled' : 'membership_resolver_disabled',
         flag: MEMBERSHIP_RESOLVER_FLAG
       });
+
+      if (!import.meta.env.DEV) {
+        console.info('[urbaphix-observability]', event);
+      }
     };
 
     const obtenerUsuario = async (authenticatedUser) => {
