@@ -43,7 +43,7 @@ La lectura de `tenant_memberships` queda apagable con `VITE_ENABLE_MEMBERSHIP_RE
 
 - **Flag apagado, ausente o distinto de `true|1|yes|on`:** `src/App.jsx` y `src/modules/auth/Login.jsx` usan el flujo legacy directo contra `usuarios_app`. No se consulta `tenant_memberships` desde el bootstrap/login.
 - **Flag encendido (`true`, `1`, `yes` u `on`):** `src/App.jsx` y `src/modules/auth/Login.jsx` usan `src/services/membershipResolver.js`, que consulta `tenant_memberships` y mantiene fallback a `usuarios_app`.
-- El valor recomendado para primera validación es encenderlo solo en DEV/QA; si aparece una regresión, apagar el flag restaura el flujo legacy sin revertir código.
+- El valor recomendado para esta validación controlada es encenderlo solo en DEV/local; no debe activarse en QA ni PRD sin aprobación explícita. Si aparece una regresión, apagar el flag restaura el flujo legacy sin revertir código.
 - No se agregan variables obligatorias nuevas: si el flag no está definido, el comportamiento efectivo es legacy.
 
 ## Flujo actual de autenticación/permisos antes de esta fase
