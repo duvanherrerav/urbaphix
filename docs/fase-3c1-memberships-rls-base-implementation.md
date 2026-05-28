@@ -43,7 +43,7 @@ Políticas aplicadas:
 ```sql
 with source_rows as (
   select
-    ua.user_id,
+    ua.id as user_id,
     ua.conjunto_id,
     case
       when ua.rol_id in ('admin', 'administrador') then 'admin_conjunto'
@@ -98,12 +98,12 @@ select *
 from (
   select
     ua.id as usuario_app_id,
-    ua.user_id,
+    ua.id as user_id,
     ua.conjunto_id,
     ua.rol_id,
     r.id as residente_id,
     case
-      when ua.user_id is null then 'missing_user_id'
+      when ua.id is null then 'missing_user_id'
       when ua.conjunto_id is null then 'missing_conjunto_id'
       when ua.rol_id not in ('admin','administrador','vigilancia','vigilante','residente') then 'unsupported_role'
       when ua.rol_id = 'residente' and r.id is null then 'missing_residente_for_residente_role'
@@ -147,9 +147,11 @@ select public.fn_is_platform_superadmin();
 
 ### 7.6 No delete duro
 ```sql
-delete from public.platform_memberships where id = '00000000-0000-0000-0000-000000000000'::uuid;
-delete from public.tenant_memberships where id = '00000000-0000-0000-0000-000000000000'::uuid;
--- esperado: 0 filas por política
+-- Prueba documental (no ejecutar como script automático):
+-- intentar DELETE manual en sesión de prueba y verificar que RLS lo deniega.
+-- ejemplo de referencia (manual):
+-- delete from public.platform_memberships where id = '<uuid_existente>'::uuid;
+-- delete from public.tenant_memberships where id = '<uuid_existente>'::uuid;
 ```
 
 ### 7.7 No duplicados activos
@@ -164,7 +166,7 @@ having count(*) > 1;
 ### 7.8 Conteo backfill
 ```sql
 select
-  (select count(*) from public.usuarios_app where user_id is not null and conjunto_id is not null) as usuarios_app_count,
+  (select count(*) from public.usuarios_app where id is not null and conjunto_id is not null) as usuarios_app_count,
   (select count(*) from public.tenant_memberships where source_legacy = 'usuarios_app') as tenant_memberships_from_legacy;
 ```
 

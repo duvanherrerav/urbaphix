@@ -18,8 +18,11 @@ where conjunto_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid;
 select public.fn_is_platform_superadmin() as is_superadmin;
 
 -- 6) No delete duro
-delete from public.platform_memberships where id = '00000000-0000-0000-0000-000000000000'::uuid;
-delete from public.tenant_memberships where id = '00000000-0000-0000-0000-000000000000'::uuid;
+-- Prueba documental no ejecutable automáticamente:
+-- Intentar DELETE manual en una sesión de prueba con un UUID existente
+-- y confirmar denegación por RLS.
+-- delete from public.platform_memberships where id = '<uuid_existente>'::uuid;
+-- delete from public.tenant_memberships where id = '<uuid_existente>'::uuid;
 
 -- 7) No duplicados activos
 select user_id, conjunto_id, count(*)
@@ -30,7 +33,7 @@ having count(*) > 1;
 
 -- 8) Conteo usuarios_app vs tenant_memberships backfill
 select
-  (select count(*) from public.usuarios_app where user_id is not null and conjunto_id is not null) as usuarios_app_count,
+  (select count(*) from public.usuarios_app where id is not null and conjunto_id is not null) as usuarios_app_count,
   (select count(*) from public.tenant_memberships where source_legacy = 'usuarios_app') as tenant_memberships_from_legacy;
 
 -- 9) Helpers nuevos
