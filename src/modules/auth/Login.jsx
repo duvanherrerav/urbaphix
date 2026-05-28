@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { isMembershipResolverEnabled, resolveUserMembership } from '../../services/membershipResolver';
 import { logger } from '../../utils/logger';
 import { getAuthErrorMessage } from '../../utils/errorMessages';
 
@@ -47,13 +48,37 @@ export default function Login() {
 
       const userId = data?.user?.id;
       if (userId) {
-        const { data: perfil, error: perfilError } = await supabase
-          .from('usuarios_app')
-          .select('rol_id')
-          .eq('id', userId)
-          .maybeSingle();
-        if (perfilError) logger.error('Login: no se pudo cargar rol del perfil', perfilError);
-        setInfoMsg(`Acceso concedido. Redirigiendo a ${getRolLabel(perfil?.rol_id)}...`);
+        try {
+          let rolId = null;
+
+          if (isMembershipResolverEnabled()) {
+            const resolution = await resolveUserMembership(data.user);
+            if (!resolution?.profile) {
+              logger.warn('Login: no se pudo resolver perfil compatible para el usuario autenticado', {
+                module: 'auth',
+                action: 'login_membership_resolution'
+              });
+            }
+            rolId = resolution?.profile?.rol_id || null;
+          } else {
+            const { data: perfil, error: perfilError } = await supabase
+              .from('usuarios_app')
+              .select('rol_id')
+              .eq('id', userId)
+              .maybeSingle();
+
+            if (perfilError) logger.error('Login: no se pudo cargar rol del perfil legacy', perfilError);
+            rolId = perfil?.rol_id || null;
+          }
+
+          setInfoMsg(`Acceso concedido. Redirigiendo a ${getRolLabel(rolId || null)}...`);
+        } catch (resolutionError) {
+          logger.error('Login: no se pudo resolver perfil; continúa el flujo de sesión', resolutionError, {
+            module: 'auth',
+            action: isMembershipResolverEnabled() ? 'login_membership_resolution' : 'login_legacy_profile'
+          });
+          setInfoMsg(`Acceso concedido. Redirigiendo a ${getRolLabel(null)}...`);
+        }
       }
     }
 
