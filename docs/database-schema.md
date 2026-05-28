@@ -53,6 +53,8 @@ Tablas detectadas en `public`:
 - vehiculos
 - visitantes
 - zonas_comunes
+- platform_memberships
+- tenant_memberships
 
 ---
 
@@ -1044,3 +1046,61 @@ Puede ampliarse más adelante con:
 - `operational_events_conjunto_created_at_desc_idx` (`conjunto_id`, `created_at desc`)
 - `operational_events_module_action_created_at_desc_idx` (`module`, `action`, `created_at desc`)
 - `operational_events_severity_created_at_desc_idx` (`severity`, `created_at desc`)
+
+
+## 32. platform_memberships
+**Descripción:** membresías de alcance plataforma (global SaaS).
+
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
+- `user_id` (uuid, NOT NULL)
+- `role_name` (text, NOT NULL, check: `superadmin|platform_support|platform_auditor|platform_ops`)
+- `status` (text, NOT NULL, default: `'active'`, check: `active|suspended|revoked`)
+- `granted_by` (uuid, nullable)
+- `granted_reason` (text, nullable)
+- `created_at` (timestamptz, NOT NULL, default: `now()`)
+- `updated_at` (timestamptz, NOT NULL, default: `now()`)
+- `revoked_at` (timestamptz, nullable)
+
+### Relaciones
+- `user_id` → `auth.users.id`
+- `granted_by` → `auth.users.id`
+
+### Índices
+- único parcial: `(user_id, role_name) where status = 'active'`
+- índice: `(user_id, status)`
+
+### RLS
+- SELECT: propio usuario o `superadmin` (`fn_is_platform_superadmin()`).
+- INSERT/UPDATE: solo `superadmin`.
+- DELETE: denegado por política.
+
+## 33. tenant_memberships
+**Descripción:** membresías por tenant (`conjunto_id`) para coexistencia con modelo legacy.
+
+### Campos
+- `id` (uuid, NOT NULL, default: `gen_random_uuid()`)
+- `user_id` (uuid, NOT NULL)
+- `conjunto_id` (uuid, NOT NULL)
+- `role_name` (text, NOT NULL, check: `admin_conjunto|vigilante|residente|contador|comite`)
+- `residente_id` (uuid, nullable)
+- `status` (text, NOT NULL, default: `'active'`, check: `active|suspended|revoked`)
+- `source_legacy` (text, NOT NULL, default: `'usuarios_app'`)
+- `created_at` (timestamptz, NOT NULL, default: `now()`)
+- `updated_at` (timestamptz, NOT NULL, default: `now()`)
+- `revoked_at` (timestamptz, nullable)
+
+### Relaciones
+- `user_id` → `auth.users.id`
+- `conjunto_id` → `conjuntos.id`
+- `residente_id` → `residentes.id`
+
+### Índices
+- único parcial: `(user_id, conjunto_id) where status = 'active'`
+- índice: `(conjunto_id, status)`
+- índice parcial: `residente_id where residente_id is not null`
+
+### RLS
+- SELECT: `superadmin` o usuarios con acceso activo al mismo conjunto (`fn_has_tenant_access`).
+- INSERT/UPDATE: `superadmin` o rol plataforma autorizado (`platform_ops`).
+- DELETE: denegado por política.
