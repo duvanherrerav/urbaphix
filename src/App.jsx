@@ -78,10 +78,26 @@ function App() {
     };
 
     const isQaRuntime = () => {
+      const qaRuntimeLabels = ['qa', 'test', 'testing', 'staging', 'preview'];
       const normalizedMode = String(import.meta.env.MODE || '').trim().toLowerCase();
       const normalizedAppEnv = String(import.meta.env.VITE_APP_ENV || '').trim().toLowerCase();
-      return ['qa', 'test', 'testing', 'staging', 'preview'].includes(normalizedMode)
-        || ['qa', 'test', 'testing', 'staging', 'preview'].includes(normalizedAppEnv);
+
+      if (qaRuntimeLabels.includes(normalizedMode) || qaRuntimeLabels.includes(normalizedAppEnv)) {
+        return true;
+      }
+
+      if (typeof window === 'undefined') return false;
+
+      const hostname = String(window.location?.hostname || '').trim().toLowerCase();
+      const productionHosts = ['urbaphix.com', 'www.urbaphix.com'];
+
+      if (!hostname || productionHosts.includes(hostname)) return false;
+
+      return hostname.endsWith('.vercel.app')
+        || hostname.includes('preview')
+        || hostname.includes('staging')
+        || hostname.includes('-qa')
+        || hostname.includes('.qa.');
     };
 
     const traceResolverFlag = (enabled) => {

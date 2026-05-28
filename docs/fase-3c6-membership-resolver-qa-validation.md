@@ -76,6 +76,7 @@ Cualquier otro valor, ausencia de variable o cadena vacía mantiene el resolver 
 
 - `.env.example` documenta `VITE_ENABLE_MEMBERSHIP_RESOLVER=false` como default seguro.
 - No hay `.env.qa` versionado en el repositorio al momento de esta fase; si existe localmente o en Vercel, no debe commitearse porque puede contener secretos.
+- Si Vercel Preview compila con modo `production` y sin `VITE_APP_ENV`, la observabilidad controlada de bootstrap también reconoce hosts QA/preview/staging, incluidos dominios `.vercel.app`, sin activar el resolver por sí sola.
 - No se debe commitear ninguna clave real de Supabase, token, service role key o variable privada.
 - No se debe modificar `.env.production` para esta fase.
 
