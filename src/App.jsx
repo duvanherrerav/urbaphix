@@ -1,6 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
-import { isMembershipResolverEnabled, resolveUserMembershipProfile } from './services/membershipResolver';
+import {
+  MEMBERSHIP_RESOLVER_FLAG,
+  isMembershipResolverEnabled,
+  resolveUserMembershipProfile
+} from './services/membershipResolver';
 import BrandLogo from './components/brand/BrandLogo';
 import ModuleIcon from './components/ui/ModuleIcon';
 
@@ -73,9 +77,22 @@ function App() {
       return data;
     };
 
+    const traceResolverFlag = (enabled) => {
+      if (!import.meta.env.DEV) return;
+
+      logger.info(`Membership resolver: flag ${enabled ? 'habilitado' : 'deshabilitado'}; ${enabled ? 'usa resolución híbrida' : 'usa flujo legacy'}.`, {
+        module: 'auth',
+        action: enabled ? 'membership_resolver_enabled' : 'membership_resolver_disabled',
+        flag: MEMBERSHIP_RESOLVER_FLAG
+      });
+    };
+
     const obtenerUsuario = async (authenticatedUser) => {
       try {
-        const perfil = isMembershipResolverEnabled()
+        const membershipResolverEnabled = isMembershipResolverEnabled();
+        traceResolverFlag(membershipResolverEnabled);
+
+        const perfil = membershipResolverEnabled
           ? await resolveUserMembershipProfile(authenticatedUser)
           : await obtenerUsuarioLegacy(authenticatedUser?.id);
 

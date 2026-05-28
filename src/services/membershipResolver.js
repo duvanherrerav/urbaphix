@@ -19,6 +19,16 @@ const LEGACY_ROLES = new Set(['admin', 'vigilancia', 'residente']);
 
 const isDevelopment = () => Boolean(import.meta.env?.DEV);
 
+const devInfo = (message, metadata = {}) => {
+  if (isDevelopment()) {
+    logger.info(message, {
+      module: 'auth',
+      action: 'membership_resolution',
+      ...metadata
+    });
+  }
+};
+
 const devWarn = (message, metadata = {}) => {
   if (isDevelopment()) {
     logger.warn(message, {
@@ -48,6 +58,31 @@ const getMembershipIncompatibility = (membership) => {
   return null;
 };
 
+const traceMembershipIncompatibility = (incompatibility, membership) => {
+  if (!incompatibility) return;
+
+  const baseMetadata = {
+    warning: incompatibility,
+    role_name: membership?.role_name || null,
+    has_conjunto_id: Boolean(membership?.conjunto_id),
+    has_residente_id: Boolean(membership?.residente_id)
+  };
+
+  if (incompatibility === 'membership_missing_conjunto_id') {
+    devWarn('Membership resolver: membership activa sin conjunto_id; se descarta para fallback seguro.', baseMetadata);
+    return;
+  }
+
+  if (incompatibility === 'membership_role_not_supported_by_current_navigation') {
+    devWarn('Membership resolver: role_name no compatible con navegación legacy; se descarta.', baseMetadata);
+    return;
+  }
+
+  if (incompatibility === 'resident_membership_missing_residente_id') {
+    devWarn('Membership resolver: membership de residente sin residente_id; se descarta para fallback seguro.', baseMetadata);
+  }
+};
+
 const pickMembership = (memberships, legacyProfile) => {
   const warnings = [];
   const activeMemberships = Array.isArray(memberships)
@@ -58,6 +93,7 @@ const pickMembership = (memberships, legacyProfile) => {
     const incompatibility = getMembershipIncompatibility(membership);
     if (incompatibility) {
       addWarning(warnings, incompatibility);
+      traceMembershipIncompatibility(incompatibility, membership);
       return false;
     }
 
@@ -65,6 +101,10 @@ const pickMembership = (memberships, legacyProfile) => {
   });
 
   if (!compatibleMemberships.length) {
+    devWarn('Membership resolver: no hay memberships activas compatibles; se usará fallback legacy.', {
+      active_memberships_count: activeMemberships.length,
+      warnings_count: warnings.length
+    });
     return { membership: null, warnings };
   }
 
@@ -73,11 +113,28 @@ const pickMembership = (memberships, legacyProfile) => {
     ? compatibleMemberships.find((membership) => membership.conjunto_id === legacyConjuntoId)
     : null;
 
-  return { membership: matchingLegacyTenant || compatibleMemberships[0], warnings };
+  const selectedMembership = matchingLegacyTenant || compatibleMemberships[0];
+
+  devInfo('Membership resolver: membership compatible seleccionada.', {
+    active_memberships_count: activeMemberships.length,
+    compatible_memberships_count: compatibleMemberships.length,
+    matched_legacy_conjunto: Boolean(matchingLegacyTenant),
+    selected_role_name: selectedMembership.role_name,
+    selected_legacy_role: TENANT_ROLE_TO_LEGACY_ROLE[selectedMembership.role_name],
+    has_conjunto_id: Boolean(selectedMembership.conjunto_id),
+    has_residente_id: Boolean(selectedMembership.residente_id)
+  });
+
+  return { membership: selectedMembership, warnings };
 };
 
 const buildLegacyResolution = (legacyProfile, warnings = []) => {
   if (!legacyProfile) {
+    devWarn('Membership resolver: resolución sin perfil legacy disponible.', {
+      source: 'none',
+      warnings_count: warnings.length
+    });
+
     return {
       profile: null,
       source: 'none',
@@ -91,6 +148,14 @@ const buildLegacyResolution = (legacyProfile, warnings = []) => {
   if (!LEGACY_ROLES.has(legacyRole)) {
     addWarning(warnings, 'legacy_role_not_supported_by_current_navigation');
   }
+
+  devInfo('Membership resolver: fallback legacy activo.', {
+    source: 'usuarios_app',
+    legacy_role: legacyRole,
+    has_conjunto_id: Boolean(legacyProfile?.conjunto_id),
+    has_residente_id: Boolean(legacyProfile?.residente_id),
+    warnings_count: warnings.length
+  });
 
   return {
     profile: {
@@ -119,7 +184,7 @@ const buildMembershipResolution = ({ authenticatedUser, legacyProfile, membershi
     addWarning(warnings, 'multiple_active_memberships_detected');
     devWarn('Membership resolver: múltiples memberships activas detectadas; se usó una membresía compatible.', {
       active_memberships_count: memberships.length,
-      selected_conjunto_id: membership.conjunto_id,
+      has_selected_conjunto_id: Boolean(membership.conjunto_id),
       selected_role_name: membership.role_name
     });
   }
@@ -160,8 +225,15 @@ export const resolveUserMembership = async (authenticatedUserOrId) => {
   const authenticatedUser = typeof authenticatedUserOrId === 'object' ? authenticatedUserOrId : null;
 
   if (!userId) {
+    devWarn('Membership resolver: aborta resolución porque no hay user id autenticado.', {
+      warning: 'missing_user_id'
+    });
     return buildLegacyResolution(null, ['missing_user_id']);
   }
+
+  devInfo('Membership resolver: resolver habilitado; inicia resolución híbrida.', {
+    flag: MEMBERSHIP_RESOLVER_FLAG
+  });
 
   const warnings = [];
 
@@ -200,13 +272,24 @@ export const resolveUserMembership = async (authenticatedUserOrId) => {
 
   if (!activeMemberships.length) {
     addWarning(warnings, 'no_active_membership');
+    devInfo('Membership resolver: no se encontraron memberships activas; se usará fallback legacy.', {
+      active_memberships_count: 0
+    });
     return buildLegacyResolution(legacyResponse.data || null, warnings);
   }
+
+  devInfo('Membership resolver: memberships activas encontradas.', {
+    active_memberships_count: activeMemberships.length
+  });
 
   const { membership: selectedMembership, warnings: compatibilityWarnings } = pickMembership(activeMemberships, legacyResponse.data);
   compatibilityWarnings.forEach((warning) => addWarning(warnings, warning));
 
   if (!selectedMembership) {
+    devWarn('Membership resolver: fallback legacy activo porque no se seleccionó membership compatible.', {
+      active_memberships_count: activeMemberships.length,
+      warnings_count: warnings.length
+    });
     return buildLegacyResolution(legacyResponse.data || null, warnings);
   }
 
