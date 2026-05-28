@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
-import { resolveUserMembershipProfile } from './services/membershipResolver';
+import { isMembershipResolverEnabled, resolveUserMembershipProfile } from './services/membershipResolver';
 import BrandLogo from './components/brand/BrandLogo';
 import ModuleIcon from './components/ui/ModuleIcon';
 
@@ -61,9 +61,23 @@ function App() {
       ]);
     };
 
+    const obtenerUsuarioLegacy = async (userId) => {
+      const { data, error } = await supabase
+        .from('usuarios_app')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      return data;
+    };
+
     const obtenerUsuario = async (authenticatedUser) => {
       try {
-        const perfil = await resolveUserMembershipProfile(authenticatedUser);
+        const perfil = isMembershipResolverEnabled()
+          ? await resolveUserMembershipProfile(authenticatedUser)
+          : await obtenerUsuarioLegacy(authenticatedUser?.id);
 
         if (!perfil) {
           if (isMounted) {
@@ -80,7 +94,7 @@ function App() {
       } catch (error) {
         logger.error('No se pudo cargar perfil de usuario', error, {
           module: 'auth',
-          action: 'load_membership_profile'
+          action: isMembershipResolverEnabled() ? 'load_membership_profile' : 'load_legacy_profile'
         });
 
         if (isMounted) {
