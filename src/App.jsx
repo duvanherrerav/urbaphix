@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
+import { isMembershipResolverEnabled, resolveUserMembershipProfile } from './services/membershipResolver';
 import BrandLogo from './components/brand/BrandLogo';
 import ModuleIcon from './components/ui/ModuleIcon';
 
@@ -60,25 +61,46 @@ function App() {
       ]);
     };
 
-    const obtenerUsuario = async (userId) => {
+    const obtenerUsuarioLegacy = async (userId) => {
       const { data, error } = await supabase
         .from('usuarios_app')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) {
-        logger.error('No se pudo cargar perfil de usuario', error);
+      if (error) throw error;
+
+      return data;
+    };
+
+    const obtenerUsuario = async (authenticatedUser) => {
+      try {
+        const perfil = isMembershipResolverEnabled()
+          ? await resolveUserMembershipProfile(authenticatedUser)
+          : await obtenerUsuarioLegacy(authenticatedUser?.id);
+
+        if (!perfil) {
+          if (isMounted) {
+            setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
+            setUsuarioApp(null);
+          }
+          return;
+        }
+
+        if (isMounted) {
+          setErrorPerfil('');
+          setUsuarioApp(perfil);
+        }
+      } catch (error) {
+        logger.error('No se pudo cargar perfil de usuario', error, {
+          module: 'auth',
+          action: isMembershipResolverEnabled() ? 'load_membership_profile' : 'load_legacy_profile'
+        });
+
         if (isMounted) {
           setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
           setUsuarioApp(null);
         }
-        return;
-      }
-
-      if (isMounted) {
-        setErrorPerfil('');
-        setUsuarioApp(data);
       }
     };
 
@@ -94,7 +116,7 @@ function App() {
 
         if (data.user) {
           migrarStoragePorteria();
-          await obtenerUsuario(data.user.id);
+          await obtenerUsuario(data.user);
         }
       } catch (error) {
         logger.error('No se pudo verificar sesión', error);
@@ -122,7 +144,7 @@ function App() {
 
         if (user) {
           migrarStoragePorteria();
-          obtenerUsuario(user.id);
+          obtenerUsuario(user);
         } else {
           setErrorPerfil('');
           setUsuarioApp(null);
