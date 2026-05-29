@@ -1,5 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { supabase } from './services/supabaseClient';
+import {
+  MEMBERSHIP_RESOLVER_FLAG,
+  isMembershipResolverEnabled,
+  resolveUserMembershipProfile
+} from './services/membershipResolver';
 import BrandLogo from './components/brand/BrandLogo';
 import ModuleIcon from './components/ui/ModuleIcon';
 
@@ -60,25 +65,86 @@ function App() {
       ]);
     };
 
-    const obtenerUsuario = async (userId) => {
+    const obtenerUsuarioLegacy = async (userId) => {
       const { data, error } = await supabase
         .from('usuarios_app')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) {
-        logger.error('No se pudo cargar perfil de usuario', error);
+      if (error) throw error;
+
+      return data;
+    };
+
+    const isQaRuntime = () => {
+      const qaRuntimeLabels = ['qa', 'test', 'testing', 'staging', 'preview'];
+      const normalizedMode = String(import.meta.env.MODE || '').trim().toLowerCase();
+      const normalizedAppEnv = String(import.meta.env.VITE_APP_ENV || '').trim().toLowerCase();
+
+      if (qaRuntimeLabels.includes(normalizedMode) || qaRuntimeLabels.includes(normalizedAppEnv)) {
+        return true;
+      }
+
+      if (typeof window === 'undefined') return false;
+
+      const hostname = String(window.location?.hostname || '').trim().toLowerCase();
+      const productionHosts = ['urbaphix.com', 'www.urbaphix.com'];
+
+      if (!hostname || productionHosts.includes(hostname)) return false;
+
+      return hostname.endsWith('.vercel.app')
+        || hostname.includes('preview')
+        || hostname.includes('staging')
+        || hostname.includes('-qa')
+        || hostname.includes('.qa.');
+    };
+
+    const traceResolverFlag = (enabled) => {
+      if (!import.meta.env.DEV && !isQaRuntime()) return;
+
+      const event = logger.info(`Membership resolver: flag ${enabled ? 'habilitado' : 'deshabilitado'}; ${enabled ? 'usa resolución híbrida' : 'usa flujo legacy'}.`, {
+        module: 'auth',
+        action: enabled ? 'membership_resolver_enabled' : 'membership_resolver_disabled',
+        flag: MEMBERSHIP_RESOLVER_FLAG
+      });
+
+      if (!import.meta.env.DEV) {
+        console.info('[urbaphix-observability]', event);
+      }
+    };
+
+    const obtenerUsuario = async (authenticatedUser) => {
+      try {
+        const membershipResolverEnabled = isMembershipResolverEnabled();
+        traceResolverFlag(membershipResolverEnabled);
+
+        const perfil = membershipResolverEnabled
+          ? await resolveUserMembershipProfile(authenticatedUser)
+          : await obtenerUsuarioLegacy(authenticatedUser?.id);
+
+        if (!perfil) {
+          if (isMounted) {
+            setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
+            setUsuarioApp(null);
+          }
+          return;
+        }
+
+        if (isMounted) {
+          setErrorPerfil('');
+          setUsuarioApp(perfil);
+        }
+      } catch (error) {
+        logger.error('No se pudo cargar perfil de usuario', error, {
+          module: 'auth',
+          action: isMembershipResolverEnabled() ? 'load_membership_profile' : 'load_legacy_profile'
+        });
+
         if (isMounted) {
           setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
           setUsuarioApp(null);
         }
-        return;
-      }
-
-      if (isMounted) {
-        setErrorPerfil('');
-        setUsuarioApp(data);
       }
     };
 
@@ -94,7 +160,7 @@ function App() {
 
         if (data.user) {
           migrarStoragePorteria();
-          await obtenerUsuario(data.user.id);
+          await obtenerUsuario(data.user);
         }
       } catch (error) {
         logger.error('No se pudo verificar sesión', error);
@@ -122,7 +188,7 @@ function App() {
 
         if (user) {
           migrarStoragePorteria();
-          obtenerUsuario(user.id);
+          obtenerUsuario(user);
         } else {
           setErrorPerfil('');
           setUsuarioApp(null);
