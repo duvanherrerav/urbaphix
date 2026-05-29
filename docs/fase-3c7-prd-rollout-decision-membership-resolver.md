@@ -70,13 +70,15 @@ Antes de redactar esta decisión se revisaron las fuentes internas indicadas por
 
 ### Go solo si todo esto es verdadero
 
-- [ ] QA fue validado con `VITE_ENABLE_MEMBERSHIP_RESOLVER=false`.
-- [ ] QA fue validado con `VITE_ENABLE_MEMBERSHIP_RESOLVER=true`.
-- [ ] En QA se confirmó evento `membership_resolver_disabled` con flag apagado.
-- [ ] En QA se confirmó evento `membership_resolution` con flag encendido.
-- [ ] En QA se confirmó `active_memberships_count: 1` para los perfiles probados.
-- [ ] En QA se confirmó `compatible_memberships_count: 1` para los perfiles probados.
-- [ ] En QA se confirmó `matched_legacy_conjunto: true` para los perfiles probados.
+- [ ] DEV/local conserva evidencia detallada del resolver cuando se ejecutan validaciones controladas con logs disponibles.
+- [ ] QA fue validado funcionalmente con `VITE_ENABLE_MEMBERSHIP_RESOLVER=false`.
+- [ ] QA fue validado funcionalmente con `VITE_ENABLE_MEMBERSHIP_RESOLVER=true`.
+- [ ] En QA se confirmó login correcto con los perfiles disponibles.
+- [ ] En QA se confirmó navegación correcta por rol con los perfiles disponibles.
+- [ ] En QA se confirmaron menús correctos por rol con los perfiles disponibles.
+- [ ] En QA no hay loops de sesión ni logout inesperado.
+- [ ] En QA se observaron consultas esperadas para el flujo validado.
+- [ ] En QA se validó rollback por feature flag hacia el flujo legacy.
 - [ ] Roles Admin, Vigilancia y Residente funcionan en QA, si existen usuarios disponibles para cada rol.
 - [ ] Producción actual funciona con flag apagado o ausente.
 - [ ] `tenant_memberships` existe en PRD con la estructura esperada.
@@ -99,7 +101,7 @@ Antes de redactar esta decisión se revisaron las fuentes internas indicadas por
 
 - [ ] Existen diferencias entre `usuarios_app` y `tenant_memberships` que no tienen explicación documentada.
 - [ ] Existen múltiples memberships activas incompatibles para usuarios reales.
-- [ ] Hay errores recurrentes de `membership_resolution` en QA o en prevalidación productiva.
+- [ ] Hay errores recurrentes del resolver durante validación funcional o prevalidación productiva.
 - [ ] Login se bloquea o entra en estado inconsistente.
 - [ ] Menú o navegación se asigna incorrectamente por rol.
 - [ ] Módulos críticos devuelven consultas vacías inesperadas para perfiles que deberían tener datos.
@@ -111,7 +113,38 @@ Antes de redactar esta decisión se revisaron las fuentes internas indicadas por
 - [ ] No hay responsable humano para rollback.
 - [ ] No hay aprobación humana Go explícita.
 
-## 6. Checklist previo a activar Vercel Production
+## 6. Evidencia por ambiente antes de PRD
+
+La evidencia detallada del resolver y la evidencia funcional QA tienen propósitos distintos. Los campos de telemetría fina no son obligatorios para todos los despliegues QA/Vercel porque pueden depender del modo de build, consola disponible o configuración de observabilidad del preview.
+
+### Evidencia DEV/local
+
+En DEV/local sí se recomienda conservar evidencia detallada cuando el entorno permite logs de depuración del resolver:
+
+- logs detallados del resolver;
+- evento o acción `membership_resolution`;
+- `active_memberships_count`;
+- `compatible_memberships_count`;
+- `matched_legacy_conjunto`;
+- confirmación de fallback hacia `usuarios_app` en escenarios controlados.
+
+Esta evidencia sirve para diagnóstico técnico y trazabilidad del resolver, pero no debe convertirse en requisito obligatorio de todos los despliegues QA/Vercel.
+
+### Evidencia QA
+
+En QA la evidencia requerida para decidir PRD debe ser funcional y operativa:
+
+- validación funcional con `VITE_ENABLE_MEMBERSHIP_RESOLVER=false`;
+- validación funcional con `VITE_ENABLE_MEMBERSHIP_RESOLVER=true`;
+- login correcto;
+- navegación correcta por rol;
+- menús correctos por rol;
+- ausencia de loops de sesión;
+- ausencia de logout inesperado;
+- consultas esperadas para el flujo validado;
+- rollback validado por feature flag hacia `VITE_ENABLE_MEMBERSHIP_RESOLVER=false` o variable ausente.
+
+## 7. Checklist previo a activar Vercel Production
 
 Ejecutar manualmente antes de tocar variables reales de Production:
 
@@ -127,7 +160,7 @@ Ejecutar manualmente antes de tocar variables reales de Production:
 10. Confirmar que el rollback por variable fue entendido por el responsable humano.
 11. Registrar hora de inicio, responsable y criterio de éxito esperado.
 
-## 7. Procedimiento de activación PRD
+## 8. Procedimiento de activación PRD
 
 La activación real debe hacerse manualmente en Vercel Production, no desde este repositorio ni desde este PR.
 
@@ -147,7 +180,7 @@ La activación real debe hacerse manualmente en Vercel Production, no desde este
 
 Esta documentación **no ejecuta el cambio** y no activa producción por sí misma.
 
-## 8. Validación inmediata post-activación
+## 9. Validación inmediata post-activación
 
 Ejecutar inmediatamente después del redeploy Production con `VITE_ENABLE_MEMBERSHIP_RESOLVER=true`:
 
@@ -173,7 +206,7 @@ Ejecutar inmediatamente después del redeploy Production con `VITE_ENABLE_MEMBER
 14. Revisar Supabase API/Auth logs si aplica.
 15. Registrar resultado Go post-activación o ejecutar rollback si aparece criterio No-Go.
 
-## 9. Rollback inmediato
+## 10. Rollback inmediato
 
 El rollback operativo no requiere SQL ni rollback estructural de base de datos.
 
@@ -196,7 +229,7 @@ Luego:
 7. Registrar hora de rollback, deployment ID y síntoma que motivó la reversión.
 8. No ejecutar `drop table`, `delete`, `truncate`, rollback de migraciones ni cambios RLS como parte del rollback del flag.
 
-## 10. Monitoreo recomendado
+## 11. Monitoreo recomendado
 
 Durante la ventana y al menos durante el periodo definido por el responsable operativo, monitorear:
 
@@ -223,7 +256,7 @@ Durante la ventana y al menos durante el periodo definido por el responsable ope
   - datos esperados en módulos críticos;
   - ausencia de regresiones percibidas.
 
-## 11. Evidencia mínima recomendada
+## 12. Evidencia mínima recomendada
 
 Registrar evidencia sin exponer secretos, tokens, emails completos, user IDs ni datos personales innecesarios:
 
@@ -237,7 +270,7 @@ Registrar evidencia sin exponer secretos, tokens, emails completos, user IDs ni 
 - Resultado de revisión de logs Vercel/Supabase si aplica.
 - Decisión final: mantener activado, rollback ejecutado o monitoreo extendido.
 
-## 12. Confirmación de seguridad de esta fase
+## 13. Confirmación de seguridad de esta fase
 
 Esta fase cumple el alcance seguro porque:
 
@@ -250,6 +283,6 @@ Esta fase cumple el alcance seguro porque:
 - No elimina fallback legacy.
 - No altera producción automáticamente.
 
-## 13. Criterio de cierre
+## 14. Criterio de cierre
 
 FASE 3C.7 se puede cerrar cuando exista este documento claro de rollout PRD, reversible, con Go / No-Go explícito, checklist de activación y rollback por variable, sin activar producción y sin cambios en Supabase.
