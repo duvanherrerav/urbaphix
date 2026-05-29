@@ -30,7 +30,7 @@ Se revisaron las fuentes internas en el orden indicado por `AGENTS.md`:
 1. `docs/database-schema.md` como inventario funcional de tablas, relaciones y políticas RLS documentadas.
 2. `supabase/migrations/`, especialmente:
    - `20260410031821_remote_schema.sql`, donde los helpers legacy consultan `usuarios_app`/`residentes`.
-   - migraciones de hardening RLS posteriores.
+   - migraciones de hardening RLS posteriores, incluyendo el hardening de pagos disponible en este checkout como `20260509064414_hardening_rls_qa.sql` (la revisión menciona `20260509064144_hardening_rls_pago.sql`; el punto documental es validar la migración de hardening de pagos aplicada en el ambiente).
    - `20260528120000_fase_3c1_memberships_rls_base.sql`, donde se crean `platform_memberships`, `tenant_memberships` y helpers de membership/plataforma.
 3. `src/services/`, especialmente `membershipResolver.js` y servicios de módulos.
 4. Módulos React que consumen Supabase en `src/modules/` y componentes globales de notificaciones.
@@ -148,7 +148,7 @@ Sin embargo, las tablas de negocio auditadas no están documentadas como migrada
 | Módulo | Rol autorizado actual | Tablas consultadas/escritas desde frontend | Filtros esperados | Dependencia `usuarios_app` | Dependencia `tenant_memberships` | Riesgo detectado | Recomendación |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Dashboard Admin | `admin` | `pagos`, `incidentes`, `registro_visitas`, `reservas_zonas`, `apartamentos`, `paquetes`, `torres` | `conjunto_id = usuarioApp.conjunto_id`; RLS por `fn_auth_conjunto_id()` | Alta: rol/conjunto de RLS legacy y actores | Media: solo perfil resuelto | Si membership difiere de `usuarios_app`, dashboard puede quedar vacío o RLS puede responder según legacy. | FASE 3D.2: definir helper canónico tenant-aware para dashboard y validar todos los widgets por conjunto. |
-| Pagos Admin / Crear Cobro | `admin` | `pagos`, `pagos_eventos`, `residentes`, `apartamentos`, `torres`, `notificaciones`, `usuarios_app` | Admin del mismo conjunto; inserts/updates con `conjunto_id`; eventos con `usuario_id = auth.uid()` | Alta: RLS admin legacy, `rechazado_por`, eventos/notificaciones | Media: perfil resuelto | `update comprobante pagos` documentado como `true` es demasiado amplio si no está restringido por columnas/ownership; pagos son datos financieros sensibles. | P1: separar policies de comprobante residente vs aprobación/rechazo admin; auditar columnas permitidas. |
+| Pagos Admin / Crear Cobro | `admin` | `pagos`, `pagos_eventos`, `residentes`, `apartamentos`, `torres`, `notificaciones`, `usuarios_app` | Admin del mismo conjunto; inserts/updates con `conjunto_id`; eventos con `usuario_id = auth.uid()` | Alta: RLS admin legacy, `rechazado_por`, eventos/notificaciones | Media: perfil resuelto | **Riesgo histórico mitigado:** la policy inicial `update comprobante pagos` aparecía como `true`, pero el hardening posterior de pagos restringe comprobantes al residente dueño y updates admin al admin del mismo conjunto. **Riesgo vigente:** confirmar que `docs/database-schema.md` refleje esa migración aplicada. | P2: reconciliar documentación vs migraciones aplicadas y validar en ambiente que las policies efectivas de `pagos` corresponden al hardening. |
 | Mis Pagos | `residente` | `pagos`, `config_pagos`, `residentes`, `comprobantes` (referencia frontend), `pagos_eventos` indirecto | `residente_id` propio y/o `usuario_id`; `conjunto_id` cuando aplique | Alta: `fn_auth_residente_id()` y relación residente-usuario | Media/Alta para `residente_id` desde membership | Referencia frontend a `comprobantes` no aparece en inventario principal del esquema documentado; riesgo documental. | P2: reconciliar tabla/artefacto `comprobantes` contra esquema real antes de hardening. |
 | Incidentes Admin | `admin` | `incidentes`, `notificaciones`, `usuarios_app` | SELECT/UPDATE mismo `conjunto_id`; UPDATE solo admin | Alta: `reportado_por`, helper rol/conjunto legacy | Media: perfil resuelto | Updates por `id` pueden depender exclusivamente de RLS para tenant si no se agrega `conjunto_id` en todos los updates. | P2: agregar patrón defensivo documentado `eq('conjunto_id', usuarioApp.conjunto_id)` en escrituras futuras, sin cambiar en esta fase. |
 | Reportar Incidente | `vigilancia` | `incidentes`, `notificaciones`, `usuarios_app` | INSERT con `conjunto_id` del usuario y `reportado_por = usuarioApp.id`; RLS rol vigilancia | Alta: RLS espera `fn_auth_rol() = 'vigilancia'` | Media: membership `vigilante` se mapea a UI `vigilancia` | Mismatch `tenant_memberships.role_name = 'vigilante'` vs RLS legacy `vigilancia` si `usuarios_app` no está sincronizado. | P1: definir normalización/compatibilidad RLS para rol vigilancia en helper tenant-aware. |
@@ -169,7 +169,7 @@ Sin embargo, las tablas de negocio auditadas no están documentadas como migrada
 | `usuarios_app` | Identidad, rol, conjunto, PII básica | SELECT amplio `true` + self; UPDATE self | Exposición horizontal de perfiles/roles si SELECT amplio sigue activo. | P1 |
 | `tenant_memberships` | Autorización tenant | SELECT same tenant/superadmin; writes platform | Divergencia con `usuarios_app` impacta UI vs RLS; no gobierna todavía tablas negocio. | P1 |
 | `platform_memberships` | Autorización plataforma | Self/superadmin; writes superadmin; delete denied | Correcto como base, pero roles plataforma no deben mapearse a módulos tenant. | P2 |
-| `pagos` | Financiera/residentes | SELECT por conjunto; inserts/updates admin; comprobante update amplio documentado | Escrituras de comprobante/rechazo requieren separación por rol/propiedad/columnas. | P1 |
+| `pagos` | Financiera/residentes | SELECT por conjunto; inserts/updates admin; comprobante residente endurecido en migración posterior | Riesgo amplio de comprobante tratado como **histórico/mitigado** por hardening; queda pendiente validar consistencia documental y policy efectiva por ambiente. | P2 |
 | `pagos_eventos` | Auditoría financiera | Admin conjunto / residente propio / insert controlado | Depende de helpers legacy; requiere consistencia con memberships. | P2 |
 | `notificaciones` | Mensajes a usuarios | SELECT por `usuario_id = auth.uid()`; INSERT autenticado | INSERT demasiado permisivo si no valida destinatario/contexto. | P1 |
 | `residentes` | Vínculo usuario-apto-conjunto | SELECT same conjunto; INSERT admin | Es fuente crítica para `fn_auth_residente_id()`; divergencia con membership afecta residente. | P1 |
@@ -206,15 +206,28 @@ Tablas como `usuarios_app`, `config_pagos` y `archivos` aparecen con lectura amp
 
 `notificaciones` permite insert a usuarios autenticados según documentación. Si no se valida destinatario y contexto, un usuario podría crear notificaciones arbitrarias para otros usuarios.
 
-### 8.5 Tablas o referencias no reconciliadas documentalmente
+### 8.5 Pagos/comprobantes: riesgo histórico mitigado vs validación vigente
+
+El hallazgo sobre `update comprobante pagos` no debe tratarse como una brecha vigente de RLS sin validar el estado aplicado. La condición amplia (`USING true WITH CHECK true`) aparece en el esquema remoto inicial y en `docs/database-schema.md`, pero el hardening posterior de pagos —identificado en las migraciones del repositorio como `20260509064414_hardening_rls_qa.sql` y referido en revisión como `20260509064144_hardening_rls_pago.sql`— restringe:
+
+- `update comprobante pagos`: a residentes cuyo `residentes.id = pagos.residente_id`, `residentes.usuario_id = auth.uid()` y `residentes.conjunto_id = pagos.conjunto_id`.
+- `update pagos admin`: a usuarios `admin` del mismo `conjunto_id` del pago.
+
+Clasificación correcta:
+
+1. **Riesgo histórico o previamente mitigado:** actualización amplia de comprobante registrada en el esquema inicial.
+2. **Riesgo vigente pendiente de validar:** confirmar en cada ambiente que la migración de hardening de pagos está aplicada y que la policy efectiva no conserva la condición amplia.
+3. **Recomendación documental:** actualizar/reconciliar `docs/database-schema.md` contra las migraciones aplicadas para que no siga describiendo el estado histórico como si fuera el estado efectivo.
+
+### 8.6 Tablas o referencias no reconciliadas documentalmente
 
 El código referencia `comprobantes` y `bitacora_porteria`, pero esas tablas no aparecen en el inventario principal de `docs/database-schema.md`. No se asume su estructura; se recomienda reconciliarlas con Supabase/migraciones antes de cualquier hardening.
 
-### 8.6 Dependencia fuerte de `residentes`
+### 8.7 Dependencia fuerte de `residentes`
 
 Los módulos de residente dependen de que `residentes.usuario_id`, `residentes.conjunto_id` y `tenant_memberships.residente_id` estén sincronizados. Cualquier inconsistencia impacta visitas, pagos, paquetes y reservas.
 
-### 8.7 Realtime y filtros frontend
+### 8.8 Realtime y filtros frontend
 
 Los filtros realtime por `conjunto_id`/`residente_id` reducen ruido, pero no reemplazan RLS. Deben mantenerse como defensa en profundidad, no como control primario.
 
@@ -236,7 +249,7 @@ Condiciones que sí convertirían el riesgo en P0 durante validación operativa:
 1. **RLS de negocio sigue anclada a `usuarios_app` mientras UI puede operar desde `tenant_memberships`.** Requiere decisión de hardening: migrar helpers existentes o crear policies tenant-aware por módulo.
 2. **`usuarios_app` con SELECT amplio documentado.** Debe restringirse a self/same tenant/roles operativos justificados antes de ampliar superadmin o soporte.
 3. **`notificaciones` con INSERT autenticado amplio documentado.** Debe limitarse por emisor/destinatario/contexto.
-4. **Pagos requiere separación fina de permisos.** La policy de actualización de comprobante documentada como `true` debe revisarse para evitar escrituras no autorizadas.
+4. **Pagos requiere reconciliación documental, no tratar el update amplio como riesgo vigente sin validar.** La condición `true` de `update comprobante pagos` corresponde al estado histórico del esquema remoto inicial; el hardening posterior restringe la actualización del comprobante al residente dueño y la actualización admin al admin del mismo conjunto. El pendiente vigente es confirmar que `docs/database-schema.md`, migraciones aplicadas y policies efectivas por ambiente estén alineadas.
 5. **Invariante residente obligatoria.** `tenant_memberships.residente_id`, `residentes.usuario_id` y `residentes.conjunto_id` deben validarse antes de migrar RLS residente.
 6. **Rol vigilancia/vigilante.** Se debe resolver formalmente en RLS tenant-aware para evitar drift.
 7. **Reservas robustas dependen de helper legacy.** Por criticidad operativa, conviene priorizar hardening tenant-aware en `reservas_zonas` y eventos.
@@ -275,7 +288,7 @@ Elegir una de estas estrategias antes de tocar RLS productiva:
    - roles `vigilante`/`vigilancia` normalizados por capa.
 2. `usuarios_app`: restringir SELECT amplio.
 3. `notificaciones`: limitar insert/select/update por destinatario/contexto.
-4. `pagos` y `pagos_eventos`: separar permisos admin/residente por acción/columnas.
+4. `pagos` y `pagos_eventos`: validar consistencia entre `docs/database-schema.md`, migraciones aplicadas y policies efectivas; no reabrir como brecha vigente el update amplio de comprobante si el hardening ya está aplicado en el ambiente.
 5. `registro_visitas`/`visitantes`: validar same tenant y ownership residente.
 6. `reservas_zonas` + eventos/documentos/bloqueos: migrar a tenant-aware o confirmar helper legacy actualizado.
 7. `paquetes`: exigir conjunto en operaciones y RLS consistente por vigilancia/residente.
@@ -304,7 +317,7 @@ Elegir una de estas estrategias antes de tocar RLS productiva:
 ### Módulos admin
 
 - [ ] Dashboard muestra solo datos del conjunto del admin.
-- [ ] Pagos admin lista, crea, aprueba/rechaza solo pagos del conjunto.
+- [ ] Pagos admin lista, crea, aprueba/rechaza solo pagos del conjunto y confirmar que la policy admin efectiva coincide con el hardening aplicado.
 - [ ] Incidentes admin lista/actualiza solo incidentes del conjunto.
 - [ ] Reservas admin lista/aprueba/rechaza solo reservas del conjunto.
 
@@ -328,7 +341,7 @@ Elegir una de estas estrategias antes de tocar RLS productiva:
 - [ ] `notificaciones` no permite insertar mensajes arbitrarios a terceros.
 - [ ] `archivos` no expone soportes cross-tenant.
 - [ ] `config_pagos` no expone configuración de otros conjuntos.
-- [ ] `pagos` no permite updates cruzados ni modificación de columnas no autorizadas.
+- [ ] `pagos` no permite updates cruzados; distinguir entre el riesgo histórico de `update comprobante pagos` amplio y la policy endurecida efectivamente aplicada en el ambiente.
 - [ ] `tenant_memberships` no permite self-escalation.
 
 ### Operación y rollback
