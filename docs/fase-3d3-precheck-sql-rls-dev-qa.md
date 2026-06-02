@@ -114,6 +114,8 @@ Cubre módulos mínimos:
 
 Cada bloque indica si el resultado depende principalmente de `usuarios_app`, de `tenant_memberships` o de trazabilidad indirecta por tablas relacionadas.
 
+Los checks filtrados por `expected_conjunto_id` validan que el dataset esperado del usuario/rol esté disponible. Para no ocultar exposición cross-tenant, el SQL también incluye checks complementarios agrupados por el `conjunto_id` real visible para el usuario autenticado; cualquier fila visible con `conjunto_id` diferente del placeholder esperado se marca como sospechosa y debe clasificarse antes de FASE 3D.4.
+
 ### 5.3 `fase_3d3_rls_tenant_isolation_checks.sql`
 
 Validación read-only para detectar posibles riesgos de acceso cruzado:
@@ -155,6 +157,8 @@ Validación read-only para detectar posibles riesgos de acceso cruzado:
 
 - `0` filas puede ser correcto si el dataset no contiene datos del módulo.
 - `0` filas no debe asumirse como bloqueo RLS sin comparar contra inventario y dataset esperado.
+- Los conteos filtrados por `expected_conjunto_id` sirven para validar datos esperados, pero no bastan para descartar exposición cruzada.
+- Los conteos agrupados por tenant real visible deben revisarse en cada ejecución; cualquier `conjunto_id` distinto del esperado es hallazgo P0 salvo justificación documentada.
 - Filas de otro `conjunto_id` visibles para un usuario de prueba tenant-scoped son hallazgo P0 salvo justificación documentada.
 - Usuarios sin membership activa no deberían ver datos tenant-scoped.
 - Membership `residente` activa sin `residente_id` debe corregirse o clasificarse antes de FASE 3D.4.

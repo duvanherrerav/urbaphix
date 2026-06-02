@@ -93,6 +93,92 @@ from public.registro_visitas rv, params p
 where rv.conjunto_id = p.expected_conjunto_id;
 
 -- -----------------------------------------------------------------------------
+-- 01B. Exposición visible agrupada por tenant real
+-- Complementa los checks filtrados: si una policy permite filas de otros conjuntos,
+-- este bloque las marca como sospechosas sin ocultarlas por expected_conjunto_id.
+-- Aplicar con cada rol de prueba autenticado.
+-- -----------------------------------------------------------------------------
+with params as (
+  select '00000000-0000-0000-0000-000000000002'::uuid as expected_conjunto_id
+), visible_by_tenant as (
+  select 'usuarios_app' as source_table, ua.conjunto_id, count(*) as visible_rows
+  from public.usuarios_app ua
+  group by ua.conjunto_id
+  union all
+  select 'tenant_memberships', tm.conjunto_id, count(*)
+  from public.tenant_memberships tm
+  group by tm.conjunto_id
+  union all
+  select 'residentes', r.conjunto_id, count(*)
+  from public.residentes r
+  group by r.conjunto_id
+  union all
+  select 'pagos', pgo.conjunto_id, count(*)
+  from public.pagos pgo
+  group by pgo.conjunto_id
+  union all
+  select 'pagos_eventos', pe.conjunto_id, count(*)
+  from public.pagos_eventos pe
+  group by pe.conjunto_id
+  union all
+  select 'registro_visitas', rv.conjunto_id, count(*)
+  from public.registro_visitas rv
+  group by rv.conjunto_id
+  union all
+  select 'visitantes', v.conjunto_id, count(*)
+  from public.visitantes v
+  group by v.conjunto_id
+  union all
+  select 'paquetes', pq.conjunto_id, count(*)
+  from public.paquetes pq
+  group by pq.conjunto_id
+  union all
+  select 'incidentes', i.conjunto_id, count(*)
+  from public.incidentes i
+  group by i.conjunto_id
+  union all
+  select 'reservas_zonas', rz.conjunto_id, count(*)
+  from public.reservas_zonas rz
+  group by rz.conjunto_id
+  union all
+  select 'reservas_eventos', re.conjunto_id, count(*)
+  from public.reservas_eventos re
+  group by re.conjunto_id
+  union all
+  select 'reservas_documentos', rd.conjunto_id, count(*)
+  from public.reservas_documentos rd
+  group by rd.conjunto_id
+  union all
+  select 'reservas_bloqueos', rb.conjunto_id, count(*)
+  from public.reservas_bloqueos rb
+  group by rb.conjunto_id
+  union all
+  select 'config_pagos', cp.conjunto_id, count(*)
+  from public.config_pagos cp
+  group by cp.conjunto_id
+)
+select
+  vbt.source_table,
+  vbt.conjunto_id as visible_conjunto_id,
+  p.expected_conjunto_id,
+  vbt.visible_rows,
+  case
+    when vbt.conjunto_id is null then 'sospechoso_conjunto_null'
+    when vbt.conjunto_id <> p.expected_conjunto_id then 'sospechoso_otro_conjunto_visible'
+    else 'esperado_conjunto_actual'
+  end as tenant_visibility_status
+from visible_by_tenant vbt
+cross join params p
+order by
+  case
+    when vbt.conjunto_id is null then 0
+    when vbt.conjunto_id <> p.expected_conjunto_id then 1
+    else 2
+  end,
+  vbt.source_table,
+  vbt.conjunto_id;
+
+-- -----------------------------------------------------------------------------
 -- 02. Pagos / Crear cobro / Mis pagos
 -- Admin_conjunto: pagos del conjunto y residentes elegibles para crear cobro.
 -- Residente: pagos propios por residente_id. 0 filas puede ser correcto si no hay cartera.
