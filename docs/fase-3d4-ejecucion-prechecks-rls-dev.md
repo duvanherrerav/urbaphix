@@ -5,8 +5,9 @@
 FASE 3D.4 documenta la ejecución manual, controlada y **solo read-only** de los prechecks RLS preparados en FASE 3D.3 para validar en **Supabase DEV**:
 
 - inventario real de tablas sensibles, helpers, grants y policies RLS;
-- acceso efectivo por rol autenticado de prueba;
-- aislamiento por `conjunto_id`, `residente_id` y `auth.uid()`;
+- evidencia estructural desde SQL Editor para metadata, conteos y validaciones que no dependan de la sesión real del usuario final;
+- evidencia efectiva por rol autenticado desde frontend/app, cliente API con JWT del usuario de prueba o simulación controlada de claims aprobada;
+- aislamiento por `conjunto_id`, `residente_id` y `auth.uid()` únicamente cuando la evidencia provenga de un contexto autenticado válido;
 - hallazgos P0/P1/P2/P3 antes de cualquier hardening RLS posterior.
 
 Esta fase **no implementa cambios en Supabase**. Su resultado esperado es evidencia técnica suficiente para decidir si Urbaphix puede avanzar a QA o a una FASE 3D.5 de hardening controlado.
@@ -16,12 +17,15 @@ Esta fase **no implementa cambios en Supabase**. Su resultado esperado es eviden
 La ejecución autorizada en esta fase está limitada a:
 
 - ambiente: **DEV**;
-- herramienta: Supabase Dashboard / SQL Editor del proyecto DEV;
+- herramienta estructural: Supabase Dashboard / SQL Editor del proyecto DEV;
+- herramientas de evidencia efectiva: sesión real de frontend/app, cliente/API con JWT válido del usuario de prueba o simulación controlada de claims previamente documentada y aprobada;
 - scripts: archivos `supabase/validation/fase_3d3_*.sql` existentes;
 - tipo de operación: consultas de diagnóstico **read-only**;
-- evidencia: capturas, exportes CSV o copias controladas de resultados sin datos sensibles innecesarios.
+- evidencia: capturas, exportes CSV, registros Network/API o copias controladas de resultados sin datos sensibles innecesarios.
 
 No se autorizan cambios de schema, datos, policies, helpers, migraciones, frontend, variables de entorno ni configuración de despliegue.
+
+**Limitación obligatoria:** el SQL Editor puede ejecutar bajo un rol elevado/postgres y no necesariamente representa `auth.uid()` ni JWT real de `admin_conjunto`, vigilancia o residente. Por eso, SQL Editor **no es evidencia final válida** para acceso efectivo cuando el resultado depende de `auth.uid()`, claims JWT o RLS evaluado como usuario final.
 
 ## 3. Prohibición explícita de PRD
 
@@ -39,30 +43,42 @@ Si por error se abre PRD o se ejecuta cualquier consulta en PRD:
 
 ## 4. Archivos SQL a ejecutar y orden recomendado
 
-Ejecutar los SQL en este orden:
+Ejecutar los SQL y evidencias en este orden lógico:
 
-1. `supabase/validation/fase_3d3_rls_precheck_inventory.sql`
+1. `supabase/validation/fase_3d3_rls_precheck_inventory.sql` desde SQL Editor DEV.
    - Objetivo: inventariar estado real de RLS, policies, helpers, grants, columnas clave, conteos y consistencia base.
-2. `supabase/validation/fase_3d3_rls_effective_access_checks.sql`
+   - Tipo de evidencia: **estructural**.
+2. `supabase/validation/fase_3d3_rls_tenant_isolation_checks.sql` desde SQL Editor DEV solo para validaciones estructurales o de metadata que no dependan de `auth.uid()` real.
+   - Objetivo: detectar señales estructurales de fuga cross-tenant, inconsistencias de memberships, filas huérfanas, tablas sensibles sin RLS o policies amplias.
+   - Tipo de evidencia: **estructural**.
+3. `supabase/validation/fase_3d3_rls_effective_access_checks.sql` mediante camino autenticado válido cuando sus resultados dependan de `auth.uid()` / JWT real.
    - Objetivo: validar acceso efectivo por usuario autenticado de prueba y rol esperado.
    - Repetir una ejecución por cada usuario de prueba disponible.
-3. `supabase/validation/fase_3d3_rls_tenant_isolation_checks.sql`
-   - Objetivo: detectar señales de fuga cross-tenant, inconsistencias de memberships, filas huérfanas, tablas sensibles sin RLS o policies amplias.
+   - Tipo de evidencia: **efectiva por usuario autenticado**.
 
-No invertir el orden salvo justificación documentada. El inventario debe ejecutarse primero porque confirma qué tablas, helpers y policies existen realmente en DEV antes de interpretar acceso efectivo.
+No invertir el orden salvo justificación documentada. El inventario debe ejecutarse primero porque confirma qué tablas, helpers y policies existen realmente en DEV antes de interpretar acceso efectivo. La validación efectiva por rol no queda aprobada si solo se ejecutó en SQL Editor con rol elevado.
 
-## 5. Instrucciones exactas de ejecución en Supabase SQL Editor DEV
+## 5. Instrucciones exactas de ejecución y separación de evidencia
 
-Para cada archivo SQL:
+### 5.1 Evidencia estructural desde Supabase SQL Editor DEV
+
+Usar SQL Editor DEV únicamente para:
+
+- inventario RLS/helpers/policies;
+- conteos estructurales;
+- revisión de metadata;
+- consistencia de memberships y datos huérfanos;
+- validaciones que no dependan de `auth.uid()` real del usuario final ni de claims JWT.
+
+Pasos:
 
 1. Abrir Supabase Dashboard.
 2. Seleccionar el proyecto **DEV** de Urbaphix.
 3. Abrir **SQL Editor**.
 4. Crear un nuevo snippet o query temporal con nombre sugerido:
    - `FASE 3D4 DEV - 01 inventory`;
-   - `FASE 3D4 DEV - 02 effective access - <rol>`;
-   - `FASE 3D4 DEV - 03 tenant isolation`.
-5. Copiar el contenido completo del archivo SQL correspondiente desde el repositorio.
+   - `FASE 3D4 DEV - 02 tenant isolation structural`.
+5. Copiar el contenido completo del archivo SQL estructural correspondiente desde el repositorio.
 6. Antes de ejecutar, confirmar que el SQL no contiene instrucciones DDL/DML no permitidas:
    - `ALTER`;
    - `CREATE`;
@@ -71,19 +87,46 @@ Para cada archivo SQL:
    - `DELETE`;
    - `INSERT`;
    - `TRUNCATE`.
-7. Para el SQL de acceso efectivo, reemplazar todos los placeholders requeridos según la sección 6.
-8. Ejecutar el SQL con el botón **Run** del SQL Editor.
-9. Capturar evidencia de cada result set relevante según la sección 8.
-10. Registrar hallazgos en la plantilla `docs/fase-3d4-plantilla-evidencia-prechecks-dev.md`.
-11. Si un query falla:
+7. Ejecutar el SQL con el botón **Run** del SQL Editor.
+8. Capturar evidencia de cada result set relevante según la sección 8.
+9. Registrar método de ejecución como `SQL Editor DEV` en la plantilla `docs/fase-3d4-plantilla-evidencia-prechecks-dev.md`.
+10. Si un query falla:
     - copiar mensaje exacto de error;
     - capturar pantalla del error;
     - no modificar el SQL en Supabase para “probar rápido” sin documentarlo;
     - clasificar el error según la matriz P0/P1/P2/P3.
 
+### 5.2 Evidencia efectiva por usuario autenticado
+
+`supabase/validation/fase_3d3_rls_effective_access_checks.sql` **no debe usarse como evidencia final desde SQL Editor** si sus resultados dependen de `auth.uid()`, JWT real o claims del usuario final. Para esos casos, la evidencia válida debe provenir de uno de estos caminos:
+
+1. **Sesión real desde frontend/app + validación Network**:
+   - iniciar sesión en DEV con el usuario de prueba;
+   - navegar los módulos cubiertos por el rol;
+   - capturar requests/responses Network relevantes, ocultando tokens y datos sensibles;
+   - confirmar que los datos visibles corresponden al `conjunto_id` / `residente_id` esperado.
+2. **Cliente/API con JWT del usuario de prueba**:
+   - usar un token válido del usuario de prueba en DEV;
+   - ejecutar consultas equivalentes a los módulos validados;
+   - registrar endpoint, método, status code, filtros y respuesta sanitizada;
+   - no persistir ni publicar el JWT.
+3. **Simulación controlada de claims**:
+   - permitida solo si el método está previamente documentado y aprobado;
+   - debe registrar quién aprobó, alcance, claims simulados y por qué representa al usuario probado;
+   - si no existe aprobación, clasificar la evidencia como no válida para Go.
+
+Para cada ejecución efectiva, registrar:
+
+- método usado: `frontend session`, `API/JWT` o `simulación controlada`;
+- usuario autenticado probado;
+- rol esperado;
+- `expected_user_id`, `expected_conjunto_id` y `expected_residente_id`;
+- evidencia Network/API o evidencia de claims simulados aprobados;
+- limitaciones y datos no cubiertos.
+
 ## 6. Parámetros y placeholders que debe reemplazar el operador
 
-El archivo `supabase/validation/fase_3d3_rls_effective_access_checks.sql` requiere ejecutar el mismo set de checks con usuarios autenticados de prueba. Antes de cada ejecución, reemplazar los placeholders por valores reales de DEV:
+El archivo `supabase/validation/fase_3d3_rls_effective_access_checks.sql` sirve como referencia de checks por rol y requiere usuarios autenticados de prueba. Cuando se use mediante cliente/API o simulación aprobada, reemplazar los placeholders por valores reales de DEV. Si se copia al SQL Editor solo para revisión o diagnóstico, marcarlo explícitamente como **no válido para evidencia final de RLS efectivo** cuando dependa de `auth.uid()` / JWT real:
 
 | Placeholder | Valor requerido | Fuente sugerida | Validación esperada |
 | --- | --- | --- | --- |
@@ -97,7 +140,9 @@ Reglas para placeholders:
 - No inventar UUIDs.
 - No mezclar `user_id`, `conjunto_id` o `residente_id` de distintos usuarios salvo que se esté validando explícitamente un caso inconsistente.
 - Registrar en evidencia el origen de cada ID usado.
+- Registrar el método de ejecución y si la evaluación usó `auth.uid()` / JWT real.
 - Si falta un usuario de prueba para un rol requerido, registrar hallazgo P2 o No-Go según impacto.
+- Si la validación efectiva se hizo solo desde SQL Editor y dependía de `auth.uid()`, no aceptarla como Go.
 
 ## 7. Usuarios de prueba requeridos en DEV
 
@@ -120,13 +165,13 @@ Para cada usuario registrar:
 - estado de membership;
 - evidencia que demuestre por qué el usuario es válido para la prueba.
 
-## 8. Evidencia que se debe capturar por SQL
+## 8. Evidencia que se debe capturar por tipo de validación
 
 ### 8.1 Inventario RLS
 
 Para `fase_3d3_rls_precheck_inventory.sql`, capturar:
 
-- contexto de ejecución: ambiente, usuario de conexión, `auth.uid()` observado;
+- contexto de ejecución: ambiente, usuario de conexión y valor de `auth.uid()` observado solo como diagnóstico del SQL Editor, sin tratarlo como sesión real de usuario final;
 - tablas sensibles existentes y faltantes;
 - estado `rls_enabled` y `force_rls` por tabla sensible;
 - policies por tabla y comando;
@@ -139,10 +184,13 @@ Para `fase_3d3_rls_precheck_inventory.sql`, capturar:
 
 ### 8.2 Acceso efectivo por rol
 
-Para `fase_3d3_rls_effective_access_checks.sql`, capturar una evidencia por usuario de prueba:
+Para `fase_3d3_rls_effective_access_checks.sql` o checks equivalentes por módulo, capturar una evidencia por usuario de prueba desde un contexto autenticado válido:
 
-- usuario/rol usado;
+- método de ejecución: `frontend session`, `API/JWT` o `simulación controlada aprobada`;
+- confirmación de que SQL Editor no fue la única fuente de evidencia si el check dependía de `auth.uid()`;
+- usuario autenticado probado y rol usado;
 - placeholders reemplazados;
+- evidencia Network/API, status code y respuesta sanitizada cuando aplique;
 - módulos con filas visibles esperadas;
 - módulos sin datos disponibles para validar;
 - cualquier fila visible con `conjunto_id` distinto al esperado;
@@ -168,11 +216,12 @@ Para `fase_3d3_rls_tenant_isolation_checks.sql`, capturar:
 
 ### 9.1 Señales esperadas sanas
 
-- Los SQL se ejecutan sin errores críticos.
+- Los SQL estructurales se ejecutan sin errores críticos en SQL Editor DEV.
 - Las tablas sensibles están inventariadas.
 - Los helpers esperados existen o su ausencia está explicada por diseño vigente.
 - Las policies de tablas sensibles muestran filtros por tenant, residente, usuario autenticado o helpers autorizados.
-- Cada usuario de prueba ve datos del `conjunto_id` esperado.
+- La evidencia efectiva por rol proviene de sesión autenticada real, API/JWT válido o simulación controlada aprobada.
+- Cada usuario de prueba ve datos del `conjunto_id` esperado en evidencia efectiva válida.
 - El rol residente no ve datos de otros residentes salvo información explícitamente común del conjunto.
 - Un usuario sin membership activa no ve datos protegidos.
 
@@ -189,6 +238,7 @@ Para `fase_3d3_rls_tenant_isolation_checks.sql`, capturar:
 - Cualquier fila visible de `conjunto_id` diferente al esperado sin justificación funcional.
 - Pagos, visitas, paquetes, incidentes, reservas o residentes visibles de otro conjunto.
 - Usuario sin membership activa con acceso a datos protegidos.
+- Validación de acceso efectivo aceptada solo desde SQL Editor pese a depender de `auth.uid()` / JWT real.
 - SQL de validación que contenga DDL/DML no permitido.
 - Evidencia de ejecución en PRD.
 
@@ -196,7 +246,7 @@ Para `fase_3d3_rls_tenant_isolation_checks.sql`, capturar:
 
 | Severidad | Definición | Hallazgos esperados | Acción requerida |
 | --- | --- | --- | --- |
-| P0 - Bloqueante | Exposición real o riesgo operativo que impide avanzar. | Acceso visible a `conjunto_id` diferente al esperado; tablas sensibles sin RLS y con datos reales; usuario sin membership activa con acceso a datos protegidos; residentes visibles de otro conjunto; pagos visibles de otro conjunto; visitas/paquetes/incidentes/reservas visibles de otro conjunto; PRD tocado por error; SQL no read-only. | Detener avance. Abrir issue/hotfix de seguridad. No ir a QA ni FASE 3D.5 hasta mitigar o aislar. |
+| P0 - Bloqueante | Exposición real o riesgo operativo que impide avanzar. | Acceso visible a `conjunto_id` diferente al esperado; tablas sensibles sin RLS y con datos reales; usuario sin membership activa con acceso a datos protegidos; residentes visibles de otro conjunto; pagos visibles de otro conjunto; visitas/paquetes/incidentes/reservas visibles de otro conjunto; PRD tocado por error; SQL no read-only; acceso efectivo aprobado solo con SQL Editor cuando dependía de `auth.uid()` / JWT real. | Detener avance. Abrir issue/hotfix de seguridad. No ir a QA ni FASE 3D.5 hasta mitigar o aislar. |
 | P1 - Alto | Debilidad relevante sin fuga directa confirmada o inconsistencia que puede habilitar fuga. | Policies demasiado amplias pero sin evidencia directa de fuga; helpers legacy inconsistentes con `tenant_memberships`; `usuarios_app` y `tenant_memberships` no reconciliados para usuarios críticos; datos huérfanos que puedan afectar RLS. | Crear plan de corrección priorizado y owner. Puede avanzar solo con aceptación explícita si no hay P0. |
 | P2 - Medio | Brecha de validación, documentación o normalización sin acceso indebido confirmado. | Documentación desactualizada frente a policies reales; tablas sin datos para validar módulo; roles no homologados encontrados pero sin acceso indebido; falta de usuario negativo si no bloquea cobertura mínima. | Documentar y planificar antes o durante FASE 3D.5. |
 | P3 - Bajo | Mejora menor sin impacto de seguridad inmediato. | Mejoras de nomenclatura; comentarios SQL incompletos; evidencia visual pendiente; ajustes de formato del reporte. | Corregir cuando sea conveniente; no bloquea por sí solo. |
@@ -206,10 +256,12 @@ Para `fase_3d3_rls_tenant_isolation_checks.sql`, capturar:
 Se puede avanzar a QA o a FASE 3D.5 si se cumple todo lo siguiente:
 
 - Los SQL se mantienen read-only.
-- DEV ejecuta el inventario sin errores críticos.
+- DEV ejecuta el inventario estructural sin errores críticos desde SQL Editor.
 - No se detecta acceso cross-tenant P0.
 - Los usuarios de prueba por rol están identificados.
 - Las tablas sensibles están inventariadas.
+- La evidencia efectiva por rol proviene de sesión autenticada real, API/JWT válido o simulación controlada aprobada.
+- Ninguna validación de acceso efectivo que dependa de `auth.uid()` fue aceptada como Go usando solo SQL Editor.
 - Los hallazgos P1/P2 tienen plan claro, owner y decisión documentada.
 - PRD no fue tocado.
 - No se modificaron migraciones, RLS, helpers, frontend funcional, `.env`, Vercel ni feature flags.
@@ -225,6 +277,8 @@ No avanzar si ocurre cualquiera de estos casos:
 - algún SQL no es read-only;
 - PRD fue tocado por error;
 - no hay evidencia suficiente para sustentar la decisión;
+- la única evidencia de acceso efectivo por rol proviene de SQL Editor y depende de `auth.uid()` / JWT real;
+- no existe sesión autenticada real, API/JWT válido ni simulación controlada aprobada para los roles mínimos;
 - un usuario sin membership activa accede a datos protegidos;
 - el rol residente ve pagos, visitas, paquetes, incidentes o reservas de otro residente/conjunto sin justificación funcional explícita.
 
@@ -234,10 +288,11 @@ No avanzar si ocurre cualquiera de estos casos:
 2. Asignar severidad P0/P1/P2/P3.
 3. Asociar módulo, tabla, policy/helper implicado y usuario de prueba.
 4. Adjuntar evidencia mínima:
-   - query o bloque ejecutado;
-   - result set relevante;
-   - screenshot o exporte;
-   - placeholders usados.
+   - query, módulo o endpoint ejecutado;
+   - método de ejecución;
+   - result set, respuesta Network/API o screenshot relevante;
+   - placeholders usados;
+   - limitación explícita si proviene de SQL Editor.
 5. Definir owner y acción siguiente:
    - documentación;
    - investigación;
@@ -278,9 +333,10 @@ Antes de cerrar FASE 3D.4, confirmar:
 - [ ] PRD no fue abierto ni usado para ejecutar SQL.
 - [ ] Los tres SQL de FASE 3D.3 fueron revisados como read-only.
 - [ ] Inventario ejecutado y evidenciado.
-- [ ] Acceso efectivo ejecutado para `admin_conjunto`.
-- [ ] Acceso efectivo ejecutado para vigilancia / `vigilante`.
-- [ ] Acceso efectivo ejecutado para `residente`.
+- [ ] Acceso efectivo ejecutado para `admin_conjunto` mediante sesión real, API/JWT válido o simulación aprobada.
+- [ ] Acceso efectivo ejecutado para vigilancia / `vigilante` mediante sesión real, API/JWT válido o simulación aprobada.
+- [ ] Acceso efectivo ejecutado para `residente` mediante sesión real, API/JWT válido o simulación aprobada.
+- [ ] Ningún check dependiente de `auth.uid()` fue aceptado como Go usando solo SQL Editor.
 - [ ] Usuario sin membership activa validado o documentado como no disponible.
 - [ ] Usuario con datos inconsistentes validado o documentado como no disponible.
 - [ ] Hallazgos clasificados P0/P1/P2/P3.
