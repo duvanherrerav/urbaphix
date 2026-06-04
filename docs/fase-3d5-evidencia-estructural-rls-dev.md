@@ -9,7 +9,7 @@ El objetivo es obtener evidencia segura sobre el estado real de:
 - RLS habilitado o deshabilitado por tabla sensible;
 - `FORCE ROW LEVEL SECURITY` cuando aplique;
 - policies existentes por tabla sensible;
-- helper functions legacy y tenant-aware;
+- helper functions legacy, tenant-aware actuales y tenant-aware objetivo/futuras;
 - grants relevantes sobre helpers;
 - columnas tenant/residente/usuario (`conjunto_id`, `residente_id`, `user_id`, `usuario_id`);
 - conteos estructurales por tabla sensible;
@@ -104,7 +104,7 @@ Este SQL contiene únicamente consultas de inventario estructural para:
 1. contexto de conexión;
 2. tablas sensibles esperadas y estado RLS/FORCE RLS;
 3. policies por tabla sensible;
-4. helpers legacy y tenant-aware;
+4. helpers legacy actuales, helpers tenant-aware existentes y helpers tenant-aware objetivo/futuros;
 5. grants `EXECUTE` de helpers relevantes;
 6. columnas clave por tabla sensible;
 7. conteos por tabla sensible;
@@ -229,17 +229,28 @@ Registrar especialmente:
 
 - policies `permissive` sobre `anon` o `authenticated`;
 - expressions con `true`;
-- ausencia de filtros visibles por `conjunto_id`, `residente_id`, `user_id`, `usuario_id`, `auth.uid()` o helpers tenant-aware;
-- helpers legacy usados sin estrategia tenant-aware clara.
+- ausencia de filtros visibles por `conjunto_id`, `residente_id`, `user_id`, `usuario_id`, `auth.uid()` o helpers tenant-aware basados en `tenant_memberships`;
+- helpers legacy usados sin estrategia tenant-aware clara;
+- dependencias de policies sensibles sobre `fn_auth_conjunto_id()`, `fn_auth_rol()` o `fn_auth_residente_id()` que deban quedar registradas como legacy pendiente de revisión.
 
 ### 8.4 Helper functions encontradas y grants relevantes
 
+Alinear la clasificación con FASE 3D.1, FASE 3D.2 y FASE 3D.3:
+
+- `fn_auth_conjunto_id()`, `fn_auth_rol()` y `fn_auth_residente_id()` son **helpers legacy / `usuarios_app`** en la arquitectura actual, porque resuelven autorización desde `usuarios_app` y `residentes`, no desde `tenant_memberships`.
+- Los helpers tenant-aware objetivo son los basados en `tenant_memberships` o plataforma, por ejemplo `fn_has_tenant_access(uuid)`, `fn_has_tenant_role(uuid, text)`, `fn_is_platform_superadmin()` y `fn_has_platform_role(text)` cuando existan en DEV.
+- Si una policy sensible depende de los helpers `fn_auth_*`, registrarla como **dependencia legacy pendiente de revisión** antes de FASE 3D.6/hardening posterior.
+
 | Helper | Categoría esperada | Existe en DEV | Roles con `EXECUTE` | Riesgo documental | Evidencia |
 | --- | --- | --- | --- | --- | --- |
-| `fn_auth_conjunto_id` | tenant-aware | Pendiente | Pendiente | Pendiente | Pendiente |
-| `fn_auth_rol` | tenant-aware | Pendiente | Pendiente | Pendiente | Pendiente |
-| `fn_auth_residente_id` | tenant-aware | Pendiente | Pendiente | Pendiente | Pendiente |
-| Helpers legacy detectados por SQL | legacy | Pendiente | Pendiente | Pendiente | Pendiente |
+| `fn_auth_conjunto_id` | legacy / `usuarios_app` | Pendiente | Pendiente | Dependencia legacy pendiente de revisión si aparece en policy sensible | Pendiente |
+| `fn_auth_rol` | legacy / `usuarios_app` | Pendiente | Pendiente | Dependencia legacy pendiente de revisión si aparece en policy sensible | Pendiente |
+| `fn_auth_residente_id` | legacy / `usuarios_app` + `residentes` | Pendiente | Pendiente | Dependencia legacy pendiente de revisión si aparece en policy sensible | Pendiente |
+| `fn_has_tenant_access` | tenant-aware objetivo / `tenant_memberships` | Pendiente | Pendiente | Pendiente | Pendiente |
+| `fn_has_tenant_role` | tenant-aware objetivo / `tenant_memberships` | Pendiente | Pendiente | Pendiente | Pendiente |
+| `fn_is_platform_superadmin` | platform-aware objetivo | Pendiente | Pendiente | Pendiente | Pendiente |
+| `fn_has_platform_role` | platform-aware objetivo | Pendiente | Pendiente | Pendiente | Pendiente |
+| Otros helpers legacy detectados por SQL | legacy pendiente de migración tenant-aware | Pendiente | Pendiente | Pendiente | Pendiente |
 
 ### 8.5 Columnas tenant/residente/usuario
 
@@ -296,7 +307,7 @@ Clasificar como **P0** si se observa cualquiera de los siguientes casos:
 Clasificar como **P1** si se observa:
 
 - policies demasiado permisivas a nivel documental o estructural;
-- helpers legacy usados en policies sensibles sin estrategia tenant-aware clara;
+- helpers legacy, incluidos `fn_auth_conjunto_id()`, `fn_auth_rol()` o `fn_auth_residente_id()`, usados en policies sensibles sin estrategia tenant-aware clara;
 - duplicidad de memberships activas para el mismo usuario sin criterio documentado;
 - residentes activos sin trazabilidad clara a membership;
 - grants `EXECUTE` amplios sobre helpers sensibles que requieren revisión prioritaria.
@@ -328,7 +339,7 @@ Se puede avanzar a FASE 3D.6 si se cumplen todos los criterios:
 - no hay P0 estructural abierto;
 - cada P1 tiene plan documentado, responsable y estado;
 - tablas sensibles principales tienen RLS/policies inventariadas;
-- helpers usados por RLS están identificados;
+- helpers usados por RLS están identificados y clasificados como legacy / `usuarios_app`, tenant-aware actual u objetivo/futuro;
 - grants relevantes están documentados;
 - columnas `conjunto_id`, `residente_id`, `user_id` y `usuario_id` están inventariadas donde existan;
 - conteos de tablas sensibles y memberships están registrados;
