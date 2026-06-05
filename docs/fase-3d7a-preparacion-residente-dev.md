@@ -211,7 +211,9 @@ Reglas del rollback:
 
 - Debe ejecutarse solo en Supabase DEV.
 - Debe apuntar al `auth_user_id`, `resident_email`, `torre_nombre` y `apartamento_numero` de prueba usados en esta fase.
-- Debe borrar solo datos de prueba creados por esta fase.
+- Debe borrar automáticamente solo `public.tenant_memberships`, `public.residentes` y `public.usuarios_app` asociados al usuario residente de prueba cuando coinciden con los placeholders.
+- No debe borrar automáticamente `public.torres` ni `public.apartamentos`, porque el template de preparación puede reutilizar una torre o apartamento preexistente.
+- La limpieza de torre/apartamento queda como revisión manual posterior y solo debe hacerse si una persona autorizada confirma que fueron creados exclusivamente por esta fase y no están referenciados por otros registros.
 - No debe borrar usuarios o datos reales.
 - El usuario Auth del Dashboard debe eliminarse o deshabilitarse manualmente desde Supabase Dashboard DEV si corresponde.
 

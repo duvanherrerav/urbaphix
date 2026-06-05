@@ -3,7 +3,10 @@
 -- TEMPLATE CONTROLADO DE ROLLBACK
 --
 -- FASE 3D.7A - Rollback residente DEV
--- Este script revierte únicamente datos de prueba preparados por esta fase.
+-- Este script revierte únicamente datos de prueba de usuario/residente/membership preparados por esta fase.
+-- No usa public.reservas.apartamento_id porque esa columna no existe en el schema actual.
+-- No borra automáticamente torres ni apartamentos: el template de preparación puede reutilizar datos existentes.
+-- Revisar manualmente cualquier limpieza de torre/apartamento después del rollback automático.
 -- No usar en QA ni PRD.
 -- El usuario Auth debe eliminarse o deshabilitarse manualmente desde Supabase Dashboard DEV si corresponde.
 --
@@ -15,6 +18,16 @@
 -- :apartamento_numero
 --
 -- Reemplazar todos los valores __...__ y revisar el preview antes de confirmar.
+-- El rollback automático solo elimina, cuando coincide con los placeholders:
+-- - public.tenant_memberships del rol residente;
+-- - public.residentes vinculado al usuario;
+-- - public.usuarios_app del usuario residente de prueba si ya no tiene residentes.
+--
+-- Limpieza manual opcional, fuera del rollback automático:
+-- - Revisar public.apartamentos por conjunto_id + torre + numero.
+-- - Revisar public.torres por conjunto_id + nombre.
+-- - Borrar torre/apartamento únicamente si una persona autorizada confirma que fueron creados por esta fase
+--   y no son datos reutilizados ni referenciados por otros registros.
 
 begin;
 
@@ -25,37 +38,46 @@ with params as (
     '__CONJUNTO_ID__'::uuid as conjunto_id,
     '__TORRE_NOMBRE__'::text as torre_nombre,
     '__APARTAMENTO_NUMERO__'::text as apartamento_numero
+), guardrails as (
+  select
+    p.*,
+    p.conjunto_id = 'a80af441-80f9-4a6c-8d3b-b8408c97dbe2'::uuid as is_expected_dev_conjunto
+  from params p
 ), preview as (
   select
-    p.auth_user_id,
-    p.conjunto_id,
+    g.auth_user_id,
+    g.conjunto_id,
+    g.is_expected_dev_conjunto,
     ua.id as usuarios_app_id,
     r.id as residente_id,
     tm.id as membership_id,
-    a.id as apartamento_id,
-    t.id as torre_id
-  from params p
+    a.id as apartamento_id_manual_review,
+    a.numero as apartamento_numero_manual_review,
+    t.id as torre_id_manual_review,
+    t.nombre as torre_nombre_manual_review
+  from guardrails g
   left join public.usuarios_app ua
-    on ua.id = p.auth_user_id
-   and ua.conjunto_id = p.conjunto_id
-   and lower(ua.email) = p.resident_email
+    on ua.id = g.auth_user_id
+   and ua.conjunto_id = g.conjunto_id
+   and lower(ua.email) = g.resident_email
    and ua.rol_id = 'residente'
   left join public.residentes r
-    on r.usuario_id = p.auth_user_id
-   and r.conjunto_id = p.conjunto_id
+    on r.usuario_id = g.auth_user_id
+   and r.conjunto_id = g.conjunto_id
   left join public.tenant_memberships tm
-    on tm.user_id = p.auth_user_id
-   and tm.conjunto_id = p.conjunto_id
+    on tm.user_id = g.auth_user_id
+   and tm.conjunto_id = g.conjunto_id
    and tm.role_name = 'residente'
    and tm.residente_id = r.id
   left join public.apartamentos a
     on a.id = r.apartamento_id
-   and a.conjunto_id = p.conjunto_id
-   and a.numero = p.apartamento_numero
+   and a.conjunto_id = g.conjunto_id
+   and a.numero = g.apartamento_numero
   left join public.torres t
     on t.id = a.torre_id
-   and t.conjunto_id = p.conjunto_id
-   and lower(t.nombre) = lower(p.torre_nombre)
+   and t.conjunto_id = g.conjunto_id
+   and lower(t.nombre) = lower(g.torre_nombre)
+  where g.is_expected_dev_conjunto
 ), deleted_memberships as (
   delete from public.tenant_memberships tm
   using preview pr
@@ -81,43 +103,14 @@ with params as (
       where r.usuario_id = ua.id
     )
   returning ua.id
-), deleted_apartamentos as (
-  delete from public.apartamentos a
-  using preview pr
-  where a.id = pr.apartamento_id
-    and not exists (
-      select 1
-      from public.residentes r
-      where r.apartamento_id = a.id
-    )
-    and not exists (
-      select 1
-      from public.paquetes pq
-      where pq.apartamento_id = a.id
-    )
-    and not exists (
-      select 1
-      from public.reservas rv
-      where rv.apartamento_id = a.id
-    )
-  returning a.id
-), deleted_torres as (
-  delete from public.torres t
-  using preview pr
-  where t.id = pr.torre_id
-    and not exists (
-      select 1
-      from public.apartamentos a
-      where a.torre_id = t.id
-    )
-  returning t.id
 )
 select
   'fase_3d7a_rollback_residente_dev' as operation,
+  (select is_expected_dev_conjunto from guardrails) as is_expected_dev_conjunto,
   (select count(*) from deleted_memberships) as memberships_deleted,
   (select count(*) from deleted_residentes) as residentes_deleted,
   (select count(*) from deleted_usuarios_app) as usuarios_app_deleted,
-  (select count(*) from deleted_apartamentos) as apartamentos_deleted,
-  (select count(*) from deleted_torres) as torres_deleted;
+  (select count(*) from preview where apartamento_id_manual_review is not null) as apartamentos_pending_manual_review,
+  (select count(*) from preview where torre_id_manual_review is not null) as torres_pending_manual_review;
 
 commit;
