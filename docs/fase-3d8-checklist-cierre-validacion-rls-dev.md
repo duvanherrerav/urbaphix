@@ -18,28 +18,38 @@ Este checklist acompaña el documento de resultados de FASE 3D.8 y resume las ve
 
 | Rol | Usuario validado | Evidencia funcional | Evidencia REST/RLS | Decisión |
 | --- | --- | --- | --- | --- |
-| `residente` | `b46ab33c-9237-4f43-a010-ff95ca1263a6` | Menú residente esperado; sin módulos admin/vigilancia; sin loop/logout inesperado. | `tenant_memberships`, `residentes`, `registro_visitas`, `paquetes`, `pagos`, `reservas_zonas` con filtros esperados y `200 OK`. | GO |
-| `vigilancia` | `02f64392-d964-4bce-a4e9-a25e56621ef6` | Menú vigilancia esperado; sin módulos admin/residente; sin loop/logout inesperado. | `tenant_memberships`, `registro_visitas`, `paquetes`, `incidentes`, `reservas_zonas` con filtros esperados y `200 OK`. | GO |
-| `admin` | `565e209b-d7c2-4959-93c1-e2662c925180` | Menú admin esperado; sin módulos residente/vigilancia; sin loop/logout inesperado. | `usuarios_app`, `tenant_memberships`, `registro_visitas`, `paquetes`, `pagos`, `incidentes`, `reservas_zonas` con filtros esperados y `200 OK`. | GO |
+| `residente` | `b46ab33c-9237-4f43-a010-ff95ca1263a6` | Menú residente esperado; sin módulos admin/vigilancia; sin loop/logout inesperado. | `tenant_memberships`, `residentes`, `registro_visitas`, `paquetes`, `pagos`, `reservas_zonas` con filtros esperados y `200 OK`. | GO funcional autenticado inicial |
+| `vigilancia` | `02f64392-d964-4bce-a4e9-a25e56621ef6` | Menú vigilancia esperado; sin módulos admin/residente; sin loop/logout inesperado. | `tenant_memberships`, `registro_visitas`, `paquetes`, `incidentes`, `reservas_zonas` con filtros esperados y `200 OK`. | GO funcional autenticado inicial |
+| `admin` | `565e209b-d7c2-4959-93c1-e2662c925180` | Menú admin esperado; sin módulos residente/vigilancia; sin loop/logout inesperado. | `usuarios_app`, `tenant_memberships`, `registro_visitas`, `paquetes`, `pagos`, `incidentes`, `reservas_zonas` con filtros esperados y `200 OK`. | GO funcional autenticado inicial |
 
-## 3. Hallazgos y riesgos
+## 3. Cobertura pendiente
+
+| Pendiente | Estado | Motivo |
+| --- | --- | --- |
+| Pruebas cross-tenant | Pendiente | No hay evidencia negativa suficiente para declarar aislamiento RLS definitivo. |
+| No visibilidad entre tenants | Pendiente | Requiere requests comparativos o escenarios negativos documentados. |
+| No visibilidad entre residentes | Pendiente | Requiere evidencia específica con residentes distintos. |
+| Módulos secundarios no evidenciados | Pendiente | La fase cubrió endpoints principales; faltan módulos no observados en esta ronda. |
+
+## 4. Hallazgos y riesgos
 
 | ID | Severidad | Estado | Seguimiento |
 | --- | --- | --- | --- |
 | F3D8-001 | P2 | Abierto no bloqueante | Falta catálogo `tipo_documento` en DEV; decidir seed DEV de catálogos mínimos o preparar QA controlada con datos completos. |
 
-## 4. Decisión final
+## 5. Decisión final
 
 | Criterio | Estado |
 | --- | --- |
-| Sin P0 RLS abierto | OK |
-| Sin P1 RLS abierto | OK |
+| Sin P0 RLS abierto en cobertura observada | OK condicionado |
+| Sin P1 RLS abierto en cobertura observada | OK condicionado |
 | Hallazgo P2 documentado | OK |
-| Residente DEV | GO |
-| Vigilancia DEV | GO |
-| Admin DEV | GO |
-| FASE 3D.7 DEV | **GO global** |
+| Residente DEV | GO funcional autenticado inicial |
+| Vigilancia DEV | GO funcional autenticado inicial |
+| Admin DEV | GO funcional autenticado inicial |
+| Cobertura negativa de aislamiento RLS | Pendiente |
+| FASE 3D.7 DEV | **GO condicionado para validación funcional autenticada inicial en DEV** |
 
-## 5. Siguiente paso recomendado
+## 6. Siguiente paso recomendado
 
-Preparar FASE 3D.9 para validación QA controlada o definir primero una tarea separada de seed DEV de catálogos mínimos, según decisión de producto/operación.
+Preparar FASE 3D.9 para validación QA controlada incorporando pruebas negativas de aislamiento RLS, o definir primero una tarea separada de seed DEV de catálogos mínimos, según decisión de producto/operación.

@@ -4,7 +4,7 @@
 
 FASE 3D.8 documenta el cierre formal de la validación efectiva autenticada de Row Level Security (RLS) ejecutada en DEV durante FASE 3D.7. La validación se realizó con sesiones reales por rol desde el frontend local y evidencia saneada de DevTools Network, observando requests REST hacia Supabase bajo el JWT de cada usuario autenticado.
 
-Decisión global: **GO global para FASE 3D.7 en DEV**.
+Decisión: **GO condicionado para validación funcional autenticada inicial en DEV**.
 
 Conclusiones principales:
 
@@ -13,7 +13,7 @@ Conclusiones principales:
 - `admin` DEV: **GO efectivo autenticado**.
 - No se identificaron errores RLS bloqueantes durante la validación efectiva autenticada.
 - No se observaron loops de sesión ni logouts inesperados en los roles validados.
-- Se conserva un hallazgo operativo **P2 no bloqueante**: DEV no tiene cargado el catálogo mínimo de `tipo_documento`, lo que limita la prueba funcional completa de creación de visita, pero no bloquea la conclusión RLS de esta fase.
+- Se conserva un hallazgo operativo **P2 no bloqueante**: DEV no tiene cargado el catálogo mínimo de `tipo_documento`, lo que limita la prueba funcional completa de creación de visita, pero no bloquea la conclusión funcional autenticada inicial de esta fase.
 
 ## 2. Ambiente validado
 
@@ -63,9 +63,22 @@ Esta fase no validó ni modificó:
 - Usuario sin membership activa o membership inactiva como prueba negativa adicional.
 - Exhaustividad de todos los módulos históricos de la app; el cierre se limita a los módulos y endpoints observados en la evidencia de FASE 3D.7.
 
-## 5. Evidencia por rol
+## 5. Cobertura pendiente
 
-### 5.1 Residente DEV
+La evidencia recopilada valida correctamente autenticación por rol, resolución de `tenant_memberships`, navegación por menú y acceso a endpoints principales con filtros esperados y respuesta `200 OK`. Sin embargo, esta fase **no** contiene todavía evidencia negativa suficiente para declarar aislamiento RLS definitivo.
+
+Queda pendiente recopilar y documentar evidencia específica para:
+
+- Pruebas cross-tenant.
+- Confirmación de no visibilidad entre tenants.
+- Confirmación de no visibilidad entre residentes.
+- Módulos secundarios no evidenciados en la navegación y requests principales de esta fase.
+
+Estos pendientes deben tratarse como cobertura adicional requerida antes de declarar aislamiento RLS definitivo.
+
+## 6. Evidencia por rol
+
+### 6.1 Residente DEV
 
 #### Identidad validada
 
@@ -101,7 +114,7 @@ Esta fase no validó ni modificó:
 | `pagos` | `residente_id` | `200 OK` |
 | `reservas_zonas` | `conjunto_id` / `residente_id` | `200 OK` |
 
-### 5.2 Vigilancia DEV
+### 6.2 Vigilancia DEV
 
 #### Identidad validada
 
@@ -135,7 +148,7 @@ Esta fase no validó ni modificó:
 | `incidentes` | `conjunto_id` | `200 OK` |
 | `reservas_zonas` | `conjunto_id` / estado | `200 OK` |
 
-### 5.3 Admin DEV
+### 6.3 Admin DEV
 
 #### Identidad validada
 
@@ -171,7 +184,7 @@ Esta fase no validó ni modificó:
 | `incidentes` | `conjunto_id` | `200 OK` |
 | `reservas_zonas` | `conjunto_id` | `200 OK` |
 
-## 6. Matriz rol → módulo → endpoint REST/RLS → filtro esperado → status
+## 7. Matriz rol → módulo → endpoint REST/RLS → filtro esperado → status
 
 | Rol | Módulo | Endpoint REST/RLS | Filtro esperado | Status |
 | --- | --- | --- | --- | --- |
@@ -194,7 +207,7 @@ Esta fase no validó ni modificó:
 | `admin` | Incidentes | `incidentes` | `conjunto_id` | `200 OK` |
 | `admin` | Reservas | `reservas_zonas` | `conjunto_id` | `200 OK` |
 
-## 7. Hallazgos
+## 8. Hallazgos
 
 | ID | Severidad | Tipo | Rol / módulo | Descripción | Impacto | Estado | Recomendación |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -202,7 +215,7 @@ Esta fase no validó ni modificó:
 
 No se identificaron hallazgos P0 ni P1 en la evidencia efectiva autenticada documentada para esta fase.
 
-## 8. Riesgos residuales
+## 9. Riesgos residuales
 
 | Riesgo residual | Severidad | Mitigación / seguimiento |
 | --- | --- | --- |
@@ -211,7 +224,7 @@ No se identificaron hallazgos P0 ni P1 en la evidencia efectiva autenticada docu
 | La evidencia proviene de navegación manual y DevTools Network, no de una suite automatizada repetible. | P3 | Convertir los escenarios GO en checklist ejecutable o pruebas automatizadas cuando se estabilice el flujo multirol. |
 | La validación se limita a DEV y no debe extrapolarse automáticamente a QA/PRD. | P3 | Repetir validación controlada en el siguiente ambiente antes de promover cambios o decisiones operativas. |
 
-## 9. Decisión GO/NO-GO global
+## 10. Decisión condicionada
 
 | Criterio | Resultado | Nota |
 | --- | --- | --- |
@@ -221,26 +234,26 @@ No se identificaron hallazgos P0 ni P1 en la evidencia efectiva autenticada docu
 | Sin loops de sesión | GO | No se observaron loops durante la validación. |
 | Sin logout inesperado | GO | No se observaron cierres inesperados de sesión. |
 | Sin módulos no autorizados visibles | GO | Cada rol mostró únicamente el menú esperado para su perfil. |
-| Sin P0/P1 RLS bloqueante | GO | No se identificaron errores RLS bloqueantes en los endpoints observados. |
-| Hallazgo P2 catalogado y no bloqueante | GO condicionado operacionalmente | Falta catálogo `tipo_documento` en DEV; requiere seguimiento fuera del cierre RLS. |
+| Sin P0/P1 RLS bloqueante en cobertura observada | GO condicionado | No se identificaron errores RLS bloqueantes en los endpoints principales observados; falta evidencia negativa para declarar aislamiento RLS definitivo. |
+| Hallazgo P2 catalogado y no bloqueante | GO condicionado | Falta catálogo `tipo_documento` en DEV; requiere seguimiento fuera del cierre funcional autenticado inicial. |
 | QA/PRD no tocados | GO | La fase se limita a DEV. |
 | Sin cambios Supabase/RLS/helpers/policies/migraciones/frontend funcional/`.env`/Vercel | GO | Esta documentación no modifica esos componentes. |
 
-**Decisión global FASE 3D.7 en DEV: GO global.**
+**Decisión FASE 3D.7 en DEV: GO condicionado para validación funcional autenticada inicial en DEV.**
 
-## 10. Recomendación para siguiente fase
+## 11. Recomendación para siguiente fase
 
 Siguiente paso recomendado:
 
-1. Preparar **FASE 3D.9** para validación QA controlada con sesiones reales por rol, evidencia saneada y checklist de promoción; o
+1. Preparar **FASE 3D.9** para validación QA controlada con sesiones reales por rol, evidencia saneada, checklist de promoción y pruebas negativas de aislamiento; o
 2. Definir primero un seed DEV de catálogos mínimos, incluyendo `tipo_documento`, si producto/operación considera necesario cerrar la prueba funcional completa de creación de visita antes de pasar a QA.
 
 La decisión depende de prioridad operativa:
 
-- Si el foco es continuidad de hardening y promoción controlada: avanzar a FASE 3D.9 QA controlada.
+- Si el foco es continuidad de hardening y promoción controlada: avanzar a FASE 3D.9 QA controlada incorporando la cobertura pendiente de aislamiento RLS.
 - Si el foco es completar funcionalidad de visitas en DEV antes de QA: ejecutar una tarea separada de seed DEV de catálogos mínimos, con migración/seed/documentación según corresponda y fuera del alcance de FASE 3D.8.
 
-## 11. Confirmación explícita de no modificación
+## 12. Confirmación explícita de no modificación
 
 Durante la elaboración documental de FASE 3D.8:
 
