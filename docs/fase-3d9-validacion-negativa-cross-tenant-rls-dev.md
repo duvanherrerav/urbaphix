@@ -76,45 +76,54 @@ Si no existen datos suficientes, la decisión esperada será `GO condicionado` o
 
 | Caso | Tabla/endpoint REST | Manipulación | Resultado esperado |
 |---|---|---|---|
-| R-01 | `residentes` | Consultar `id` o `usuario_id` de otro residente | `200 OK` con array vacío, `401`, o `403`; nunca datos ajenos |
-| R-02 | `pagos` | Filtrar por `residente_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca pagos ajenos |
-| R-03 | `paquetes` | Filtrar por `residente_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca paquetes ajenos |
-| R-04 | `registro_visitas` | Consultar visitas asociadas a visitante/residente ajeno | `200 OK` con array vacío, `401`, o `403`; nunca visitas ajenas |
-| R-05 | `reservas_zonas` | Filtrar por `residente_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca reservas ajenas |
-| R-06 | Tablas con `conjunto_id` | Cambiar filtro al `conjunto_id` de otro tenant | `200 OK` con array vacío, `401`, o `403`; nunca datos de otro conjunto |
+| R-01 | `residentes` | Consultar `id` o `usuario_id` de otro residente | `200 OK` con array vacío o `403` por policy; nunca datos ajenos |
+| R-02 | `pagos` | Filtrar por `residente_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca pagos ajenos |
+| R-03 | `paquetes` | Filtrar por `residente_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca paquetes ajenos |
+| R-04 | `registro_visitas` | Consultar visitas asociadas a visitante/residente ajeno | `200 OK` con array vacío o `403` por policy; nunca visitas ajenas |
+| R-05 | `reservas_zonas` | Filtrar por `residente_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca reservas ajenas |
+| R-06 | Tablas con `conjunto_id` | Cambiar filtro al `conjunto_id` de otro tenant | `200 OK` con array vacío o `403` por policy; nunca datos de otro conjunto |
 
 ### 7.2 Vigilancia
 
 | Caso | Tabla/endpoint REST | Manipulación | Resultado esperado |
 |---|---|---|---|
-| V-01 | `registro_visitas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca visitas de otro conjunto |
-| V-02 | `paquetes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca paquetes de otro conjunto |
-| V-03 | `incidentes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca incidentes de otro conjunto |
-| V-04 | `reservas_zonas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca reservas de otro conjunto |
-| V-05 | `usuarios_app` | Filtrar perfiles fuera de su tenant | `200 OK` con array vacío, `401`, o `403`; nunca perfiles ajenos |
+| V-01 | `registro_visitas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca visitas de otro conjunto |
+| V-02 | `paquetes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca paquetes de otro conjunto |
+| V-03 | `incidentes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca incidentes de otro conjunto |
+| V-04 | `reservas_zonas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca reservas de otro conjunto |
+| V-05 | `usuarios_app` | Filtrar perfiles fuera de su tenant | `200 OK` con array vacío o `403` por policy; nunca perfiles ajenos |
 
 ### 7.3 Admin conjunto
 
 | Caso | Tabla/endpoint REST | Manipulación | Resultado esperado |
 |---|---|---|---|
-| A-01 | `usuarios_app` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca usuarios ajenos |
-| A-02 | `residentes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca residentes ajenos |
-| A-03 | `pagos` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca pagos ajenos |
-| A-04 | `paquetes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca paquetes ajenos |
-| A-05 | `registro_visitas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca visitas ajenas |
-| A-06 | `incidentes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca incidentes ajenos |
-| A-07 | `reservas_zonas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca reservas ajenas |
-| A-08 | `config_pagos` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío, `401`, o `403`; nunca configuración ajena |
+| A-01 | `usuarios_app` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca usuarios ajenos |
+| A-02 | `residentes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca residentes ajenos |
+| A-03 | `pagos` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca pagos ajenos |
+| A-04 | `paquetes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca paquetes ajenos |
+| A-05 | `registro_visitas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca visitas ajenas |
+| A-06 | `incidentes` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca incidentes ajenos |
+| A-07 | `reservas_zonas` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca reservas ajenas |
+| A-08 | `config_pagos` | Filtrar por `conjunto_id` ajeno | `200 OK` con array vacío o `403` por policy; nunca configuración ajena |
 
-## 8. Resultados aceptables
+## 8. Controles no autenticados vs pruebas negativas autenticadas
 
-Una prueba negativa pasa cuando ocurre uno de estos resultados:
+### 8.1 Control no autenticado separado
+
+El control `control_no_autenticado_sin_jwt` puede ejecutarse sin JWT para confirmar que un endpoint no permite acceso anónimo. En ese control, `401 Unauthorized` es un resultado esperado porque valida ausencia de sesión, token ausente, token expirado o token inválido.
+
+Este control **no cuenta como evidencia de aislamiento RLS autenticado**, porque no ejercita correctamente `auth.uid()` ni las policies bajo una sesión real de usuario `authenticated`.
+
+### 8.2 Pruebas negativas autenticadas RLS
+
+Toda prueba negativa RLS debe ejecutarse con sesión válida y JWT real del rol DEV correspondiente. Una prueba autenticada pasa solo cuando ocurre uno de estos resultados:
 
 - `200 OK` con array vacío por filtrado correcto de RLS.
-- `401 Unauthorized` si no hay sesión válida.
-- `403 Forbidden` si la política bloquea la operación.
+- `403 Forbidden` por bloqueo de policy.
 
-Una prueba falla si aparece cualquier dato de otro `tenant` o de otro `residente_id` no autorizado, incluso si el status es `200 OK`.
+En pruebas autenticadas RLS, `401 Unauthorized` debe registrarse como `SETUP_FAIL`, no como `PASS`, porque indica que la sesión/JWT no fue válido y la prueba no validó aislamiento RLS.
+
+Una prueba falla como `FAIL P0` si aparece cualquier dato de otro `tenant` o de otro `residente_id` no autorizado, incluso si el status es `200 OK`.
 
 ## 9. Método recomendado de ejecución efectiva
 
@@ -130,8 +139,9 @@ Una prueba falla si aparece cualquier dato de otro `tenant` o de otro `residente
 
 | Severidad | Definición | Acción esperada |
 |---|---|---|
-| P0 | Exposición real de datos de otro tenant o residente | Bloquear avance; corregir RLS/policies antes de cualquier GO |
-| P1 | Endpoint permite consulta no esperada aunque no devuelve datos por falta de dataset | Revisar policy, alcance de endpoint y dataset; no declarar GO sin explicación |
+| PASS | `200 OK` con array vacío o `403 Forbidden` por policy en una prueba autenticada con JWT válido | Registrar evidencia saneada y continuar |
+| SETUP_FAIL | `401 Unauthorized` en una prueba autenticada | Corregir sesión/JWT antes de evaluar aislamiento RLS; no contar como PASS |
+| FAIL P0 | Exposición real de datos de otro tenant o residente | Bloquear avance; corregir RLS/policies antes de cualquier GO |
 | P2 | No existen datos suficientes en DEV para ejecutar una prueba negativa | Preparar seed DEV controlado o limitar decisión a `GO condicionado` |
 | P3 | Mejora documental, trazabilidad u observabilidad | Registrar mejora sin bloquear si no afecta aislamiento |
 

@@ -28,7 +28,9 @@ Copiar un bloque por cada caso probado.
 | Campo | Valor |
 |---|---|
 | Rol autenticado | `admin` / `vigilancia` / `residente` |
-| `auth.uid()` esperado |  |
+| sesion_valida | `si` / `no` |
+| jwt_presente | `si` / `no` |
+| auth_uid_esperado |  |
 | `conjunto_id` propio esperado |  |
 | `residente_id` propio esperado, si aplica |  |
 | Endpoint REST probado | `/rest/v1/<tabla>?<filtros>` |
@@ -36,26 +38,42 @@ Copiar un bloque por cada caso probado.
 | Parámetro manipulado | `conjunto_id` / `residente_id` / `id` / `usuario_id` |
 | Valor propio esperado |  |
 | Valor ajeno probado |  |
-| Status code | `200` / `401` / `403` / otro |
+| status_code | `200` / `401` / `403` / otro |
 | Respuesta saneada | `[]` / `{...}` saneado / error saneado |
-| Resultado | `PASS` / `FAIL` |
-| Clasificación | `P0` / `P1` / `P2` / `P3` |
+| resultado | `PASS` / `SETUP_FAIL` / `FAIL` |
+| Clasificación | `PASS` / `SETUP_FAIL` / `FAIL P0` / `P2` / `P3` |
 | Evidencia adjunta | Captura Network, curl saneado o log controlado |
 | Observaciones |  |
 
 #### Criterio PASS
 
-Marcar `PASS` solo si el resultado fue uno de estos:
+Marcar `PASS` solo si `sesion_valida = si`, `jwt_presente = si` y el resultado fue uno de estos:
 
 - `200 OK` con array vacío.
-- `401 Unauthorized` por ausencia o invalidez de sesión.
-- `403 Forbidden` por bloqueo de política.
+- `403 Forbidden` por bloqueo de policy.
 
-#### Criterio FAIL
+#### Criterio SETUP_FAIL
 
-Marcar `FAIL` si la respuesta contiene cualquier dato de otro `conjunto_id`, otro `residente_id` o usuario fuera del alcance autorizado.
+Marcar `SETUP_FAIL` si una prueba autenticada devuelve `401 Unauthorized`, porque indica sesión ausente, JWT ausente, JWT expirado o token inválido. No contar este resultado como evidencia de aislamiento RLS autenticado.
 
-## 4. Evidencia estructural
+#### Criterio FAIL P0
+
+Marcar `FAIL P0` si la respuesta contiene cualquier dato de otro `conjunto_id`, otro `residente_id` o usuario fuera del alcance autorizado.
+
+## 4. Control no autenticado separado
+
+Usar este bloque únicamente para controles sin JWT, no para evidencia de aislamiento RLS autenticado.
+
+| Campo | Valor |
+|---|---|
+| ID control | `control_no_autenticado_sin_jwt` |
+| Endpoint REST probado | `/rest/v1/<tabla>?<filtros>` |
+| jwt_presente | `no` |
+| status_code esperado | `401 Unauthorized` |
+| Propósito | Confirmar que el endpoint no permite acceso anónimo |
+| Cuenta como evidencia RLS autenticada | `no` |
+
+## 5. Evidencia estructural
 
 Adjuntar salida saneada de:
 
@@ -67,28 +85,29 @@ supabase/validation/fase_3d9_plan_checks_negativos_rls_dev.sql
 
 La evidencia estructural debe indicar si hay datos suficientes o si falta seed DEV controlado.
 
-## 5. Clasificación de hallazgos
+## 6. Clasificación de hallazgos
 
 | Severidad | Cuándo usarla |
 |---|---|
-| P0 | Hay exposición real de datos de otro tenant/residente |
-| P1 | La consulta manipulada queda habilitada de forma no esperada aunque no devuelva datos por falta de dataset |
+| PASS | `200 OK` con array vacío o `403 Forbidden` por policy, con sesión válida y JWT presente |
+| SETUP_FAIL | `401 Unauthorized` en una prueba autenticada; corregir sesión/JWT y repetir |
+| FAIL P0 | Hay exposición real de datos de otro tenant/residente |
 | P2 | DEV no tiene datos suficientes para ejecutar la prueba negativa |
 | P3 | Mejora documental, observabilidad o formato de evidencia |
 
-## 6. Cierre de fase
+## 7. Cierre de fase
 
 | Campo | Valor |
 |---|---|
 | Total casos PASS |  |
 | Total casos FAIL P0 |  |
-| Total casos FAIL P1 |  |
+| Total casos SETUP_FAIL |  |
 | Total casos P2 por falta de datos |  |
 | Total P3 |  |
 | Decisión final propuesta | `GO para ejecutar validación negativa/cross-tenant DEV` / `GO condicionado` / `NO-GO` |
 | Justificación |  |
 
-## 7. Confirmación de no impacto
+## 8. Confirmación de no impacto
 
 Confirmar explícitamente al cierre:
 

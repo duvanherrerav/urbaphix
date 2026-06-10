@@ -54,7 +54,7 @@ select
   valor_propio,
   coalesce(valor_ajeno, '<sin_candidato>') as valor_ajeno,
   case when valor_ajeno is null then 'p2_sin_datos_candidatos' else 'listo_para_ejecucion_autenticada' end as estado_preparacion,
-  '200_con_array_vacio_o_401_o_403' as resultado_aceptable,
+  '200_con_array_vacio_o_403_por_policy' as resultado_aceptable,
   'nunca_debe_retornar_datos_ajenos' as condicion_bloqueante
 from plan_base
 order by caso;
