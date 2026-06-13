@@ -93,6 +93,7 @@ Todos los datos nuevos o reutilizados deben estar identificados con prefijo `DEV
 - Datos operativos del segundo conjunto:
   - Un `pagos`.
   - Un `paquetes`.
+  - Un `visitantes` + un `registro_visitas` cross-tenant asociado al conjunto ajeno.
   - Un `incidentes`.
   - Una `reservas_zonas`.
   - Una `config_pagos`.
@@ -152,7 +153,7 @@ Guardar como evidencia:
 - Resultado del diagnóstico pre-seed.
 - Confirmación humana del proyecto DEV `polstaxmencetxgctvsw` antes de ejecutar DML.
 - Resultado completo del seed, incluyendo IDs creados/reutilizados.
-- Resultado del post-check.
+- Resultado del post-check, incluyendo evidencia de `registro_visitas` tanto del residente ajeno del mismo conjunto como del conjunto ajeno cross-tenant.
 - Resultado reejecutado de `fase_3d9_identificar_datos_negativos_dev.sql`.
 - Si se hace rollback, resultado del rollback y post-check posterior.
 
@@ -176,6 +177,7 @@ Se considera GO si:
   - residentes ajenos;
   - pagos ajenos;
   - paquetes ajenos;
+  - visitas ajenas/cross-tenant;
   - incidentes ajenos o cross-tenant;
   - segundo conjunto para cross-tenant.
 - Todo queda en DEV.

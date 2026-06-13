@@ -57,29 +57,37 @@ FROM (
          EXISTS (SELECT 1 FROM public.registro_visitas rv, public.visitantes v, k WHERE rv.visitante_id = v.id AND v.residente_id = k.residente_same_id AND rv.conjunto_id = k.conjunto_principal_id AND (rv.qr_code LIKE k.prefijo_like OR rv.notas LIKE k.prefijo_like)),
          'Debe existir registro de visita negativo del residente ajeno mismo conjunto'
   UNION ALL
-  SELECT '11_incidente_cross_tenant_existe',
+  SELECT '11_registro_visita_cross_tenant_existe',
+         EXISTS (SELECT 1 FROM public.registro_visitas rv, public.visitantes v, k WHERE rv.visitante_id = v.id AND v.residente_id = k.residente_cross_id AND rv.conjunto_id = k.conjunto_ajeno_id AND (rv.qr_code LIKE k.prefijo_like OR rv.notas LIKE k.prefijo_like)),
+         'Debe existir registro de visita negativo cross-tenant del conjunto ajeno'
+  UNION ALL
+  SELECT '12_incidente_cross_tenant_existe',
          EXISTS (SELECT 1 FROM public.incidentes i, k WHERE i.conjunto_id = k.conjunto_ajeno_id AND i.descripcion LIKE k.prefijo_like),
          'Debe existir incidente negativo cross-tenant'
   UNION ALL
-  SELECT '12_reserva_ajena_mismo_conjunto_existe',
+  SELECT '13_reserva_ajena_mismo_conjunto_existe',
          EXISTS (SELECT 1 FROM public.reservas_zonas rz, k WHERE rz.residente_id = k.residente_same_id AND rz.conjunto_id = k.conjunto_principal_id AND (rz.motivo LIKE k.prefijo_like OR rz.observaciones LIKE k.prefijo_like)),
          'Debe existir reserva negativa del residente ajeno mismo conjunto'
   UNION ALL
-  SELECT '13_reserva_cross_tenant_existe',
+  SELECT '14_reserva_cross_tenant_existe',
          EXISTS (SELECT 1 FROM public.reservas_zonas rz, k WHERE rz.residente_id = k.residente_cross_id AND rz.conjunto_id = k.conjunto_ajeno_id AND (rz.motivo LIKE k.prefijo_like OR rz.observaciones LIKE k.prefijo_like)),
          'Debe existir reserva negativa cross-tenant'
   UNION ALL
-  SELECT '14_config_pagos_cross_tenant_existe',
+  SELECT '15_config_pagos_cross_tenant_existe',
          EXISTS (SELECT 1 FROM public.config_pagos cp, k WHERE cp.conjunto_id = k.conjunto_ajeno_id AND (cp.tipo LIKE k.prefijo_like OR cp.instrucciones LIKE k.prefijo_like)),
          'Debe existir config_pagos negativa cross-tenant'
   UNION ALL
-  SELECT '15_sin_conjunto_negativo_fuera_uuid_reservado',
+  SELECT '16_sin_conjunto_negativo_fuera_uuid_reservado',
          NOT EXISTS (SELECT 1 FROM public.conjuntos c, k WHERE c.nombre LIKE k.prefijo_like AND c.id <> k.conjunto_ajeno_id),
          'No deben existir conjuntos negativos adicionales no controlados por FASE 3D.10'
   UNION ALL
-  SELECT '16_sin_duplicados_qr_negativo',
+  SELECT '17_sin_duplicados_qr_negativo_same',
          (SELECT count(*) FROM public.registro_visitas WHERE qr_code = 'DEV-RLS-NEGATIVE-QR-SAME-3D10') = 1,
-         'Debe existir exactamente un QR negativo controlado'
+         'Debe existir exactamente un QR negativo controlado mismo conjunto'
+  UNION ALL
+  SELECT '18_sin_duplicados_qr_negativo_cross',
+         (SELECT count(*) FROM public.registro_visitas WHERE qr_code = 'DEV-RLS-NEGATIVE-QR-CROSS-3D10') = 1,
+         'Debe existir exactamente un QR negativo controlado cross-tenant'
 ) checks
 ORDER BY check_name;
 

@@ -40,6 +40,8 @@ DECLARE
   v_incidente_cross_id uuid := '11111111-3d10-4000-8000-000000000027';
   v_reserva_cross_id uuid := '11111111-3d10-4000-8000-000000000028';
   v_config_pagos_cross_id uuid := '11111111-3d10-4000-8000-000000000029';
+  v_visitante_cross_id uuid := '11111111-3d10-4000-8000-000000000030';
+  v_registro_visita_cross_id uuid := '11111111-3d10-4000-8000-000000000031';
 
   v_tipo_documento text;
 BEGIN
@@ -178,7 +180,9 @@ BEGIN
         apartamento_id = EXCLUDED.apartamento_id;
 
   INSERT INTO public.visitantes (id, conjunto_id, residente_id, nombre, tipo_documento, documento, tipo_vehiculo, placa, activo)
-  VALUES (v_visitante_same_id, v_conjunto_principal_id, v_residente_same_id, 'DEV-RLS-NEGATIVE-VISITANTE-SAME', v_tipo_documento, 'DEV3D10SAME', NULL, NULL, true)
+  VALUES
+    (v_visitante_same_id, v_conjunto_principal_id, v_residente_same_id, 'DEV-RLS-NEGATIVE-VISITANTE-SAME', v_tipo_documento, 'DEV3D10SAME', NULL, NULL, true),
+    (v_visitante_cross_id, v_conjunto_ajeno_id, v_residente_cross_id, 'DEV-RLS-NEGATIVE-VISITANTE-CROSS', v_tipo_documento, 'DEV3D10CROSS', NULL, NULL, true)
   ON CONFLICT (id) DO UPDATE
     SET conjunto_id = EXCLUDED.conjunto_id,
         residente_id = EXCLUDED.residente_id,
@@ -189,7 +193,9 @@ BEGIN
         updated_at = now();
 
   INSERT INTO public.registro_visitas (id, visitante_id, conjunto_id, apartamento_id, fecha_visita, estado, qr_code, validado_por, notas)
-  VALUES (v_registro_visita_same_id, v_visitante_same_id, v_conjunto_principal_id, v_apto_same_id, current_date + 1, 'pendiente', 'DEV-RLS-NEGATIVE-QR-SAME-3D10', NULL, 'DEV-RLS-NEGATIVE-REGISTRO-VISITA-SAME')
+  VALUES
+    (v_registro_visita_same_id, v_visitante_same_id, v_conjunto_principal_id, v_apto_same_id, current_date + 1, 'pendiente', 'DEV-RLS-NEGATIVE-QR-SAME-3D10', NULL, 'DEV-RLS-NEGATIVE-REGISTRO-VISITA-SAME'),
+    (v_registro_visita_cross_id, v_visitante_cross_id, v_conjunto_ajeno_id, v_apto_cross_id, current_date + 1, 'pendiente', 'DEV-RLS-NEGATIVE-QR-CROSS-3D10', NULL, 'DEV-RLS-NEGATIVE-REGISTRO-VISITA-CROSS')
   ON CONFLICT (id) DO UPDATE
     SET visitante_id = EXCLUDED.visitante_id,
         conjunto_id = EXCLUDED.conjunto_id,

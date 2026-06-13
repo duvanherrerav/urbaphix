@@ -37,6 +37,8 @@ DECLARE
   v_incidente_cross_id uuid := '11111111-3d10-4000-8000-000000000027';
   v_reserva_cross_id uuid := '11111111-3d10-4000-8000-000000000028';
   v_config_pagos_cross_id uuid := '11111111-3d10-4000-8000-000000000029';
+  v_visitante_cross_id uuid := '11111111-3d10-4000-8000-000000000030';
+  v_registro_visita_cross_id uuid := '11111111-3d10-4000-8000-000000000031';
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.conjuntos WHERE id = v_conjunto_principal_id) THEN
     RAISE EXCEPTION 'ABORTADO: conjunto principal DEV % no existe. Verifique que está en Supabase DEV polstaxmencetxgctvsw.', v_conjunto_principal_id;
@@ -73,11 +75,11 @@ BEGIN
     AND (motivo LIKE 'DEV-RLS-NEGATIVE%' OR observaciones LIKE 'DEV-RLS-NEGATIVE%' OR metadata ->> 'dataset' = 'negative-rls');
 
   DELETE FROM public.registro_visitas
-  WHERE id = v_registro_visita_same_id
+  WHERE id IN (v_registro_visita_same_id, v_registro_visita_cross_id)
     AND (qr_code LIKE 'DEV-RLS-NEGATIVE%' OR notas LIKE 'DEV-RLS-NEGATIVE%');
 
   DELETE FROM public.visitantes
-  WHERE id = v_visitante_same_id
+  WHERE id IN (v_visitante_same_id, v_visitante_cross_id)
     AND (nombre LIKE 'DEV-RLS-NEGATIVE%' OR documento LIKE 'DEV3D10%');
 
   DELETE FROM public.paquetes
