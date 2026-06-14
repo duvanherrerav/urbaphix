@@ -691,12 +691,13 @@ Tablas detectadas en `public`:
 - `residentes crear admin`
   - comando: `INSERT`
   - condición: rol `admin`
-- `residentes multi conjunto`
+- `residentes_select_admin_conjunto`
   - comando: `SELECT`
-  - condición: mismo `conjunto_id`
-- `residentes_select_same_conjunto`
+  - condición: `superadmin`, membresía activa `admin_conjunto`/`contador` del mismo `conjunto_id`, o admin legacy del mismo `conjunto_id`
+- `residentes_select_residente_propio`
   - comando: `SELECT`
-  - condición: mismo conjunto por relación con `usuarios_app`
+  - condición: propietario estricto por membresía activa `residente` (`tenant_memberships.user_id = auth.uid()`, `tenant_memberships.residente_id = residentes.id`, `tenant_memberships.status = 'active'`) o fallback legacy directo `residentes.usuario_id = auth.uid()`
+- Nota FASE 3D.13: usuarios con rol `residente` no pueden leer otras filas de `residentes` solo por compartir `conjunto_id`; no se concede lectura amplia a `vigilancia`/`vigilante`.
 
 ---
 
