@@ -318,9 +318,12 @@ Tablas detectadas en `public`:
 - `crear pagos admin conjunto`
   - comando: `INSERT`
   - condición: admin del mismo conjunto
-- `pagos multi conjunto`
+- `pagos_select_admin_conjunto`
   - comando: `SELECT`
-  - condición: mismo `conjunto_id`
+  - condición: `superadmin`, membresía activa `admin_conjunto`/`contador` del mismo `conjunto_id`, o admin legacy del mismo `conjunto_id`
+- `pagos_select_residente_propios`
+  - comando: `SELECT`
+  - condición: membresía activa `residente` del mismo `conjunto_id` y `pagos.residente_id = tenant_memberships.residente_id`
 - `update comprobante pagos`
   - comando: `UPDATE`
   - condición: `true`
