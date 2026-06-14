@@ -10,7 +10,7 @@ La policy legacy `pagos multi conjunto` permitía `SELECT` cuando el usuario per
 
 La migración `20260614120000_fase_3d12_pagos_select_rls_residente_propios.sql` reemplaza esa lectura por dos policies:
 
-- `pagos_select_residente_propios`: permite a `tenant_memberships.role_name = 'residente'` leer únicamente pagos donde `pagos.residente_id = tenant_memberships.residente_id`, con membresía activa del mismo `conjunto_id`.
+- `pagos_select_residente_propios`: permite a `tenant_memberships.role_name = 'residente'` leer únicamente pagos donde `pagos.residente_id = tenant_memberships.residente_id`, con membresía activa del mismo `conjunto_id`. Como compatibilidad temporal segura para residentes sin backfill completo, también permite el camino legacy propietario directo `residentes.usuario_id = auth.uid()`, `residentes.id = pagos.residente_id` y `residentes.conjunto_id = pagos.conjunto_id`.
 - `pagos_select_admin_conjunto`: mantiene lectura por `conjunto_id` para `superadmin`, `admin_conjunto`, `contador` y el rol legacy `usuarios_app.rol_id = 'admin'`.
 
 ## Precondiciones
@@ -19,7 +19,7 @@ La migración `20260614120000_fase_3d12_pagos_select_rls_residente_propios.sql` 
 - Usuario residente principal DEV autenticado:
   - Auth user: `b46ab33c-9237-4f43-a010-ff95ca1263a6`
   - Email: `residente.dev@urbaphix.com`
-  - Debe tener una fila activa en `tenant_memberships` con `role_name = 'residente'` y su `residente_id` propio.
+  - Debe tener una fila activa en `tenant_memberships` con `role_name = 'residente'` y su `residente_id` propio, o una relación legacy directa en `residentes.usuario_id` hacia su usuario autenticado.
 - Pago negativo existente de otro residente del mismo conjunto:
   - `residente_id = 11111111-3d10-4000-8000-000000000013`
   - `concepto = DEV-RLS-NEGATIVE-PAGO-SAME`
@@ -46,7 +46,7 @@ curl -i "$SUPABASE_URL/rest/v1/pagos?select=id,conjunto_id,residente_id,concepto
   -H "Authorization: Bearer $RESIDENTE_TOKEN"
 ```
 
-Resultado esperado: `200` con cero o más pagos del mismo `residente_id` propio. Si existen pagos DEV del residente principal, deben seguir visibles.
+Resultado esperado: `200` con cero o más pagos del mismo `residente_id` propio. Si existen pagos DEV del residente principal, deben seguir visibles tanto por la ruta principal `tenant_memberships` como por la ruta legacy propietaria directa cuando aún no exista membresía activa.
 
 ### Positivo admin — admin consulta pagos del conjunto
 

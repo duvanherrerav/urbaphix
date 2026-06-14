@@ -323,7 +323,7 @@ Tablas detectadas en `public`:
   - condición: `superadmin`, membresía activa `admin_conjunto`/`contador` del mismo `conjunto_id`, o admin legacy del mismo `conjunto_id`
 - `pagos_select_residente_propios`
   - comando: `SELECT`
-  - condición: membresía activa `residente` del mismo `conjunto_id` y `pagos.residente_id = tenant_memberships.residente_id`
+  - condición: membresía activa `residente` del mismo `conjunto_id` y `pagos.residente_id = tenant_memberships.residente_id`; fallback legacy propietario estricto con `residentes.usuario_id = auth.uid()`, `residentes.id = pagos.residente_id` y `residentes.conjunto_id = pagos.conjunto_id`
 - `update comprobante pagos`
   - comando: `UPDATE`
   - condición: `true`

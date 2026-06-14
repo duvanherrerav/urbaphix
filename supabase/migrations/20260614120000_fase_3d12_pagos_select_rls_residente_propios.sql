@@ -2,7 +2,8 @@
 -- Hallazgo P0: la policy legacy "pagos multi conjunto" permitía que cualquier
 -- usuario autenticado del mismo conjunto leyera pagos de otros residentes.
 -- La lectura de residentes queda limitada estrictamente a su residente_id activo
--- en tenant_memberships; roles administrativos conservan lectura por conjunto.
+-- en tenant_memberships o a la relación legacy directa residentes.usuario_id.
+-- Roles administrativos conservan lectura por conjunto.
 
 alter table public.pagos enable row level security;
 
@@ -46,5 +47,12 @@ using (
       and tm.residente_id = pagos.residente_id
       and tm.status = 'active'
       and tm.role_name = 'residente'
+  )
+  or exists (
+    select 1
+    from public.residentes r
+    where r.usuario_id = auth.uid()
+      and r.id = pagos.residente_id
+      and r.conjunto_id = pagos.conjunto_id
   )
 );
