@@ -691,12 +691,16 @@ Tablas detectadas en `public`:
 - `residentes crear admin`
   - comando: `INSERT`
   - condición: rol `admin`
-- `residentes multi conjunto`
+- `residentes_select_admin_conjunto`
   - comando: `SELECT`
-  - condición: mismo `conjunto_id`
-- `residentes_select_same_conjunto`
+  - condición: `superadmin`, membresía activa `admin_conjunto`/`contador` del mismo `conjunto_id`, o admin legacy del mismo `conjunto_id`
+- `residentes_select_residente_propio`
   - comando: `SELECT`
-  - condición: mismo conjunto por relación con `usuarios_app`
+  - condición: propietario estricto por membresía activa `residente` (`tenant_memberships.user_id = auth.uid()`, `tenant_memberships.residente_id = residentes.id`, `tenant_memberships.status = 'active'`) o fallback legacy directo `residentes.usuario_id = auth.uid()`
+- `residentes_select_vigilancia_lookup_paquetes`
+  - comando: `SELECT`
+  - condición: lookup operativo de portería/paquetería para `vigilancia`/`vigilante` del mismo `conjunto_id` vía membresía activa (`tenant_memberships.user_id = auth.uid()`, `tenant_memberships.conjunto_id = residentes.conjunto_id`, `tenant_memberships.status = 'active'`) o fallback legacy controlado (`usuarios_app.id = auth.uid()`, `usuarios_app.conjunto_id = residentes.conjunto_id`)
+- Nota FASE 3D.13: usuarios con rol `residente` no pueden leer otras filas de `residentes` solo por compartir `conjunto_id`; vigilancia/vigilante conserva únicamente lookup acotado al mismo conjunto para operación de portería/paquetería.
 
 ---
 
