@@ -395,15 +395,27 @@ Tablas detectadas en `public`:
 - `insert paquetes vigilancia`
   - comando: `INSERT`
   - condición: rol `vigilancia`
-- `paquetes por conjunto`
+- `paquetes_select_admin_conjunto`
   - comando: `SELECT`
-  - condición: mismo `conjunto_id`
-- `paquetes residente`
+  - condición: `superadmin`, membresía activa `admin_conjunto`/`contador` del mismo `conjunto_id`, o admin legacy del mismo `conjunto_id`
+- `paquetes_select_residente_propios`
   - comando: `SELECT`
-  - condición: paquete del residente autenticado
+  - condición: residente autenticado solo lee paquetes donde `residente_id` corresponde a su membresía activa de residente y al mismo `conjunto_id`, o fallback legacy `residentes.usuario_id = auth.uid()` con el mismo `conjunto_id`
+- `paquetes_select_vigilancia_conjunto`
+  - comando: `SELECT`
+  - condición: lectura operativa de portería/paquetería para `vigilancia`/`vigilante` del mismo `conjunto_id` vía membresía activa o fallback legacy `usuarios_app`
 - `update paquetes vigilancia`
   - comando: `UPDATE`
   - condición: rol `vigilancia`
+- Nota FASE 3D.14: se elimina la lectura amplia `paquetes por conjunto`; un residente no puede leer paquetes de otros residentes aunque compartan conjunto, y todos los accesos conservados validan `conjunto_id` para evitar lectura cross-tenant.
+
+### Checklist REST/PostgREST FASE 3D.14
+- Residente DEV autenticado (`residente.dev@urbaphix.com`) consultando un paquete de otro residente del mismo conjunto por `residente_id=eq.<residente_ajeno>` debe recibir `200 []` o `403`.
+- Residente DEV autenticado consultando sus paquetes propios por `residente_id=eq.<residente_propio>` debe recibir únicamente sus filas.
+- Admin DEV autenticado debe poder consultar paquetes donde `conjunto_id=eq.<conjunto_dev>`.
+- Vigilancia DEV autenticado debe poder consultar paquetes donde `conjunto_id=eq.<conjunto_dev>` para operación de recepción/entrega.
+- Residente DEV autenticado consultando paquetes de otro tenant por `conjunto_id=eq.<conjunto_ajeno>` o `residente_id=eq.<residente_ajeno_cross_tenant>` debe recibir `200 []` o `403`.
+- Vigilancia DEV autenticado consultando paquetes de otro tenant por `conjunto_id=eq.<conjunto_ajeno>` debe recibir `200 []` o `403`.
 
 ---
 
