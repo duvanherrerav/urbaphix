@@ -679,9 +679,23 @@ Tablas detectadas en `public`:
 - `reservas_insert_residente_admin`
   - comando: `INSERT`
   - condición: admin del mismo conjunto o residente dueño
-- `reservas_select_admin_vigilancia_residente`
+- `reservas_zonas_select_admin_conjunto`
   - comando: `SELECT`
-  - condición: admin, vigilancia o residente dueño del mismo conjunto
+  - condición: `superadmin` vía `fn_is_platform_superadmin()` lee todos los conjuntos; `admin_conjunto`/`contador` con membresía activa en `tenant_memberships` leen reservas de su `conjunto_id`; fallback legacy `usuarios_app.rol_id = 'admin'` solo lee su mismo `conjunto_id`.
+- `reservas_zonas_select_residente_propias`
+  - comando: `SELECT`
+  - condición: residente autenticado solo lee filas donde `reservas_zonas.residente_id` coincide con su `tenant_memberships.residente_id` activo del mismo `conjunto_id`; fallback legacy estricto con `residentes.usuario_id = auth.uid()`, `residentes.id = reservas_zonas.residente_id` y `residentes.conjunto_id = reservas_zonas.conjunto_id`.
+- `reservas_zonas_select_vigilancia_conjunto`
+  - comando: `SELECT`
+  - condición: `vigilancia`/`vigilante` con membresía activa en `tenant_memberships` o fallback legacy `usuarios_app` lee reservas de su mismo `conjunto_id` para operación de check-in/check-out y control de zonas comunes.
+
+### Checklist REST/PostgREST FASE 3D.15
+- [ ] Residente DEV autenticado consulta una reserva de otro residente del mismo conjunto mediante `/rest/v1/reservas_zonas?...&residente_id=eq.<residente_ajeno>` y obtiene `200 []` o `403`.
+- [ ] Residente DEV autenticado consulta sus propias reservas mediante `/rest/v1/reservas_zonas?...&residente_id=eq.<residente_propio>` y solo recibe filas propias.
+- [ ] Admin DEV consulta `/rest/v1/reservas_zonas?select=id,conjunto_id,residente_id,estado` y solo recibe filas de su conjunto, salvo sesión platform superadmin.
+- [ ] Vigilancia/vigilante DEV consulta reservas operativas del conjunto para check-in/check-out o control de zonas comunes y no recibe filas cross-tenant.
+- [ ] Residente DEV intenta filtrar `conjunto_id` cross-tenant y obtiene `200 []` o `403`.
+- [ ] Confirmar que `INSERT`, `UPDATE` y `DELETE` conservan las policies existentes y no cambian respecto a la fase anterior.
 
 ---
 
