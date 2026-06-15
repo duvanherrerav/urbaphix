@@ -753,6 +753,29 @@ export const listarDocumentosReservas = async (reservaIds = []) => {
     return { ok: true, data: byReserva, error: null };
 };
 
+
+const getOcupacionReservasDisponibilidad = async ({
+    conjunto_id,
+    recurso_id,
+    fecha_inicio,
+    fecha_fin,
+    reserva_id_excluir = null
+}) => {
+    const { data, error } = await supabase.rpc('fn_reservas_zonas_ocupacion_disponibilidad', {
+        p_conjunto_id: conjunto_id,
+        p_recurso_id: recurso_id,
+        p_fecha_inicio: fecha_inicio,
+        p_fecha_fin: fecha_fin,
+        p_reserva_id_excluir: reserva_id_excluir
+    });
+
+    if (error) {
+        return { ok: false, data: [], error };
+    }
+
+    return { ok: true, data: data || [], error: null };
+};
+
 export const validarDisponibilidadReserva = async ({
     conjunto_id,
     recurso_id,
@@ -775,19 +798,19 @@ export const validarDisponibilidadReserva = async ({
     const inicioConBuffer = formatLocalDateTime(addMinutes(fecha_inicio, -bufferMin));
     const finConBuffer = formatLocalDateTime(addMinutes(fecha_fin, bufferMin));
 
-    let qReservas = supabase
-        .from('reservas_zonas')
-        .select('id, fecha_inicio, fecha_fin, estado')
-        .eq('conjunto_id', conjunto_id)
-        .eq('recurso_id', recurso_id)
-        .in('estado', ESTADOS_ACTIVOS_RESERVA)
-        .lt('fecha_inicio', finConBuffer)
-        .gt('fecha_fin', inicioConBuffer);
+    const reservasResp = await getOcupacionReservasDisponibilidad({
+        conjunto_id,
+        recurso_id,
+        fecha_inicio: inicioConBuffer,
+        fecha_fin: finConBuffer,
+        reserva_id_excluir
+    });
 
-    if (reserva_id_excluir) qReservas = qReservas.neq('id', reserva_id_excluir);
+    if (!reservasResp.ok) {
+        return { ok: false, data: null, error: humanizeReservaError(reservasResp.error, 'No se pudo validar solapes de reserva') };
+    }
 
-    const { data: reservasActivas, error: errorReservas } = await qReservas;
-    if (errorReservas) return { ok: false, data: null, error: humanizeReservaError(errorReservas, 'No se pudo validar solapes de reserva') };
+    const reservasActivas = reservasResp.data;
 
     const { data: bloqueos, error: errorBloqueos } = await supabase
         .from('reservas_bloqueos')
@@ -858,16 +881,18 @@ export const getDisponibilidadRecurso = async ({
     const dayStart = `${fecha}T00:00:00`;
     const dayEnd = `${fecha}T23:59:59`;
 
-    const { data: reservas, error: errorReservas } = await supabase
-        .from('reservas_zonas')
-        .select('id, fecha_inicio, fecha_fin, estado')
-        .eq('conjunto_id', conjunto_id)
-        .eq('recurso_id', recurso_id)
-        .in('estado', ESTADOS_ACTIVOS_RESERVA)
-        .lt('fecha_inicio', dayEnd)
-        .gt('fecha_fin', dayStart);
+    const reservasResp = await getOcupacionReservasDisponibilidad({
+        conjunto_id,
+        recurso_id,
+        fecha_inicio: dayStart,
+        fecha_fin: dayEnd
+    });
 
-    if (errorReservas) return { ok: false, data: null, error: humanizeReservaError(errorReservas, 'No se pudo cargar reservas activas del recurso') };
+    if (!reservasResp.ok) {
+        return { ok: false, data: null, error: humanizeReservaError(reservasResp.error, 'No se pudo cargar ocupación activa del recurso') };
+    }
+
+    const reservas = reservasResp.data;
 
     const { data: bloqueos, error: errorBloqueos } = await supabase
         .from('reservas_bloqueos')
