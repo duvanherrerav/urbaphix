@@ -522,12 +522,15 @@ Tablas detectadas en `public`:
 - `registro_visitas_insert_propios`
   - comando: `INSERT`
   - condición: el visitante pertenece a un residente autenticado
-- `registro_visitas_select_propios`
+- `registro_visitas_select_admin_conjunto`
   - comando: `SELECT`
-  - condición: visitas del propio residente
-- `registro_visitas_select_same_conjunto`
+  - condición: `superadmin` lee todos los conjuntos; `admin_conjunto`/`contador` con membresía activa en `tenant_memberships` leen registros de visita de su `conjunto_id`; fallback legacy `usuarios_app.rol_id = 'admin'` solo lee su mismo `conjunto_id`.
+- `registro_visitas_select_residente_propios`
   - comando: `SELECT`
-  - condición: usuario del mismo conjunto o relación indirecta por visitante/residente
+  - condición: residente autenticado solo lee registros asociados a visitantes propios por `tenant_memberships.residente_id` activo del mismo `conjunto_id`; fallback legacy estricto con `residentes.usuario_id = auth.uid()` y visitante del mismo residente/conjunto.
+- `registro_visitas_select_vigilancia_conjunto`
+  - comando: `SELECT`
+  - condición: `vigilancia`/`vigilante` con membresía activa en `tenant_memberships` o fallback legacy `usuarios_app` lee registros de visita de su mismo `conjunto_id` para operación de portería.
 - `registro_visitas_update_vigilancia_admin`
   - comando: `UPDATE`
   - condición: rol `vigilancia` o `admin`
@@ -892,12 +895,15 @@ Tablas detectadas en `public`:
 - `visitantes_insert_propios`
   - comando: `INSERT`
   - condición: visitante ligado a residente del usuario autenticado
-- `visitantes_select_propios`
+- `visitantes_select_admin_conjunto`
   - comando: `SELECT`
-  - condición: visitantes del propio residente
-- `visitantes_select_same_conjunto`
+  - condición: `superadmin` lee todos los conjuntos; `admin_conjunto`/`contador` con membresía activa en `tenant_memberships` leen visitantes de su `conjunto_id`; fallback legacy `usuarios_app.rol_id = 'admin'` solo lee su mismo `conjunto_id`.
+- `visitantes_select_residente_propios`
   - comando: `SELECT`
-  - condición: mismo conjunto
+  - condición: residente autenticado solo lee visitantes donde `visitantes.residente_id` coincide con su `tenant_memberships.residente_id` activo del mismo `conjunto_id`; fallback legacy estricto con `residentes.usuario_id = auth.uid()`, `residentes.id = visitantes.residente_id` y `residentes.conjunto_id = visitantes.conjunto_id`.
+- `visitantes_select_vigilancia_conjunto`
+  - comando: `SELECT`
+  - condición: `vigilancia`/`vigilante` con membresía activa en `tenant_memberships` o fallback legacy `usuarios_app` lee visitantes de su mismo `conjunto_id` para operación de portería.
 - `visitantes_update_propios`
   - comando: `UPDATE`
   - condición: visitante del propio residente
