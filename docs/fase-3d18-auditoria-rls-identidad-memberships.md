@@ -67,10 +67,11 @@ order by tablename, policyname;
 
 ## Matriz REST de validación DEV
 
-> Estado de esta PR: matriz preparada para ejecución. No se adjuntan JWT/cookies/keys. Un `401` en estas pruebas debe registrarse como `SETUP_FAIL`, no como PASS.
+> Estado de esta PR: matriz preparada para ejecución. No se adjuntan JWT/cookies/keys. Para pruebas autenticadas, un `401` debe registrarse como `SETUP_FAIL`, no como PASS. Para la prueba anónima R0, `401` sí es resultado esperado seguro porque no hay JWT.
 
 | ID | Rol DEV | Endpoint REST | Manipulación | Esperado | Resultado actual | Clasificación |
 |---|---|---|---|---|---|---|
+| R0 | Anónimo / no-JWT | `/rest/v1/usuarios_app?select=id,conjunto_id,rol_id,email,telefono,activo,fcm_token` | Headers: solo `apikey: <anon key>`, sin `Authorization` Bearer | `401`, `403` o `200 []`; **FAIL P0** si devuelve cualquier fila con `email`, `telefono`, `rol_id`, `conjunto_id` o `fcm_token` | Pendiente de ejecución con anon key DEV, sin JWT | PENDIENTE |
 | R1 | Residente DEV | `/rest/v1/usuarios_app?select=id,conjunto_id,rol_id,email,telefono,activo,fcm_token&conjunto_id=eq.11111111-3d10-4000-8000-000000000010` | Filtro a conjunto ajeno | `200 []` o `403` | Pendiente de ejecución con token DEV | PENDIENTE |
 | R2 | Residente/Admin/Vigilancia DEV | `/rest/v1/usuarios_app?select=id,conjunto_id,rol_id,email,telefono,activo,fcm_token&conjunto_id=eq.<conjunto_propio>` | Filtro mismo conjunto | Solo campos funcionalmente justificados por rol | Pendiente de ejecución con token DEV | PENDIENTE |
 | R3 | Residente DEV | `/rest/v1/tenant_memberships?select=id,user_id,conjunto_id,role_name,residente_id,status&conjunto_id=eq.<conjunto_ajeno>` | Filtro a conjunto ajeno | `200 []` o `403` | Pendiente de ejecución con token DEV | PENDIENTE |
@@ -103,7 +104,7 @@ order by tablename, policyname;
 ### `usuarios_app`
 
 - **Riesgo documental:** alto. La policy `lectura usuarios` con condición `true` contradice el aislamiento esperado por `conjunto_id` y puede exponer `email`, `telefono`, `rol_id`, `activo` y `fcm_token` si REST lo confirma.
-- **Dictamen sin REST:** no cerrar como PASS. Requiere ejecutar R1/R2/R7/R8.
+- **Dictamen sin REST:** no cerrar como PASS. Requiere ejecutar R0/R1/R2/R7/R8, incluyendo lectura anónima con anon key sin `Authorization` porque la policy legacy `lectura usuarios` fue creada sin `TO` y la tabla tiene grant histórico a `anon`.
 - **Fix recomendado solo si REST confirma exposición:** reemplazar la lectura amplia por policies explícitas de self-read y lectura same-tenant por roles operativos justificados, evitando exponer `fcm_token` y datos sensibles a roles no necesarios. Cualquier cambio debe ir en migración separada y actualizar `docs/database-schema.md`.
 
 ### `tenant_memberships`
@@ -121,8 +122,9 @@ order by tablename, policyname;
 
 No se crea migración de hardening en esta PR porque todavía no existe evidencia REST adjunta. La ruta segura es ejecutar la matriz anterior en DEV y abrir un PR específico si se confirma cualquiera de estos hallazgos:
 
-1. `usuarios_app` devuelve filas de otro `conjunto_id` a residente/admin/vigilancia tenant normal: **FAIL P0**.
-2. `tenant_memberships` devuelve filas de otro `conjunto_id`: **FAIL P0**.
-3. Usuario tenant normal puede insertar/actualizar/eliminar memberships o asignarse roles: **FAIL P0**.
-4. `platform_memberships` expone roles plataforma ajenos a tenant normal: **FAIL P0**.
-5. Lectura same-tenant expone roles/metadata sensible sin necesidad funcional clara: **FAIL P1**.
+1. `usuarios_app` devuelve cualquier fila a una request anónima/no-JWT con anon key que exponga `email`, `telefono`, `rol_id`, `conjunto_id` o `fcm_token`: **FAIL P0**.
+2. `usuarios_app` devuelve filas de otro `conjunto_id` a residente/admin/vigilancia tenant normal: **FAIL P0**.
+3. `tenant_memberships` devuelve filas de otro `conjunto_id`: **FAIL P0**.
+4. Usuario tenant normal puede insertar/actualizar/eliminar memberships o asignarse roles: **FAIL P0**.
+5. `platform_memberships` expone roles plataforma ajenos a tenant normal: **FAIL P0**.
+6. Lectura same-tenant expone roles/metadata sensible sin necesidad funcional clara: **FAIL P1**.
