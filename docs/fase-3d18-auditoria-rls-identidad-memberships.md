@@ -150,6 +150,65 @@ order by tablename, policyname;
 - No se modifica `usuarios_app`, `platform_memberships` ni frontend funcional.
 - INSERT/UPDATE siguen restringidos a `superadmin`/`platform_ops` y DELETE sigue denegado, por lo que la corrección no abre self-escalation a residentes.
 
+
+## FASE 3D.20 — Auditoría REST de `platform_memberships`
+
+### Alcance
+
+FASE 3D.20 focaliza la validación efectiva autenticada de `public.platform_memberships` en Supabase DEV. Esta tabla controla roles globales de plataforma, por lo que la evidencia debe confirmar que usuarios tenant normales no puedan inferir roles ajenos ni ejecutar self-escalation a `superadmin` o `platform_ops`.
+
+### Fuente documental validada
+
+La estructura y policies base se mantienen alineadas con `docs/database-schema.md` y `supabase/migrations/20260528120000_fase_3c1_memberships_rls_base.sql`:
+
+- Columnas auditadas: `id`, `user_id`, `role_name`, `status`, `granted_by`, `granted_reason`, `created_at`, `updated_at`, `revoked_at`.
+- SELECT esperado: `user_id = auth.uid()` o `fn_is_platform_superadmin()`.
+- INSERT/UPDATE esperado: solo `fn_is_platform_superadmin()`.
+- DELETE esperado: denegado por policy.
+
+### Runner local de evidencia saneada
+
+Se agrega `scripts/fase_3d20_platform_memberships_rest_audit.mjs` para ejecutar la matriz P1–P8 vía REST sin imprimir JWT, anon key, service role key ni cookies. El script solo imprime endpoints, status code, cantidad de filas y respuesta saneada con UUIDs/metadata sensibles enmascarados.
+
+Variables requeridas:
+
+```bash
+export SUPABASE_URL='https://<dev-project-ref>.supabase.co'
+export SUPABASE_ANON_KEY='<anon-key-dev>'
+export TOKEN_RESIDENTE='<jwt-dev>'
+export TOKEN_VIGILANCIA='<jwt-dev>'
+export TOKEN_ADMIN='<jwt-dev>'
+export TOKEN_CROSS='<jwt-dev>'
+# Opcional y solo si existe sesión DEV segura:
+export TOKEN_SUPERADMIN='<jwt-dev-superadmin-controlado>'
+
+node scripts/fase_3d20_platform_memberships_rest_audit.mjs
+```
+
+### Matriz P1–P8 requerida
+
+| ID | Rol DEV | Acción REST | Esperado seguro | Clasificación si no hay setup |
+|---|---|---|---|---|
+| P1 | Residente normal | `GET /rest/v1/platform_memberships?select=id,user_id,role_name,status,granted_by,granted_reason,revoked_at` | `200 []`, o únicamente self-read si existiera fila propia; nunca roles plataforma ajenos. | `401` = `SETUP_FAIL` |
+| P2 | Vigilancia normal | misma lectura | `200 []`, o únicamente self-read si existiera fila propia; nunca roles plataforma ajenos. | `401` = `SETUP_FAIL` |
+| P3 | Admin conjunto normal | misma lectura | `200 []`, o únicamente self-read si existiera fila propia; no hereda lectura global plataforma. | `401` = `SETUP_FAIL` |
+| P4 | Usuario cross-tenant normal | misma lectura | `200 []`, o únicamente self-read si existiera fila propia; nunca roles plataforma ajenos. | `401` = `SETUP_FAIL` |
+| P5 | Residente | `POST /rest/v1/platform_memberships` con payload saneado `platform_ops` | `403` o rechazo 4xx; sin inserción. | `401` = `SETUP_FAIL` |
+| P6 | Residente | `PATCH /rest/v1/platform_memberships?id=eq.<uuid-saneado>` cambiando `role_name` o `status` | `403` o sin filas afectadas; sin self-update ni escalación. | `401` = `SETUP_FAIL` |
+| P7 | Residente | `DELETE /rest/v1/platform_memberships?id=eq.<uuid-saneado>` | `403` o sin filas afectadas. | `401` = `SETUP_FAIL` |
+| P8 | Superadmin controlado | lectura administrativa | Puede leer memberships plataforma según diseño. | Sin token seguro = `NO APLICABLE / PENDIENTE POR SETUP` |
+
+### Criterios de cierre FASE 3D.20
+
+- **PASS:** P1–P4 retornan `[]` o solo self-read; P5–P7 rechazan escritura/eliminación; P8 pasa o queda `NO APLICABLE` por falta de sesión superadmin segura.
+- **FAIL P0:** cualquier usuario tenant normal ve roles plataforma ajenos, inserta `superadmin`/`platform_ops`, actualiza `role_name`/`status`/metadata sensible o elimina filas.
+- **SETUP_FAIL:** cualquier prueba autenticada responde `401` por JWT expirado/inválido o token equivocado.
+- **NO APLICABLE:** P8 no se ejecuta por ausencia de sesión superadmin DEV controlada.
+
+### Estado documental
+
+No se modifica RLS, migraciones ni frontend en esta fase porque no hay evidencia REST adjunta de un FAIL P0. El entregable implementado es el runner de validación y la matriz documental para capturar evidencia saneada P1–P8 en DEV sin tocar QA/PRD ni crear credenciales superadmin reales.
+
 ## Conclusión de fase
 
 FASE 3D.19 crea una migración de hardening para `tenant_memberships_select` porque la evidencia REST confirmó lectura same-tenant de memberships ajenos por residente (**FAIL P1**). Se mantiene pendiente ejecutar la matriz post-fix T1–T7 en DEV con tokens reales saneando la evidencia.
