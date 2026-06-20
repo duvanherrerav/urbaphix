@@ -2,7 +2,7 @@
 
 ## Alcance y fuentes revisadas
 
-Auditoría documental + plan REST para `usuarios_app`, `tenant_memberships` y `platform_memberships` en DEV. No se modifican migraciones ni policies porque esta fase exige evidencia antes de hardening.
+Auditoría documental + plan REST para `usuarios_app`, `tenant_memberships` y `platform_memberships` en DEV. FASE 3D.19 agrega hardening específico para `tenant_memberships_select` después de confirmarse exposición lateral same-tenant para residentes.
 
 Fuentes validadas en orden requerido:
 
@@ -56,7 +56,7 @@ order by tablename, policyname;
 | `usuarios_app` | `lectura usuarios` | SELECT | `true` | **Potencial FAIL P0/P1 si REST confirma lectura cross-tenant o exposición excesiva**. |
 | `usuarios_app` | `usuario puede verse` | SELECT | `id = auth.uid()` | Correcta para self-read, pero queda subsumida por `lectura usuarios`. |
 | `usuarios_app` | `usuarios actualizar su info` | UPDATE | `id = auth.uid()` | Requiere validar si permite alterar campos sensibles propios (`rol_id`, `conjunto_id`, `activo`, `fcm_token`) desde cliente. |
-| `tenant_memberships` | `tenant_memberships_select` | SELECT | `fn_is_platform_superadmin()` o `fn_has_tenant_access(conjunto_id)` | Evita cross-tenant; permite same-tenant a cualquier miembro activo, lo cual puede exponer roles/relaciones internas si REST confirma filas de terceros. |
+| `tenant_memberships` | `tenant_memberships_select` | SELECT | FASE 3D.19: `superadmin`/`platform_ops`; `admin_conjunto`/`contador` por mismo `conjunto_id`; `residente` solo self-read activo; `vigilancia`/`vigilante` solo self-read activo. | Corrige exposición lateral same-tenant de memberships para residentes y minimiza lectura de roles internos por vigilancia. |
 | `tenant_memberships` | `tenant_memberships_insert` | INSERT | `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')` | No permite self-escalation a usuario tenant normal si helpers están correctos. |
 | `tenant_memberships` | `tenant_memberships_update` | UPDATE | `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')` en `USING` y `WITH CHECK` | No permite cambiar `role_name`/`status` a usuario tenant normal si helpers están correctos. |
 | `tenant_memberships` | `tenant_memberships_delete_denied` | DELETE | `false` | Deniega deletes cliente. |
@@ -74,14 +74,14 @@ order by tablename, policyname;
 | R0 | Anónimo / no-JWT | `/rest/v1/usuarios_app?select=id,conjunto_id,rol_id,email,telefono,activo,fcm_token` | Headers: solo `apikey: <anon key>`, sin `Authorization` Bearer | `401`, `403` o `200 []`; **FAIL P0** si devuelve cualquier fila con `email`, `telefono`, `rol_id`, `conjunto_id` o `fcm_token` | Pendiente de ejecución con anon key DEV, sin JWT | PENDIENTE |
 | R1 | Residente DEV | `/rest/v1/usuarios_app?select=id,conjunto_id,rol_id,email,telefono,activo,fcm_token&conjunto_id=eq.11111111-3d10-4000-8000-000000000010` | Filtro a conjunto ajeno | `200 []` o `403` | Pendiente de ejecución con token DEV | PENDIENTE |
 | R2 | Residente/Admin/Vigilancia DEV | `/rest/v1/usuarios_app?select=id,conjunto_id,rol_id,email,telefono,activo,fcm_token&conjunto_id=eq.<conjunto_propio>` | Filtro mismo conjunto | Solo campos funcionalmente justificados por rol | Pendiente de ejecución con token DEV | PENDIENTE |
-| R3 | Residente DEV | `/rest/v1/tenant_memberships?select=id,user_id,conjunto_id,role_name,residente_id,status&conjunto_id=eq.<conjunto_ajeno>` | Filtro a conjunto ajeno | `200 []` o `403` | Pendiente de ejecución con token DEV | PENDIENTE |
-| R4 | Residente DEV | `/rest/v1/tenant_memberships?select=id,user_id,conjunto_id,role_name,residente_id,status&conjunto_id=eq.<conjunto_propio>` | Filtro mismo conjunto | Definir si puede ver memberships de terceros; si sí, posible P1 | Pendiente de ejecución con token DEV | PENDIENTE |
+| R3 | Residente DEV | `/rest/v1/tenant_memberships?select=id,user_id,conjunto_id,role_name,residente_id,status&conjunto_id=eq.<conjunto_ajeno>` | Filtro a conjunto ajeno | `200 []` o `403` | FASE 3D.19 esperado post-fix: `[]` o `403`; pendiente ejecución REST DEV con token real | PENDIENTE_POST_FIX |
+| R4 | Residente DEV | `/rest/v1/tenant_memberships?select=id,user_id,conjunto_id,role_name,residente_id,status&conjunto_id=eq.<conjunto_propio>` | Filtro mismo conjunto | Solo self-read activo (`user_id = auth.uid()`, `role_name = residente`, `status = active`) | Evidencia recibida: antes del fix devolvió 4 filas same-tenant incluyendo admin/vigilancia/otro residente (**FAIL P1**). FASE 3D.19 esperado post-fix: 1 fila propia | FAIL_P1_CORREGIDO_PENDIENTE_DEV |
 | R5a | Residente DEV | `POST /rest/v1/tenant_memberships` | Crear membership propia `admin_conjunto`/`contador`/`vigilante` | `403` o `401 SETUP_FAIL`; nunca inserta | Pendiente de ejecución con token DEV | PENDIENTE |
 | R5b | Residente DEV | `PATCH /rest/v1/tenant_memberships?id=eq.<membership_propia>` | Cambiar `role_name` o `status` | `403`/sin filas afectadas; nunca escala | Pendiente de ejecución con token DEV | PENDIENTE |
 | R5c | Residente DEV | `DELETE /rest/v1/tenant_memberships?id=eq.<membership_ajena>` | Revocar/eliminar ajena | `403`/sin filas afectadas | Pendiente de ejecución con token DEV | PENDIENTE |
 | R6 | Tenant normal DEV | `/rest/v1/platform_memberships?select=id,user_id,role_name,status` | Lectura global plataforma | `200 []` si no tiene fila propia, o solo self-read; nunca roles ajenos | Pendiente de ejecución con token DEV | PENDIENTE |
 | R7 | Admin conjunto DEV | `usuarios_app` y `tenant_memberships` filtrando `<conjunto_ajeno>` | Lectura cross-tenant admin | `200 []` o `403` | Pendiente de ejecución con token DEV | PENDIENTE |
-| R8 | Vigilancia DEV | `usuarios_app` y `tenant_memberships` mismo conjunto y ajeno | Visibilidad mínima operativa | Sin cross-tenant y sin memberships/roles internos amplios salvo justificación | Pendiente de ejecución con token DEV | PENDIENTE |
+| R8 | Vigilancia DEV | `usuarios_app` y `tenant_memberships` mismo conjunto y ajeno | Visibilidad mínima operativa | Sin cross-tenant y sin memberships/roles internos amplios salvo justificación | FASE 3D.19 decisión: vigilancia/vigilante no requiere inventario de memberships; esperado `tenant_memberships` self-read activo o `[]` según exista membership | PENDIENTE_POST_FIX |
 
 ## Plantilla de evidencia REST saneada
 
@@ -118,9 +118,41 @@ order by tablename, policyname;
 - **Riesgo documental:** bajo/medio. SELECT permite self-read o superadmin, y writes solo superadmin. Para usuario tenant normal sin membership plataforma debería devolver `[]`.
 - **Dictamen sin REST:** no hay evidencia P0; requiere ejecutar R6 y, si existe sesión controlada, superadmin para comprobar lectura administrativa esperada.
 
+
+## FASE 3D.19 — Hardening aplicado a `tenant_memberships_select`
+
+### Decisión de acceso
+
+- `platform_superadmin`: conserva lectura global por operación y auditoría plataforma.
+- `platform_ops`: conserva lectura operativa requerida para soporte plataforma, sin ampliar INSERT/UPDATE/DELETE.
+- `admin_conjunto`: conserva lectura de memberships de su `conjunto_id` para administración del tenant.
+- `contador`: conserva lectura de memberships del `conjunto_id` porque varias políticas 3D.12–3D.16 lo tratan como rol operativo/administrativo de lectura por conjunto.
+- `residente`: queda restringido a su propia fila activa, con `user_id = auth.uid()`, `role_name = 'residente'` y `status = 'active'`.
+- `vigilancia`/`vigilante`: no tiene necesidad funcional de inventariar roles internos; queda limitado a self-read activo.
+
+### Checklist REST T1–T7 post-fix
+
+> No se adjuntan JWT, cookies, anon keys ni service keys. Ejecutar solo en DEV. No tocar QA/PRD.
+
+| ID | Token | Endpoint / acción | Esperado post-fix | Estado documental |
+|---|---|---|---|---|
+| T1 | `$TOKEN_RESIDENTE` | `GET /rest/v1/tenant_memberships?select=id,user_id,conjunto_id,role_name,residente_id,status` | `HTTP 200`, 1 fila propia; `user_id = auth.uid()`, `role_name = residente`, `status = active`, `conjunto_id = a80af441-80f9-4a6c-8d3b-b8408c97dbe2` | Pendiente ejecución DEV |
+| T2 | `$TOKEN_RESIDENTE` | Misma lectura sin filtro | No devuelve `admin_conjunto`, `vigilante`/`vigilancia`, otro `user_id` ni otro `residente_id` | Pendiente ejecución DEV |
+| T3 | `$TOKEN_RESIDENTE` | `GET ...&conjunto_id=eq.11111111-3d10-4000-8000-000000000010` | `[]` o `403`; nunca filas cross-tenant | Pendiente ejecución DEV |
+| T4 | `$TOKEN_ADMIN` | `GET ...&conjunto_id=eq.a80af441-80f9-4a6c-8d3b-b8408c97dbe2` | Admin conserva lectura de memberships de su conjunto | Pendiente ejecución DEV |
+| T5 | `$TOKEN_ADMIN` | `GET ...&conjunto_id=eq.11111111-3d10-4000-8000-000000000010` | `[]` o `403`; nunca filas cross-tenant | Pendiente ejecución DEV |
+| T6 | Token vigilancia | `GET /rest/v1/tenant_memberships?select=id,user_id,conjunto_id,role_name,residente_id,status` | Solo self-read activo o `[]`; no inventario de roles internos | Pendiente ejecución DEV |
+| T7 | `$TOKEN_RESIDENTE` | `POST`, `PATCH role_name/status`, `DELETE` sobre `tenant_memberships` | `403` o sin filas afectadas; sin INSERT/UPDATE/DELETE y sin self-escalation | Pendiente ejecución DEV |
+
+### Confirmaciones
+
+- No se toca QA ni PRD; el cambio es una migración versionada para aplicar por el flujo normal en DEV.
+- No se modifica `usuarios_app`, `platform_memberships` ni frontend funcional.
+- INSERT/UPDATE siguen restringidos a `superadmin`/`platform_ops` y DELETE sigue denegado, por lo que la corrección no abre self-escalation a residentes.
+
 ## Conclusión de fase
 
-No se crea migración de hardening en esta PR porque todavía no existe evidencia REST adjunta. La ruta segura es ejecutar la matriz anterior en DEV y abrir un PR específico si se confirma cualquiera de estos hallazgos:
+FASE 3D.19 crea una migración de hardening para `tenant_memberships_select` porque la evidencia REST confirmó lectura same-tenant de memberships ajenos por residente (**FAIL P1**). Se mantiene pendiente ejecutar la matriz post-fix T1–T7 en DEV con tokens reales saneando la evidencia.
 
 1. `usuarios_app` devuelve cualquier fila a una request anónima/no-JWT con anon key que exponga `email`, `telefono`, `rol_id`, `conjunto_id` o `fcm_token`: **FAIL P0**.
 2. `usuarios_app` devuelve filas de otro `conjunto_id` a residente/admin/vigilancia tenant normal: **FAIL P0**.

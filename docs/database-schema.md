@@ -1146,6 +1146,6 @@ Puede ampliarse más adelante con:
 - índice parcial: `residente_id where residente_id is not null`
 
 ### RLS
-- SELECT: `superadmin` o usuarios con acceso activo al mismo conjunto (`fn_has_tenant_access`).
+- SELECT: `superadmin` y `platform_ops` pueden leer memberships requeridos para operación plataforma; `admin_conjunto` y `contador` con membresía activa leen memberships de su mismo `conjunto_id`; `residente` solo lee su propia fila activa (`user_id = auth.uid()`, `role_name = 'residente'`, `status = 'active'`); `vigilancia`/`vigilante` no tiene necesidad funcional de inventariar roles internos y queda limitado a self-read activo.
 - INSERT/UPDATE: `superadmin` o rol plataforma autorizado (`platform_ops`).
 - DELETE: denegado por política.
