@@ -179,6 +179,10 @@ export TOKEN_RESIDENTE='<jwt-dev>'
 export TOKEN_VIGILANCIA='<jwt-dev>'
 export TOKEN_ADMIN='<jwt-dev>'
 export TOKEN_CROSS='<jwt-dev>'
+# Opcional para validar que P5 usa el auth.uid() real del token residente:
+export RESIDENTE_USER_ID='<uuid-auth-residente-dev>'
+# Requerido solo si se ejecutan P6/P7 contra una fila real controlada:
+export PLATFORM_MEMBERSHIP_TARGET_ID='<uuid-platform-membership-controlado>'
 # Opcional y solo si existe sesión DEV segura:
 export TOKEN_SUPERADMIN='<jwt-dev-superadmin-controlado>'
 
@@ -193,21 +197,21 @@ node scripts/fase_3d20_platform_memberships_rest_audit.mjs
 | P2 | Vigilancia normal | misma lectura | `200 []`, o únicamente self-read si existiera fila propia; nunca roles plataforma ajenos. | `401` = `SETUP_FAIL` |
 | P3 | Admin conjunto normal | misma lectura | `200 []`, o únicamente self-read si existiera fila propia; no hereda lectura global plataforma. | `401` = `SETUP_FAIL` |
 | P4 | Usuario cross-tenant normal | misma lectura | `200 []`, o únicamente self-read si existiera fila propia; nunca roles plataforma ajenos. | `401` = `SETUP_FAIL` |
-| P5 | Residente | `POST /rest/v1/platform_memberships` con payload saneado `platform_ops` | `403` o rechazo 4xx; sin inserción. | `401` = `SETUP_FAIL` |
-| P6 | Residente | `PATCH /rest/v1/platform_memberships?id=eq.<uuid-saneado>` cambiando `role_name` o `status` | `403` o sin filas afectadas; sin self-update ni escalación. | `401` = `SETUP_FAIL` |
-| P7 | Residente | `DELETE /rest/v1/platform_memberships?id=eq.<uuid-saneado>` | `403` o sin filas afectadas. | `401` = `SETUP_FAIL` |
+| P5 | Residente | `POST /rest/v1/platform_memberships` con `user_id = auth.uid()` real del token residente, resuelto vía `/auth/v1/user` y opcionalmente validado contra `RESIDENTE_USER_ID` | `403` o rechazo 4xx por RLS; sin inserción. Si no se confirma el usuario real, `SETUP_FAIL`. | `401` = `SETUP_FAIL` |
+| P6 | Residente | `PATCH /rest/v1/platform_memberships?id=eq.<uuid-controlado>` sobre una fila real controlada indicada en `PLATFORM_MEMBERSHIP_TARGET_ID` | `403` o sin filas afectadas sobre target real; sin self-update ni escalación. Sin target real controlado, `NO_APLICABLE / PENDIENTE_POR_SETUP`, no PASS. | `401` = `SETUP_FAIL` |
+| P7 | Residente | `DELETE /rest/v1/platform_memberships?id=eq.<uuid-controlado>` sobre una fila real controlada indicada en `PLATFORM_MEMBERSHIP_TARGET_ID` | `403` o sin filas afectadas sobre target real. Sin target real controlado, `NO_APLICABLE / PENDIENTE_POR_SETUP`, no PASS. | `401` = `SETUP_FAIL` |
 | P8 | Superadmin controlado | lectura administrativa | Puede leer memberships plataforma según diseño. | Sin token seguro = `NO APLICABLE / PENDIENTE POR SETUP` |
 
 ### Criterios de cierre FASE 3D.20
 
-- **PASS:** P1–P4 retornan `[]` o solo self-read; P5–P7 rechazan escritura/eliminación; P8 pasa o queda `NO APLICABLE` por falta de sesión superadmin segura.
+- **PASS:** P1–P4 retornan `[]` o solo self-read; P5 rechaza el INSERT usando el `auth.uid()` real confirmado del token residente; P6–P7 rechazan escritura/eliminación únicamente cuando apuntan a una fila real controlada; P8 pasa o queda `NO APLICABLE` por falta de sesión superadmin segura.
 - **FAIL P0:** cualquier usuario tenant normal ve roles plataforma ajenos, inserta `superadmin`/`platform_ops`, actualiza `role_name`/`status`/metadata sensible o elimina filas.
 - **SETUP_FAIL:** cualquier prueba autenticada responde `401` por JWT expirado/inválido o token equivocado.
-- **NO APLICABLE:** P8 no se ejecuta por ausencia de sesión superadmin DEV controlada.
+- **NO APLICABLE:** P8 no se ejecuta por ausencia de sesión superadmin DEV controlada; P6/P7 no se ejecutan si no existe `PLATFORM_MEMBERSHIP_TARGET_ID` real y seguro para prueba.
 
 ### Estado documental
 
-No se modifica RLS, migraciones ni frontend en esta fase porque no hay evidencia REST adjunta de un FAIL P0. El entregable implementado es el runner de validación y la matriz documental para capturar evidencia saneada P1–P8 en DEV sin tocar QA/PRD ni crear credenciales superadmin reales.
+No se modifica RLS, migraciones ni frontend en esta fase porque no hay evidencia REST adjunta de un FAIL P0. El entregable implementado es el runner de validación y la matriz documental para capturar evidencia saneada P1–P8 en DEV sin tocar QA/PRD ni crear credenciales superadmin reales. Para evitar falsos PASS, P5 no usa UUID fijo: resuelve el usuario real del JWT residente antes del INSERT. P6/P7 no usan UUID all-zero: solo corren contra `PLATFORM_MEMBERSHIP_TARGET_ID` real/controlado o quedan `NO_APLICABLE / PENDIENTE_POR_SETUP`.
 
 ## Conclusión de fase
 
