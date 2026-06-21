@@ -223,3 +223,43 @@ FASE 3D.19 crea una migración de hardening para `tenant_memberships_select` por
 4. Usuario tenant normal puede insertar/actualizar/eliminar memberships o asignarse roles: **FAIL P0**.
 5. `platform_memberships` expone roles plataforma ajenos a tenant normal: **FAIL P0**.
 6. Lectura same-tenant expone roles/metadata sensible sin necesidad funcional clara: **FAIL P1**.
+
+## Anexo FASE 3D.22 — Hardening SELECT `config_pagos`
+
+### Alcance
+
+- Tabla afectada: `public.config_pagos`.
+- Cambio estructural: reemplazo de policy SELECT legacy pública por policy SELECT autenticada y scoped por tenant.
+- Entorno objetivo de aplicación: DEV. No tocar QA ni PRD durante esta fase.
+
+### Decisión RLS
+
+La policy legacy `lectura config pagos` (`SELECT`, roles `public`, `USING true`) debe eliminarse porque permite lectura anónima/no-JWT de configuración operativa de pagos.
+
+La nueva policy `config_pagos_select_conjunto` permite lectura únicamente a:
+
+- `platform_superadmin` vía `fn_is_platform_superadmin()`.
+- `platform_ops` vía `fn_has_platform_role('platform_ops')`.
+- membresías activas del mismo `conjunto_id` con rol `admin_conjunto`.
+- membresías activas del mismo `conjunto_id` con rol `contador`.
+- membresías activas del mismo `conjunto_id` con rol `residente`.
+
+No se incluye `vigilante`/`vigilancia` porque no hay evidencia funcional directa en este issue de que el flujo de vigilancia necesite consultar URL o instrucciones de pago.
+
+### Checklist REST post-fix C1–C6
+
+| Caso | Consulta | Token | Resultado esperado |
+| --- | --- | --- | --- |
+| C1 | `/rest/v1/config_pagos?select=id,conjunto_id,tipo,url_pago,instrucciones,activo` | apikey anon sin `Authorization Bearer` | `403` o `[]`; nunca filas. |
+| C2 | mismo endpoint filtrando `conjunto_id=a80af441-80f9-4a6c-8d3b-b8408c97dbe2` | `$TOKEN_RESIDENTE` same-tenant | `200 OK`; solo filas del conjunto propio, si existen. |
+| C3 | mismo endpoint filtrando `conjunto_id=11111111-3d10-4000-8000-000000000010` | `$TOKEN_RESIDENTE` cross-tenant | `[]` o `403`; nunca filas ajenas. |
+| C4 | mismo endpoint filtrando conjunto propio de admin | `$TOKEN_ADMIN` same-tenant | `200 OK`; solo filas del conjunto propio, si existen. |
+| C5 | mismo endpoint filtrando conjunto ajeno | `$TOKEN_ADMIN` cross-tenant | `[]` o `403`; nunca filas ajenas. |
+| C6 | `pg_policies` para `public.config_pagos` | SQL DEV autorizado | No existe `lectura config pagos`; existe `config_pagos_select_conjunto` para `authenticated` sin `USING true`. |
+
+### Confirmación operacional
+
+- No se modifica frontend.
+- No se modifican otras tablas.
+- No se propone SQL destructivo de datos; solo se reemplaza una policy RLS.
+- No se deben exponer JWT, anon key, service role key, cookies ni secretos al registrar evidencia.
