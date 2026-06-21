@@ -171,9 +171,11 @@ Tablas detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- `lectura config pagos`
+- `config_pagos_select_conjunto`
   - comando: `SELECT`
-  - condición: `true`
+  - roles: `authenticated`
+  - condición: `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')` o membresía activa del mismo `conjunto_id` con rol `admin_conjunto`, `contador` o `residente`; conserva fallback legacy same-tenant autenticado con `conjunto_id = fn_auth_conjunto_id()` para usuarios aún no completamente backfilled en `tenant_memberships`.
+  - deniega lectura anónima/no-JWT y lectura cross-tenant; no reabre `roles {public} USING true`.
 
 ---
 
