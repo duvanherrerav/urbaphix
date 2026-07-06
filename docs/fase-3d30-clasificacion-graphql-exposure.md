@@ -70,7 +70,7 @@ Aun así, el warning sí es útil para priorizar hardening porque GraphQL amplí
 | `incidentes` | Sensible / seguridad | Novedades de seguridad y reportes. | Hardening real. | Mantener. | Validar lectura por admin/vigilancia same-tenant y ausencia cross-tenant. |
 | `multas` | Sensible financiera/disciplinaria | Valores/sanciones asociadas a residentes/conjunto. | Hardening real. | Mantener. | Revisar ownership residente y lectura administrativa por `tenant_memberships`. |
 | `notificaciones` | Sensible personal | Mensajes por `usuario_id`. | Hardening real. | Mantener. | Confirmar policies duplicadas y que GraphQL no permita enumeración de terceros. |
-| `operational_events` | Auditoría/operacional | Eventos internos de operación/auditoría. | Hardening real. | Mantener. | Exponer solo a roles platform/admin autorizados o vía backend/RPC. |
+| `operational_events` | Cerrada FASE 3D.28 / auditoría operacional | Eventos internos de operación/auditoría. | No debe permanecer como prioridad GraphQL mientras conserve deny policies y sin grants cliente. | No reabrir salvo nueva evidencia. | Ver sección de cierre FASE 3D.28. |
 | `pagos` | Sensible financiera | Cobros, comprobantes, estados y residente. | Hardening real; FASE 3D.12 redujo lectura residente. | Mantener. | No revocar en bloque; validar flujos admin/contador/residente antes de cambios de grants. |
 | `pagos_eventos` | Sensible financiera/auditoría | Historial de eventos de pagos. | Hardening real. | Mantener. | Mantener lectura por admin/residente propia; considerar no exponer GraphQL directamente. |
 | `paquetes` | Sensible operativa | Entregas, destinatarios y portería. | Hardening real; FASE 3D.14 acota residente. | Mantener. | Validar vigilancia same-tenant y residente propio. |
@@ -87,15 +87,29 @@ Aun así, el warning sí es útil para priorizar hardening porque GraphQL amplí
 | `roles` | Catálogo / legacy | Enumeración de roles legacy. | Ruido esperado para authenticated; hardening bajo si sin PII. | Mantener. | Conservar lectura autenticada; evitar escritura cliente. |
 | `tipos_documento` | Catálogo | Catálogo de tipos de documento. | Ruido aceptable si datos no sensibles. | Mantener. | Puede quedar como catálogo controlado; revisar si anon es necesario. |
 | `torres` | Tenant scoped / catálogo estructural | Estructura física por conjunto. | Ruido esperado authenticated; hardening real para anon. | Mantener. | Similar a apartamentos; validar mismo `conjunto_id`. |
-| `trasteos` | Sensible operativa / legacy | Mudanzas, fechas y residentes. | Hardening real si RLS no documentada. | Mantener. | Completar RLS/inventario antes de exposición GraphQL. |
+| `trasteos` | Cerrada FASE 3D.28 / legacy | Mudanzas, fechas y residentes. | No debe permanecer como prioridad GraphQL mientras conserve deny policies y sin grants cliente. | No reabrir salvo nueva evidencia. | Ver sección de cierre FASE 3D.28. |
 | `usuarios_app` | Legacy sensible | Perfil legacy, rol, conjunto, email/datos de usuario. | Hardening real P0/P1; policy `SELECT true` es deuda conocida. | No tocar en esta fase para no romper bootstrap. | Diseñar reemplazo seguro para bootstrap con membership resolver y limitar exposición directa. |
-| `vehiculos` | Sensible PII/activos | Placas y asociación a residentes. | Hardening real si existe en snapshot y no en inventario principal actual. | Mantener. | Confirmar estado actual de tabla y RLS; tratar como sensible. |
+| `vehiculos` | Cerrada FASE 3D.28 / legacy sensible | Placas y asociación a residentes. | No debe permanecer como prioridad GraphQL mientras conserve deny policies y sin grants cliente. | No reabrir salvo nueva evidencia. | Ver sección de cierre FASE 3D.28. |
 | `visitantes` | Sensible / visitas | Datos personales de visitantes. | Hardening real; FASE 3D.16 acota lecturas. | Mantener. | Validar ausencia anon y owner/residente/admin/vigilancia same-tenant. |
 | `zonas_comunes` | Catálogo tenant | Catálogo de zonas comunes. | Ruido esperado authenticated; hardening real para anon/escrituras. | Mantener. | Revisar si tabla sigue activa frente a `recursos_comunes`. |
 | `platform_memberships` | Plataforma sensible | Roles platform, superadmin y operadores. | Hardening real crítico. | Mantener. | Nunca tratar como catálogo público; revisar exposición GraphQL en fase platform. |
 | `tenant_memberships` | Plataforma/tenant sensible | Membresías, roles tenant y estado. | Hardening real crítico. | Mantener. | Mantener RLS estricta; validar que usuarios solo lean sus memberships o roles autorizados. |
 
-## 7. Separación de ruido esperado vs hardening real
+
+## 7. Cerradas en FASE 3D.28 / no reabrir salvo nueva evidencia
+
+Las tablas `operational_events`, `vehiculos` y `trasteos` ya fueron tratadas por FASE 3D.28 mediante la migración `supabase/migrations/20260706130000_deny_legacy_rls_no_policy_tables.sql` y están documentadas en `docs/database-schema.md` como tablas cerradas para roles cliente.
+
+Mientras conserven simultáneamente estas condiciones, **no deben aparecer como prioridad activa de hardening GraphQL**:
+
+- RLS habilitado y forzado.
+- `REVOKE ALL` aplicado para `anon` y `authenticated`.
+- Policy restrictiva `FOR ALL TO anon, authenticated` con `USING (false)` y `WITH CHECK (false)`.
+- Sin flujo frontend activo que requiera reabrir lectura/escritura cliente.
+
+Estas tablas solo deben reabrirse si aparece evidencia nueva, por ejemplo: un warning Advisor real posterior a FASE 3D.28 que demuestre grants cliente restaurados, una regresión de policies, o un requerimiento funcional formal que exija rediseñar el acceso con RLS y pruebas por rol. Hasta entonces, las fases futuras deben concentrarse en tablas que aún conservan grants heredados reales y superficie cliente activa.
+
+## 8. Separación de ruido esperado vs hardening real
 
 ### Ruido esperado controlado
 
@@ -118,9 +132,9 @@ Debe tratarse como hardening real cuando la tabla cumple una o más condiciones:
 - Podría permitir enumeración de tenants, usuarios, roles o residentes.
 - Su consumo frontend puede reemplazarse por policies más finas sin romper módulos.
 
-Tablas prioritarias para fases posteriores: `usuarios_app`, `archivos`, `residentes`, `visitantes`, `registro_visitas`, `pagos`, `pagos_eventos`, `config_pagos`, `paquetes`, `notificaciones`, `platform_memberships`, `tenant_memberships`, `operational_events`, `accesos`, `incidentes`, `multas`, `pqr`, `reservas_documentos`, `reservas_eventos`, `vehiculos` y `trasteos`.
+Tablas prioritarias para fases posteriores: `usuarios_app`, `archivos`, `residentes`, `visitantes`, `registro_visitas`, `pagos`, `pagos_eventos`, `config_pagos`, `paquetes`, `notificaciones`, `platform_memberships`, `tenant_memberships`, `accesos`, `incidentes`, `multas`, `pqr`, `reservas_documentos` y `reservas_eventos`. `operational_events`, `vehiculos` y `trasteos` quedan fuera del backlog activo mientras mantengan el cierre de FASE 3D.28.
 
-## 8. Reglas de decisión para fases posteriores
+## 9. Reglas de decisión para fases posteriores
 
 1. No revocar grants globales a `anon`/`authenticated` por lote.
 2. Para cada tabla sensible, validar primero:
@@ -134,8 +148,9 @@ Tablas prioritarias para fases posteriores: `usuarios_app`, `archivos`, `residen
 6. No tocar `tenant_memberships`/`platform_memberships` sin pruebas específicas de superadmin y roles platform.
 7. Mantener filtros frontend por `conjunto_id`, `residente_id` y `auth.uid()`, pero considerar RLS como frontera real.
 8. Documentar cualquier cambio futuro en `docs/database-schema.md` y crear migración SQL separada.
+9. Mantener el foco de fases futuras en tablas con grants heredados reales o superficie cliente activa; no reprocesar tablas cerradas en FASE 3D.28 sin evidencia nueva.
 
-## 9. Query read-only sugerida para capturar warnings reales
+## 10. Query read-only sugerida para capturar warnings reales
 
 Cuando se ejecute en Supabase DEV/QA, adjuntar evidencia real por tabla antes de abrir fase de hardening:
 
@@ -170,7 +185,7 @@ order by tablename, policyname;
 
 Estas consultas son de solo lectura y no sustituyen pruebas efectivas con JWT real para `anon`, `authenticated`, residente, vigilancia, admin de conjunto, contador y superadmin.
 
-## 10. Recomendación de cierre
+## 11. Recomendación de cierre
 
 FASE 3D.30 debe cerrarse como **documentación de clasificación**. La recomendación es abrir fases posteriores separadas:
 
