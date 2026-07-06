@@ -16,6 +16,19 @@ Este documento sirve como fuente de verdad funcional para:
 - Respetar RLS en toda consulta, inserción o actualización.
 - Cuando se agregue una tabla o campo nuevo, actualizar este documento.
 
+
+---
+
+# Extensiones Postgres
+
+Extensiones requeridas por el esquema:
+
+- `btree_gist`
+  - schema esperado: `extensions`
+  - motivo: requerido por la constraint de exclusión `reservas_zonas_no_solape` en `public.reservas_zonas`, que usa GiST para impedir solapes de reservas activas por `recurso_id` y rango horario.
+  - antecedente: el snapshot inicial la creó en `public`; FASE 3D.29 la reubica a `extensions` sin recrear la constraint ni cambiar RLS, tablas, columnas o FKs.
+  - rollback documentado si fuese estrictamente necesario: `ALTER EXTENSION btree_gist SET SCHEMA public;`. No usar `DROP EXTENSION btree_gist` mientras exista `reservas_zonas_no_solape`.
+
 ---
 
 # Inventario completo de tablas
@@ -668,6 +681,9 @@ Tablas detectadas en `public`:
 - `estado` (text, NOT NULL, default: `'solicitada'::text`)
 - `created_at` (timestamp with time zone, NOT NULL, default: `now()`)
 - `updated_at` (timestamp with time zone, NOT NULL, default: `now()`)
+
+### Restricciones e índices relevantes
+- `reservas_zonas_no_solape`: exclusion constraint GiST sobre `recurso_id` y `tsrange(fecha_inicio, fecha_fin, '[)')` para estados activos (`solicitada`, `aprobada`, `en_curso`). Depende de la extensión `btree_gist`, alojada en `extensions` desde FASE 3D.29 para no mantener objetos de extensión en `public`.
 
 ### Relaciones
 - `conjunto_id` → `conjuntos.id`
