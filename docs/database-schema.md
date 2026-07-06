@@ -50,7 +50,6 @@ Tablas detectadas en `public`:
 - torres
 - trasteos
 - usuarios_app
-- vehiculos
 - visitantes
 - zonas_comunes
 - platform_memberships
@@ -830,7 +829,11 @@ Tablas detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- No visible en los TXT cargados
+- RLS habilitado (`ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`).
+- `anon`: sin permisos de lectura/escritura.
+- `authenticated`: sin permisos de lectura/escritura.
+- Policy cerrada `trasteos_deny_client_access` (`FOR ALL TO anon, authenticated`) con `USING (false)` y `WITH CHECK (false)`.
+- Objetivo FASE 3D.28: mantener la tabla legacy cerrada y reducir el warning de Supabase Advisor por RLS activo sin policies, sin habilitar flujos funcionales.
 
 ---
 
@@ -872,7 +875,11 @@ Tablas detectadas en `public`:
 - `residente_id` → `residentes.id`
 
 ### RLS
-- No visible en los TXT cargados
+- RLS habilitado (`ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`).
+- `anon`: sin permisos de lectura/escritura.
+- `authenticated`: sin permisos de lectura/escritura.
+- Policy cerrada `vehiculos_deny_client_access` (`FOR ALL TO anon, authenticated`) con `USING (false)` y `WITH CHECK (false)`.
+- Objetivo FASE 3D.28: mantener la tabla legacy cerrada y reducir el warning de Supabase Advisor por RLS activo sin policies, sin habilitar flujos funcionales.
 
 ### Nota
 - Los TXT cargados no mostraron más columnas de `vehiculos`
@@ -1026,8 +1033,10 @@ Patrones de control vistos en las políticas:
 - reservas_eventos
 - reservas_zonas
 - residentes
+- trasteos
 - tipos_documento
 - usuarios_app
+- vehiculos
 - visitantes
 
 ---
@@ -1086,7 +1095,9 @@ Puede ampliarse más adelante con:
 - RLS habilitado (`ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`).
 - `anon`: sin permisos de lectura/escritura.
 - `authenticated`: sin permisos de lectura/escritura.
-- Sin policies públicas en esta fase; inserción prevista únicamente vía Edge Function con `service_role`.
+- Policy cerrada `operational_events_deny_client_access` (`FOR ALL TO anon, authenticated`) con `USING (false)` y `WITH CHECK (false)`.
+- Inserción prevista únicamente vía Edge Function con `service_role`; no se habilita acceso directo desde clientes.
+- Objetivo FASE 3D.28: reducir el warning de Supabase Advisor por RLS activo sin policies manteniendo la tabla cerrada para roles cliente.
 
 ### Índices
 - `operational_events_created_at_desc_idx` (`created_at desc`)
