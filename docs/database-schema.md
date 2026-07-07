@@ -142,6 +142,10 @@ Tablas detectadas en `public`:
   - comando: `SELECT`
   - condición: `true`
 
+### Grants
+- FASE 3D.32 revoca `ALL PRIVILEGES` de `anon` sobre `public.archivos` para reducir exposición GraphQL/PostgREST heredada.
+- `authenticated` y `service_role` no se modifican en esta fase.
+
 ---
 
 ## 4. comunicados
@@ -878,6 +882,10 @@ Tablas detectadas en `public`:
 - `usuarios actualizar su info`
   - comando: `UPDATE`
   - condición: `id = auth.uid()`
+
+### Grants
+- FASE 3D.32 revoca `ALL PRIVILEGES` de `anon` sobre `public.usuarios_app` para reducir exposición GraphQL/PostgREST heredada.
+- `authenticated` y `service_role` no se modifican en esta fase porque login/bootstrap/membershipResolver consultan esta tabla con sesión autenticada.
 
 ---
 
