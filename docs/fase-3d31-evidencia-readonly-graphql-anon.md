@@ -9,7 +9,7 @@ El objetivo de esta fase es documentar el estado observado sin ejecutar hardenin
 1. **Exposición de metadata/introspection**: GraphQL puede listar o introspectar tablas del esquema `public` porque existen grants heredados para `anon`.
 2. **Fuga real de filas**: el rol `anon` puede leer datos concretos de una tabla.
 
-La evidencia DEV tomada indica que, para las tablas revisadas, el warning corresponde principalmente a **metadata/introspection exposure** y no a una fuga de filas observada, porque todas las consultas read-only con rol `anon` devolvieron `0` filas visibles.
+La evidencia DEV tomada indica que no se observó fuga de filas en las consultas read-only con rol `anon`, porque todas devolvieron `0` filas visibles. Sin embargo, ese resultado no convierte automáticamente todas las tablas en metadata-only: cuando existen grants anon heredados y policies `SELECT` amplias, la superficie sigue siendo row-exposing si existen datos.
 
 ## 2. Alcance
 
@@ -51,7 +51,7 @@ Evidencia tomada en DEV:
 1. Varias tablas conservan `SELECT` grant para `anon` por grants heredados.
 2. Todas las tablas revisadas tienen RLS activo.
 3. La prueba read-only con rol `anon` arrojó `0` filas visibles en todas las tablas revisadas.
-4. El resultado indica que el advisor GraphQL anon reporta principalmente superficie de metadata/introspection, no fuga de filas anon observada en DEV.
+4. El resultado indica que no se observó fuga de filas anon en DEV, pero no cierra el riesgo de superficie cuando existen grants heredados y policies `SELECT` amplias o `USING true`.
 
 ## 6. Matriz de evidencia read-only anon
 
@@ -59,7 +59,7 @@ Evidencia tomada en DEV:
 | --- | --- | --- | ---: | --- |
 | `accesos` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
 | `apartamentos` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
-| `archivos` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
+| `archivos` | Sí, heredado | Sí | 0 | **Row-exposing risk / P1 documental**: sin fuga de filas anon observada en DEV, pero la combinación de grant anon heredado y policy SELECT amplia mantiene riesgo real si existen datos. |
 | `comunicados` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
 | `config_pagos` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
 | `conjuntos` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
@@ -84,7 +84,7 @@ Evidencia tomada en DEV:
 | `tenant_memberships` | Sí, heredado | Sí | 0 | Metadata/introspection exposure en tabla tenant sensible; sin fuga de filas anon observada en DEV. |
 | `tipos_documento` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
 | `torres` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
-| `usuarios_app` | Sí, heredado | Sí | 0 | Metadata/introspection exposure en tabla legacy sensible; sin fuga de filas anon observada en DEV. |
+| `usuarios_app` | Sí, heredado | Sí | 0 | **Row-exposing risk / P1 documental**: sin fuga de filas anon observada en DEV, pero la combinación de grant anon heredado y policy SELECT amplia mantiene riesgo real si existen datos. |
 | `visitantes` | Sí, heredado | Sí | 0 | Metadata/introspection exposure en tabla PII/visitas; sin fuga de filas anon observada en DEV. |
 | `zonas_comunes` | Sí, heredado | Sí | 0 | Metadata/introspection exposure; sin fuga de filas anon observada en DEV. |
 
@@ -92,15 +92,23 @@ Evidencia tomada en DEV:
 
 ### 7.1 Riesgo de metadata/introspection
 
-El riesgo confirmado por la evidencia es que el rol `anon` conserva superficie GraphQL sobre tablas del esquema `public` debido a grants heredados. Aunque RLS impida devolver filas, GraphQL/Supabase Advisor puede seguir reportando exposición porque la tabla es visible a nivel de permisos.
+El riesgo confirmado por la evidencia es que el rol `anon` conserva superficie GraphQL sobre tablas del esquema `public` debido a grants heredados. Aunque RLS impida devolver filas en una prueba puntual, GraphQL/Supabase Advisor puede seguir reportando exposición porque la tabla es visible a nivel de permisos.
 
-Este riesgo importa porque puede revelar nombres de tablas, estructura consultable o superficie API que no debería presentarse a clientes anónimos, especialmente en tablas sensibles como `residentes`, `visitantes`, `usuarios_app`, `tenant_memberships`, `platform_memberships`, pagos y visitas.
+Este riesgo importa porque puede revelar nombres de tablas, estructura consultable o superficie API que no debería presentarse a clientes anónimos, especialmente en tablas sensibles como `residentes`, `visitantes`, `tenant_memberships`, `platform_memberships`, pagos y visitas.
 
-### 7.2 Riesgo de fuga real de filas
+### 7.2 Riesgo row-exposing por grants + policies amplias
+
+`anon_visible_rows = 0` **no equivale a cierre de riesgo** cuando una tabla conserva grant `SELECT` para `anon` y además tiene una policy amplia, por ejemplo `SELECT` permisivo o `USING true`. En ese escenario, la prueba DEV puede devolver cero filas por ausencia de datos visibles en ese momento, por dataset incompleto o por condiciones operativas temporales, pero la superficie sigue siendo row-exposing si posteriormente existen datos que satisfacen la policy.
+
+Por este motivo, `archivos` y `usuarios_app` se clasifican como **row-exposing risk / P1 documental** aunque `anon_visible_rows = 0` en DEV. La evidencia observada sigue siendo cero filas, pero el riesgo de superficie es real mientras permanezcan grants anon heredados y policies SELECT amplias.
+
+### 7.3 Riesgo de fuga real de filas
 
 La evidencia DEV revisada no mostró fuga real de filas para `anon` en las tablas de la matriz. En todos los casos se observó `anon_visible_rows = 0` con RLS activo.
 
-Por tanto, FASE 3D.31 no justifica cambios urgentes de policies ni revocaciones masivas en este PR. El hallazgo debe tratarse como deuda de hardening de superficie API, no como incidente confirmado de exposición de datos anon en DEV.
+Ese resultado debe interpretarse estrictamente como evidencia observada en DEV, no como garantía de que todas las superficies sean metadata-only. Para tablas con grants anon heredados y policies SELECT amplias, especialmente `archivos` y `usuarios_app`, el riesgo de exposición de filas sigue abierto si existen datos.
+
+Por tanto, FASE 3D.31 no ejecuta cambios urgentes de policies ni revocaciones masivas en este PR. El hallazgo debe tratarse como deuda de hardening de superficie API y row-exposing risk para tablas con policies amplias, no como incidente confirmado de exposición de datos anon en DEV.
 
 ## 8. Consideraciones multi tenant y Superadmin
 
@@ -134,4 +142,5 @@ FASE 3D.31 queda como evidencia read-only documental:
 - `anon_visible_rows = 0` en todas las tablas revisadas.
 - No se observó fuga de filas anon en DEV para la matriz documentada.
 - Sí permanece deuda de hardening por metadata/introspection GraphQL anon.
+- `archivos` y `usuarios_app` permanecen como row-exposing risk / P1 documental por grants anon heredados y policies SELECT amplias, aunque DEV haya devuelto cero filas.
 - No se realizan cambios SQL, RLS, frontend ni Vercel en esta fase.
