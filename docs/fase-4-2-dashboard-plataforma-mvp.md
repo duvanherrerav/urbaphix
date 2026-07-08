@@ -3,13 +3,13 @@
 ## Alcance implementado
 
 - Reemplaza placeholders principales de `/superadmin` por un dashboard MVP read-only para operación plataforma.
-- Consume métricas agregadas con sesión autenticada Supabase desde frontend, sin `service_role`.
-- No agrega CRUD, migraciones SQL, tablas, columnas, FKs ni políticas RLS.
+- Consume métricas globales agregadas mediante `fn_platform_dashboard_metrics()` con sesión autenticada Supabase desde frontend, sin `service_role`.
+- No agrega CRUD, tablas, columnas, FKs ni políticas RLS; la única migración incorpora una RPC `SECURITY DEFINER` read-only para métricas globales autorizadas.
 - Evita PII detallada: solo muestra contadores agregados y metadatos de sesión/membership ya visibles para el usuario plataforma autenticado.
 
 ## KPIs iniciales
 
-El dashboard muestra tarjetas para:
+El dashboard muestra tarjetas globales SaaS para roles plataforma autorizados (`superadmin` o `platform_ops`):
 
 1. conjuntos
 2. usuarios app
@@ -41,5 +41,6 @@ Precheck de referencia reportado para DEV:
 - [ ] `platform_ops` ve el dashboard si `SuperadminGuard` permite su membership activa.
 - [ ] Usuario tenant sin `platform_membership` activa no entra a `/superadmin`.
 - [ ] Estados de carga, error y sin datos se renderizan sin exponer documentos, placas, comprobantes ni PII detallada.
-- [ ] `npm run build` pasa.
+- [ ] Las métricas globales provienen de `fn_platform_dashboard_metrics()` y no de consultas tenant directas desde frontend.
+- [ ] `npm run build:dev` pasa como check de build válido del repo.
 - [ ] `npm run lint` pasa si el proyecto mantiene script de lint disponible.

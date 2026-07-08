@@ -1,89 +1,56 @@
 import { supabase } from '../../services/supabaseClient';
 import { logger } from '../../utils/logger';
 
-const ACTIVE_STATUS = 'active';
-const PENDING_STATUS = 'pendiente';
-const OPEN_INCIDENT_STATUSES = ['nuevo', 'en_gestion'];
+const METRIC_KEY_MAP = Object.freeze({
+  conjuntos: 'conjuntos',
+  usuarios_app: 'usuariosApp',
+  tenant_memberships_active: 'tenantMembershipsActive',
+  platform_memberships_active: 'platformMembershipsActive',
+  residentes: 'residentes',
+  visitas_30d: 'visitas30d',
+  paquetes_pendientes: 'paquetesPendientes',
+  pagos_pendientes: 'pagosPendientes',
+  incidentes_abiertos: 'incidentesAbiertos'
+});
 
-const countQuery = async ({ key, table, label, applyFilters }) => {
-  let query = supabase.from(table).select('id', { count: 'exact', head: true });
-
-  if (applyFilters) {
-    query = applyFilters(query);
-  }
-
-  const { count, error } = await query;
-
-  if (error) {
-    throw Object.assign(new Error(`No se pudo consultar ${label}`), { cause: error, metricKey: key });
-  }
-
-  return [key, count ?? 0];
+const normalizeMetricValue = (value) => {
+  const numericValue = Number(value ?? 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
 };
 
-export const getSuperadminMetrics = async () => {
-  const visitsSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+const normalizeMetrics = (row) => Object.entries(METRIC_KEY_MAP).reduce((acc, [rpcKey, uiKey]) => ({
+  ...acc,
+  [uiKey]: normalizeMetricValue(row?.[rpcKey])
+}), {});
 
-  const metrics = [
-    { key: 'conjuntos', label: 'conjuntos', table: 'conjuntos' },
-    { key: 'usuariosApp', label: 'usuarios app', table: 'usuarios_app' },
-    {
-      key: 'tenantMembershipsActive',
-      label: 'memberships tenant activos',
-      table: 'tenant_memberships',
-      applyFilters: (query) => query.eq('status', ACTIVE_STATUS)
-    },
-    {
-      key: 'platformMembershipsActive',
-      label: 'memberships plataforma activos',
-      table: 'platform_memberships',
-      applyFilters: (query) => query.eq('status', ACTIVE_STATUS)
-    },
-    { key: 'residentes', label: 'residentes', table: 'residentes' },
-    {
-      key: 'visitas30d',
-      label: 'visitas últimos 30 días',
-      table: 'registro_visitas',
-      applyFilters: (query) => query.gte('created_at', visitsSince)
-    },
-    {
-      key: 'paquetesPendientes',
-      label: 'paquetes pendientes',
-      table: 'paquetes',
-      applyFilters: (query) => query.eq('estado', PENDING_STATUS)
-    },
-    {
-      key: 'pagosPendientes',
-      label: 'pagos pendientes',
-      table: 'pagos',
-      applyFilters: (query) => query.eq('estado', PENDING_STATUS)
-    },
-    {
-      key: 'incidentesAbiertos',
-      label: 'incidentes abiertos',
-      table: 'incidentes',
-      applyFilters: (query) => query.in('estado', OPEN_INCIDENT_STATUSES)
-    }
-  ];
+export const getSuperadminMetrics = async () => {
+  const generatedAt = new Date().toISOString();
 
   try {
-    const entries = await Promise.all(metrics.map(countQuery));
+    const { data, error } = await supabase.rpc('fn_platform_dashboard_metrics');
+
+    if (error) {
+      throw error;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+
     return {
-      data: Object.fromEntries(entries),
+      data: normalizeMetrics(row),
       error: null,
-      generatedAt: new Date().toISOString()
+      generatedAt
     };
   } catch (error) {
     logger.error('No se pudieron cargar métricas plataforma', error, {
       module: 'superadmin',
       action: 'load_platform_metrics',
-      metricKey: error?.metricKey
+      rpc: 'fn_platform_dashboard_metrics'
     });
 
     return {
       data: null,
       error,
-      generatedAt: new Date().toISOString()
+      generatedAt
     };
   }
 };
