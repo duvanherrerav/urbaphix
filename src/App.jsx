@@ -43,7 +43,8 @@ function App() {
   const [modulo, setModulo] = useState('');
   const [pagosTab, setPagosTab] = useState('bandejas');
   const menuRef = useRef(null);
-  const isSuperadminRoute = typeof window !== 'undefined' && window.location?.pathname === '/superadmin';
+  const currentPath = typeof window !== 'undefined' ? window.location?.pathname || '' : '';
+  const isSuperadminRoute = currentPath === '/superadmin' || currentPath.startsWith('/superadmin/');
 
   const menuBtnClass = (target) => `app-sidebar-item ${moduloActual === target ? 'app-sidebar-item-active' : ''}`;
   const ROLES_VALIDOS = ['admin', 'vigilancia', 'residente'];
