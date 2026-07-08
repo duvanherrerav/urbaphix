@@ -31,6 +31,7 @@ const ReportarIncidente = lazy(() => import('./modules/seguridad/pages/ReportarI
 const ReservarZona = lazy(() => import('./modules/reservas/pages/ReservarZona'));
 const PanelReservasAdmin = lazy(() => import('./modules/reservas/pages/PanelReservasAdmin'));
 const PanelReservasVigilancia = lazy(() => import('./modules/reservas/pages/PanelReservasVigilancia'));
+const SuperadminGuard = lazy(() => import('./modules/superadmin/SuperadminGuard'));
 
 function App() {
 
@@ -42,6 +43,7 @@ function App() {
   const [modulo, setModulo] = useState('');
   const [pagosTab, setPagosTab] = useState('bandejas');
   const menuRef = useRef(null);
+  const isSuperadminRoute = typeof window !== 'undefined' && window.location?.pathname === '/superadmin';
 
   const menuBtnClass = (target) => `app-sidebar-item ${moduloActual === target ? 'app-sidebar-item-active' : ''}`;
   const ROLES_VALIDOS = ['admin', 'vigilancia', 'residente'];
@@ -255,6 +257,14 @@ function App() {
   useEffect(() => {
     setModulo('');
   }, [usuarioApp?.rol_id]);
+
+  if (isSuperadminRoute) {
+    return (
+      <Suspense fallback={<div className="app-shell flex min-h-screen items-center justify-center p-6 text-app-text-secondary">Cargando Superadmin...</div>}>
+        <SuperadminGuard user={user} isBootstrapping={isBootstrapping} />
+      </Suspense>
+    );
+  }
 
   if (isBootstrapping) {
     return (
