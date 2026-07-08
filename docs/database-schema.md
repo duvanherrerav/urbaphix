@@ -553,6 +553,10 @@ Tablas detectadas en `public`:
   - comando: `UPDATE`
   - condición: rol `vigilancia` o `admin`
 
+### Permisos / grants
+- FASE 3D.36: se revocan privilegios heredados de `anon` sobre `public.registro_visitas` para reducir exposición GraphQL/PostgREST sin modificar `authenticated`, `service_role` ni policies RLS.
+- El flujo funcional de residentes, vigilancia, admin de conjunto, QR y realtime debe continuar usando sesión autenticada y controles RLS por `conjunto_id`, `residente_id` y `auth.uid()`.
+
 ---
 
 ## 17. reservas
@@ -940,6 +944,10 @@ Tablas detectadas en `public`:
 - `visitantes_update_propios`
   - comando: `UPDATE`
   - condición: visitante del propio residente
+
+### Permisos / grants
+- FASE 3D.36: se revocan privilegios heredados de `anon` sobre `public.visitantes` para reducir exposición GraphQL/PostgREST sin modificar `authenticated`, `service_role` ni policies RLS.
+- El flujo funcional de residentes, vigilancia, admin de conjunto, QR y realtime debe continuar usando sesión autenticada y controles RLS por `conjunto_id`, `residente_id` y `auth.uid()`.
 
 ---
 
