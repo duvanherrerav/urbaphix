@@ -1157,6 +1157,10 @@ Puede ampliarse más adelante con:
 - INSERT/UPDATE: solo `superadmin`.
 - DELETE: denegado por política.
 
+### Permisos / grants
+- FASE 3D.34: se revocan privilegios heredados de `anon` sobre `public.platform_memberships` para reducir exposición GraphQL/PostgREST sin modificar `authenticated`, `service_role` ni policies RLS.
+- La operación plataforma/superadmin debe continuar usando sesión autenticada con membership plataforma activa o backend autorizado con `service_role`, nunca grants directos de `anon`.
+
 ## 33. tenant_memberships
 **Descripción:** membresías por tenant (`conjunto_id`) para coexistencia con modelo legacy.
 
@@ -1186,3 +1190,7 @@ Puede ampliarse más adelante con:
 - SELECT: `superadmin` y `platform_ops` pueden leer memberships requeridos para operación plataforma; `admin_conjunto` y `contador` con membresía activa leen memberships de su mismo `conjunto_id`; `residente` solo lee su propia fila activa (`user_id = auth.uid()`, `role_name = 'residente'`, `status = 'active'`); `vigilancia`/`vigilante` no tiene necesidad funcional de inventariar roles internos y queda limitado a self-read activo.
 - INSERT/UPDATE: `superadmin` o rol plataforma autorizado (`platform_ops`).
 - DELETE: denegado por política.
+
+### Permisos / grants
+- FASE 3D.34: se revocan privilegios heredados de `anon` sobre `public.tenant_memberships` para reducir exposición GraphQL/PostgREST sin modificar `authenticated`, `service_role` ni policies RLS.
+- `membershipResolver`, login y bootstrap deben consultar esta tabla únicamente con sesión autenticada; el flujo anónimo no requiere acceso directo a memberships.
