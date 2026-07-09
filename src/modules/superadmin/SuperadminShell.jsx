@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BrandLogo from '../../components/brand/BrandLogo';
 import { supabase } from '../../services/supabaseClient';
-import { getSuperadminMetrics, getSuperadminTenantsSummary } from './superadminMetricsService';
+import { getSuperadminMembershipsSummary, getSuperadminMetrics, getSuperadminTenantsSummary } from './superadminMetricsService';
 
 const navItems = [
   { key: 'summary', label: 'Resumen plataforma', icon: '📡', description: 'KPIs agregados read-only de la operación SaaS.' },
   { key: 'tenants', label: 'Tenants', icon: '🏢', description: 'Inventario agregado de conjuntos y métricas operativas.' },
+  { key: 'memberships', label: 'Usuarios/Memberships', icon: '🔐', description: 'Memberships plataforma y tenant read-only.' },
   { label: 'Operación', icon: '🛠️', description: 'Señales operativas sin CRUD ni datos sensibles.' },
   { label: 'Auditoría', icon: '🧾', description: 'Trazabilidad futura de eventos de plataforma.' }
 ];
@@ -23,6 +24,10 @@ const metricCards = [
 ];
 
 const formatMetric = (value) => new Intl.NumberFormat('es-CO').format(value ?? 0);
+
+const formatDateTime = (value) => (value
+  ? new Date(value).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
+  : '—');
 
 function MetricSkeleton() {
   return (
@@ -54,7 +59,9 @@ function SuperadminShell({ user, platformMembership }) {
   const roleName = platformMembership?.role_name || 'platform';
   const [metricsState, setMetricsState] = useState({ status: 'loading', data: null, error: null, generatedAt: null });
   const [tenantsState, setTenantsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
+  const [membershipsState, setMembershipsState] = useState({ status: 'idle', data: { platform: [], tenant: [] }, error: null, generatedAt: null });
   const tenantsRequestStartedRef = useRef(false);
+  const membershipsRequestStartedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -101,6 +108,33 @@ function SuperadminShell({ user, platformMembership }) {
     };
 
     loadTenants();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== 'memberships' || membershipsRequestStartedRef.current) return undefined;
+
+    let isMounted = true;
+    membershipsRequestStartedRef.current = true;
+
+    const loadMemberships = async () => {
+      setMembershipsState({ status: 'loading', data: { platform: [], tenant: [] }, error: null, generatedAt: null });
+      const result = await getSuperadminMembershipsSummary();
+
+      if (!isMounted) return;
+
+      setMembershipsState({
+        status: result.error ? 'error' : 'success',
+        data: result.data,
+        error: result.error,
+        generatedAt: result.generatedAt
+      });
+    };
+
+    loadMemberships();
 
     return () => {
       isMounted = false;
@@ -276,6 +310,79 @@ function SuperadminShell({ user, platformMembership }) {
               )}
             </section>
           )}
+
+          {activeSection === 'memberships' && (
+            <section className="app-surface-primary overflow-hidden p-0 shadow-app" aria-busy={membershipsState.status === 'loading'}>
+              <div className="border-b border-app-border px-5 py-4">
+                <p className="app-badge-info mb-3 inline-flex">Usuarios/Memberships · read-only</p>
+                <h2 className="text-xl font-semibold text-app-text-primary">Usuarios y memberships</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-app-text-secondary">
+                  Lectura segura para Superadmin de memberships plataforma y tenant. Solo muestra email, rol, estado y fechas operativas; no incluye teléfonos, documentos, placas ni comprobantes.
+                </p>
+              </div>
+
+              {membershipsState.status === 'error' && (
+                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                  No fue posible cargar Usuarios/Memberships con la sesión actual. Verifica RLS/membership plataforma activa y vuelve a intentar.
+                </div>
+              )}
+
+              {membershipsState.status === 'loading' && (
+                <div className="grid gap-4 p-5 lg:grid-cols-2">
+                  {[1, 2].map((item) => <MetricSkeleton key={item} />)}
+                </div>
+              )}
+
+              {membershipsState.status === 'success' && (
+                <div className="space-y-5 p-5">
+                  {[
+                    ['Platform memberships', membershipsState.data.platform, false],
+                    ['Tenant memberships', membershipsState.data.tenant, true]
+                  ].map(([title, memberships, showTenant]) => (
+                    <div key={title} className="overflow-hidden rounded-2xl border border-app-border bg-app-bg-alt">
+                      <div className="flex items-center justify-between gap-3 border-b border-app-border px-4 py-3">
+                        <h3 className="font-semibold text-app-text-primary">{title}</h3>
+                        <span className="app-badge-info">{formatMetric(memberships.length)} registros</span>
+                      </div>
+                      {memberships.length === 0 ? (
+                        <p className="px-4 py-4 text-sm text-app-text-secondary">No hay memberships para mostrar.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-app-border text-sm">
+                            <thead className="text-left text-xs uppercase tracking-[0.14em] text-app-text-secondary">
+                              <tr>
+                                {showTenant && <th className="px-4 py-3 font-semibold">Conjunto</th>}
+                                <th className="px-4 py-3 font-semibold">Email</th>
+                                <th className="px-4 py-3 font-semibold">Rol</th>
+                                <th className="px-4 py-3 font-semibold">Estado</th>
+                                <th className="px-4 py-3 font-semibold">Creado</th>
+                                <th className="px-4 py-3 font-semibold">Actualizado</th>
+                                <th className="px-4 py-3 font-semibold">Revocado</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-app-border text-app-text-primary">
+                              {memberships.map((membership) => (
+                                <tr key={membership.id}>
+                                  {showTenant && <td className="whitespace-nowrap px-4 py-3">{membership.conjuntoNombre}</td>}
+                                  <td className="whitespace-nowrap px-4 py-3">{membership.email}</td>
+                                  <td className="whitespace-nowrap px-4 py-3">{membership.roleName}</td>
+                                  <td className="whitespace-nowrap px-4 py-3">{membership.status}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-app-text-secondary">{formatDateTime(membership.createdAt)}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-app-text-secondary">{formatDateTime(membership.updatedAt)}</td>
+                                  <td className="whitespace-nowrap px-4 py-3 text-app-text-secondary">{formatDateTime(membership.revokedAt)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
         </main>
       </div>
     </div>
