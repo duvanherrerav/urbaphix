@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BrandLogo from '../../components/brand/BrandLogo';
 import { supabase } from '../../services/supabaseClient';
-import { getSuperadminMembershipsSummary, getSuperadminMetrics, getSuperadminOperationsSummary, getSuperadminTenantsSummary } from './superadminMetricsService';
+import { getSuperadminAuditSummary, getSuperadminMembershipsSummary, getSuperadminMetrics, getSuperadminOperationsSummary, getSuperadminTenantsSummary } from './superadminMetricsService';
 
 const navItems = [
   { key: 'summary', label: 'Resumen plataforma', icon: '📡', description: 'KPIs agregados read-only de la operación SaaS.' },
   { key: 'tenants', label: 'Tenants', icon: '🏢', description: 'Inventario agregado de conjuntos y métricas operativas.' },
   { key: 'memberships', label: 'Usuarios/Memberships', icon: '🔐', description: 'Memberships plataforma y tenant read-only.' },
   { key: 'operations', label: 'Operación', icon: '🛠️', description: 'Señales operativas sin CRUD ni datos sensibles.' },
-  { label: 'Auditoría', icon: '🧾', description: 'Trazabilidad futura de eventos de plataforma.' }
+  { key: 'audit', label: 'Auditoría', icon: '🧾', description: 'Trazabilidad agregada read-only de señales del sistema.' }
 ];
 
 const metricCards = [
@@ -23,6 +23,14 @@ const metricCards = [
   { key: 'incidentesAbiertos', label: 'Incidentes abiertos', icon: '🚨', description: 'Incidentes nuevos o en gestión.' }
 ];
 
+
+const auditSources = [
+  { key: 'operational_events', label: 'Eventos operativos', icon: '🛰️' },
+  { key: 'pagos_eventos', label: 'Eventos de pagos', icon: '💳' },
+  { key: 'reservas_eventos', label: 'Eventos de reservas', icon: '📅' },
+  { key: 'notificaciones', label: 'Notificaciones', icon: '🔔' },
+  { key: 'incidentes', label: 'Incidentes', icon: '🚨' }
+];
 
 const operationDomains = [
   { key: 'visitas', label: 'Visitas', icon: '🚪', openLabel: 'Pendientes' },
@@ -69,9 +77,11 @@ function SuperadminShell({ user, platformMembership }) {
   const [tenantsState, setTenantsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
   const [membershipsState, setMembershipsState] = useState({ status: 'idle', data: { platform: [], tenant: [] }, error: null, generatedAt: null });
   const [operationsState, setOperationsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
+  const [auditState, setAuditState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
   const tenantsRequestStartedRef = useRef(false);
   const membershipsRequestStartedRef = useRef(false);
   const operationsRequestStartedRef = useRef(false);
+  const auditRequestStartedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -179,6 +189,34 @@ function SuperadminShell({ user, platformMembership }) {
     };
   }, [activeSection]);
 
+
+  useEffect(() => {
+    if (activeSection !== 'audit' || auditRequestStartedRef.current) return undefined;
+
+    let isMounted = true;
+    auditRequestStartedRef.current = true;
+
+    const loadAudit = async () => {
+      setAuditState({ status: 'loading', data: [], error: null, generatedAt: null });
+      const result = await getSuperadminAuditSummary();
+
+      if (!isMounted) return;
+
+      setAuditState({
+        status: result.error ? 'error' : 'success',
+        data: result.data,
+        error: result.error,
+        generatedAt: result.generatedAt
+      });
+    };
+
+    loadAudit();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeSection]);
+
   const hasNoData = useMemo(() => {
     if (metricsState.status !== 'success' || !metricsState.data) return false;
     return metricCards.every((metric) => Number(metricsState.data[metric.key] || 0) === 0);
@@ -195,6 +233,16 @@ function SuperadminShell({ user, platformMembership }) {
       openTotal: rows.reduce((sum, row) => sum + row.openTotal, 0)
     };
   }), [operationsState.data]);
+
+  const auditBySource = useMemo(() => auditSources.map((source) => {
+    const rows = auditState.data.filter((row) => row.source === source.key);
+    return {
+      ...source,
+      rows,
+      total: rows.reduce((sum, row) => sum + row.total, 0),
+      total30d: rows.reduce((sum, row) => sum + row.total30d, 0)
+    };
+  }), [auditState.data]);
 
   const generatedAtLabel = metricsState.generatedAt
     ? new Date(metricsState.generatedAt).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
@@ -487,6 +535,62 @@ function SuperadminShell({ user, platformMembership }) {
                           <div key={`${domain.key}-${row.estado}`} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
                             <span className="font-medium text-app-text-primary">{row.estado}</span>
                             <span className="text-app-text-secondary">{formatMetric(row.total)} registros</span>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+
+          {activeSection === 'audit' && (
+            <section className="app-surface-primary overflow-hidden p-0 shadow-app" aria-busy={auditState.status === 'loading'}>
+              <div className="border-b border-app-border px-5 py-4">
+                <p className="app-badge-info mb-3 inline-flex">Auditoría · read-only</p>
+                <h2 className="text-xl font-semibold text-app-text-primary">Trazabilidad agregada del sistema</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-app-text-secondary">
+                  KPIs agregados por fuente, tipo, estado, severidad o acción para señales de auditoría. No se muestran eventos individuales, metadata, mensajes, errores, URLs, documentos, placas, teléfonos ni comprobantes.
+                </p>
+              </div>
+
+              {auditState.status === 'error' && (
+                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                  No fue posible cargar Auditoría con la sesión actual. Verifica RLS/membership plataforma activa y vuelve a intentar.
+                </div>
+              )}
+
+              {auditState.status === 'loading' && (
+                <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+                  {auditSources.map((source) => <MetricSkeleton key={source.key} />)}
+                </div>
+              )}
+
+              {auditState.status === 'success' && auditState.data.length === 0 && (
+                <div className="m-5 rounded-2xl border border-state-warning/30 bg-state-warning/10 px-5 py-4 text-sm text-state-warning">
+                  No hay señales de auditoría agregadas para mostrar todavía.
+                </div>
+              )}
+
+              {auditState.status === 'success' && auditState.data.length > 0 && (
+                <div className="grid gap-4 p-5 xl:grid-cols-2">
+                  {auditBySource.filter((source) => source.rows.length > 0).map((source) => (
+                    <article key={source.key} className="overflow-hidden rounded-2xl border border-app-border bg-app-bg-alt">
+                      <div className="border-b border-app-border p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="flex items-center gap-2 font-semibold text-app-text-primary"><span aria-hidden="true">{source.icon}</span>{source.label}</h3>
+                          <span className="app-badge-info">{formatMetric(source.total)} señales</span>
+                        </div>
+                        <p className="mt-2 text-sm text-app-text-secondary">{formatMetric(source.total30d)} señales en los últimos 30 días.</p>
+                      </div>
+                      <div className="divide-y divide-app-border">
+                        {source.rows.map((row) => (
+                          <div key={`${source.key}-${row.dimension}-${row.value}`} className="grid grid-cols-[1fr_auto] gap-4 px-4 py-3 text-sm sm:grid-cols-[8rem_1fr_auto]">
+                            <span className="text-app-text-secondary">{row.dimension}</span>
+                            <span className="font-medium text-app-text-primary">{row.value}</span>
+                            <span className="text-right text-app-text-secondary">{formatMetric(row.total)} total · {formatMetric(row.total30d)} 30d</span>
                           </div>
                         ))}
                       </div>

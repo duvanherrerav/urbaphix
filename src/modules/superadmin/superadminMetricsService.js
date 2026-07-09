@@ -156,6 +156,14 @@ export const getSuperadminMembershipsSummary = async () => {
 };
 
 
+const normalizeAuditRow = (row) => ({
+  source: row?.source || '',
+  dimension: row?.dimension || 'sin_dimension',
+  value: row?.value || 'sin_valor',
+  total: normalizeMetricValue(row?.total),
+  total30d: normalizeMetricValue(row?.total_30d)
+});
+
 export const getSuperadminOperationsSummary = async () => {
   const generatedAt = new Date().toISOString();
 
@@ -176,6 +184,37 @@ export const getSuperadminOperationsSummary = async () => {
       module: 'superadmin',
       action: 'load_platform_operations_summary',
       rpc: 'fn_platform_operations_summary'
+    });
+
+    return {
+      data: [],
+      error,
+      generatedAt
+    };
+  }
+};
+
+
+export const getSuperadminAuditSummary = async () => {
+  const generatedAt = new Date().toISOString();
+
+  try {
+    const { data, error } = await supabase.rpc('fn_platform_audit_summary');
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      data: (Array.isArray(data) ? data : []).map(normalizeAuditRow),
+      error: null,
+      generatedAt
+    };
+  } catch (error) {
+    logger.error('No se pudo cargar resumen de auditoría plataforma', error, {
+      module: 'superadmin',
+      action: 'load_platform_audit_summary',
+      rpc: 'fn_platform_audit_summary'
     });
 
     return {
