@@ -23,6 +23,19 @@ const normalizeMetrics = (row) => Object.entries(METRIC_KEY_MAP).reduce((acc, [r
   [uiKey]: normalizeMetricValue(row?.[rpcKey])
 }), {});
 
+const normalizeTenant = (row) => ({
+  id: row?.conjunto_id || '',
+  nombre: row?.nombre || 'Sin nombre',
+  ciudad: row?.ciudad || 'Sin ciudad',
+  direccion: row?.direccion || null,
+  createdAt: row?.created_at || null,
+  usuarios: normalizeMetricValue(row?.usuarios),
+  residentes: normalizeMetricValue(row?.residentes),
+  visitas30d: normalizeMetricValue(row?.visitas_30d),
+  paquetesPendientes: normalizeMetricValue(row?.paquetes_pendientes),
+  pagosPendientes: normalizeMetricValue(row?.pagos_pendientes)
+});
+
 export const getSuperadminMetrics = async () => {
   const generatedAt = new Date().toISOString();
 
@@ -49,6 +62,36 @@ export const getSuperadminMetrics = async () => {
 
     return {
       data: null,
+      error,
+      generatedAt
+    };
+  }
+};
+
+export const getSuperadminTenantsSummary = async () => {
+  const generatedAt = new Date().toISOString();
+
+  try {
+    const { data, error } = await supabase.rpc('fn_platform_tenants_summary');
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      data: (Array.isArray(data) ? data : []).map(normalizeTenant),
+      error: null,
+      generatedAt
+    };
+  } catch (error) {
+    logger.error('No se pudo cargar resumen de tenants plataforma', error, {
+      module: 'superadmin',
+      action: 'load_platform_tenants_summary',
+      rpc: 'fn_platform_tenants_summary'
+    });
+
+    return {
+      data: [],
       error,
       generatedAt
     };
