@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BrandLogo from '../../components/brand/BrandLogo';
 import { supabase } from '../../services/supabaseClient';
-import { getSuperadminMetrics } from './superadminMetricsService';
+import { getSuperadminMetrics, getSuperadminTenantsSummary } from './superadminMetricsService';
 
 const navItems = [
-  { label: 'Resumen plataforma', icon: '📡', description: 'KPIs agregados read-only de la operación SaaS.' },
-  { label: 'Tenants', icon: '🏢', description: 'Inventario agregado de conjuntos y memberships.' },
+  { key: 'summary', label: 'Resumen plataforma', icon: '📡', description: 'KPIs agregados read-only de la operación SaaS.' },
+  { key: 'tenants', label: 'Tenants', icon: '🏢', description: 'Inventario agregado de conjuntos y métricas operativas.' },
   { label: 'Operación', icon: '🛠️', description: 'Señales operativas sin CRUD ni datos sensibles.' },
   { label: 'Auditoría', icon: '🧾', description: 'Trazabilidad futura de eventos de plataforma.' }
 ];
@@ -49,9 +49,12 @@ function MetricCard({ metric, value }) {
 }
 
 function SuperadminShell({ user, platformMembership }) {
+  const [activeSection, setActiveSection] = useState('summary');
   const displayName = user?.user_metadata?.name || user?.email || 'Usuario plataforma';
   const roleName = platformMembership?.role_name || 'platform';
   const [metricsState, setMetricsState] = useState({ status: 'loading', data: null, error: null, generatedAt: null });
+  const [tenantsState, setTenantsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
+  const tenantsRequestStartedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,6 +80,33 @@ function SuperadminShell({ user, platformMembership }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (activeSection !== 'tenants' || tenantsRequestStartedRef.current) return undefined;
+
+    let isMounted = true;
+    tenantsRequestStartedRef.current = true;
+
+    const loadTenants = async () => {
+      setTenantsState({ status: 'loading', data: [], error: null, generatedAt: null });
+      const result = await getSuperadminTenantsSummary();
+
+      if (!isMounted) return;
+
+      setTenantsState({
+        status: result.error ? 'error' : 'success',
+        data: result.data,
+        error: result.error,
+        generatedAt: result.generatedAt
+      });
+    };
+
+    loadTenants();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeSection]);
+
   const hasNoData = useMemo(() => {
     if (metricsState.status !== 'success' || !metricsState.data) return false;
     return metricCards.every((metric) => Number(metricsState.data[metric.key] || 0) === 0);
@@ -100,11 +130,13 @@ function SuperadminShell({ user, platformMembership }) {
           </div>
 
           <nav className="space-y-2" aria-label="Navegación Superadmin">
-            {navItems.map((item, index) => (
+            {navItems.map((item) => (
               <button
                 key={item.label}
                 type="button"
-                className={`app-sidebar-item w-full ${index === 0 ? 'app-sidebar-item-active' : ''}`}
+                onClick={() => item.key && setActiveSection(item.key)}
+                className={`app-sidebar-item w-full ${activeSection === item.key ? 'app-sidebar-item-active' : ''}`}
+                aria-current={activeSection === item.key ? 'page' : undefined}
               >
                 <span aria-hidden="true">{item.icon}</span>
                 <span>{item.label}</span>
@@ -173,13 +205,77 @@ function SuperadminShell({ user, platformMembership }) {
             </section>
           )}
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-busy={metricsState.status === 'loading'}>
-            {metricsState.status === 'loading'
-              ? metricCards.map((metric) => <MetricSkeleton key={metric.key} />)
-              : metricCards.map((metric) => (
-                  <MetricCard key={metric.key} metric={metric} value={metricsState.data?.[metric.key]} />
-                ))}
-          </section>
+          {activeSection === 'summary' && (
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-busy={metricsState.status === 'loading'}>
+              {metricsState.status === 'loading'
+                ? metricCards.map((metric) => <MetricSkeleton key={metric.key} />)
+                : metricCards.map((metric) => (
+                    <MetricCard key={metric.key} metric={metric} value={metricsState.data?.[metric.key]} />
+                  ))}
+            </section>
+          )}
+
+          {activeSection === 'tenants' && (
+            <section className="app-surface-primary overflow-hidden p-0 shadow-app" aria-busy={tenantsState.status === 'loading'}>
+              <div className="border-b border-app-border px-5 py-4">
+                <p className="app-badge-info mb-3 inline-flex">Tenants · read-only</p>
+                <h2 className="text-xl font-semibold text-app-text-primary">Gestión de conjuntos / tenants</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-app-text-secondary">
+                  Inventario seguro de conjuntos con métricas agregadas por tenant. No incluye documentos, placas, comprobantes, teléfonos ni datos personales detallados.
+                </p>
+              </div>
+
+              {tenantsState.status === 'error' && (
+                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                  No fue posible cargar el listado de tenants con la sesión actual. Verifica RLS/membership activa y vuelve a intentar.
+                </div>
+              )}
+
+              {tenantsState.status === 'loading' && (
+                <div className="grid gap-4 p-5 lg:grid-cols-2">
+                  {[1, 2].map((item) => <MetricSkeleton key={item} />)}
+                </div>
+              )}
+
+              {tenantsState.status === 'success' && tenantsState.data.length === 0 && (
+                <div className="m-5 rounded-2xl border border-state-warning/30 bg-state-warning/10 px-5 py-4 text-sm text-state-warning">
+                  No hay conjuntos disponibles para mostrar todavía.
+                </div>
+              )}
+
+              {tenantsState.status === 'success' && tenantsState.data.length > 0 && (
+                <div className="divide-y divide-app-border">
+                  {tenantsState.data.map((tenant) => (
+                    <article key={tenant.id} className="grid gap-4 px-5 py-5 lg:grid-cols-[1fr_auto]">
+                      <div>
+                        <h3 className="text-lg font-semibold text-app-text-primary">{tenant.nombre}</h3>
+                        <p className="mt-1 text-sm text-app-text-secondary">{tenant.ciudad}</p>
+                        {tenant.direccion && <p className="mt-1 text-sm text-app-text-secondary">{tenant.direccion}</p>}
+                        <p className="mt-2 text-xs text-app-text-secondary">
+                          Creado: {tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString('es-CO', { dateStyle: 'medium' }) : 'Sin fecha'}
+                        </p>
+                      </div>
+
+                      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5 lg:min-w-[34rem]">
+                        {[
+                          ['Usuarios', tenant.usuarios],
+                          ['Residentes', tenant.residentes],
+                          ['Visitas 30d', tenant.visitas30d],
+                          ['Paquetes pendientes', tenant.paquetesPendientes],
+                          ['Pagos pendientes', tenant.pagosPendientes]
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-2xl border border-app-border bg-app-bg-alt p-3">
+                            <dt className="text-xs text-app-text-secondary">{label}</dt>
+                            <dd className="mt-1 text-lg font-bold text-app-text-primary">{formatMetric(value)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </main>
       </div>
     </div>
