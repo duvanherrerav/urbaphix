@@ -45,6 +45,7 @@ Tablas detectadas en `public`:
 - multas
 - notificaciones
 - operational_events
+- tenant_lifecycle
 - pagos
 - pagos_eventos
 - paquetes
@@ -67,6 +68,7 @@ Tablas detectadas en `public`:
 - zonas_comunes
 - platform_memberships
 - tenant_memberships
+- tenant_lifecycle
 
 ---
 
@@ -216,7 +218,49 @@ Tablas detectadas en `public`:
 
 ---
 
-## 7. incidentes
+## 7. tenant_lifecycle
+**Descripción:** tabla complementaria 1:1 para lifecycle SaaS, licencia y bloqueo operativo de cada tenant/conjunto. FASE 5.1 la agrega sin modificar `public.conjuntos` ni habilitar CRUD frontend.
+
+### Campos
+- `conjunto_id` (uuid, NOT NULL, PK, FK `conjuntos.id`)
+- `lifecycle_status` (text, NOT NULL, default: `'onboarding'`, check: `onboarding|active|suspended|archived`)
+- `license_status` (text, nullable, default: `'active'`, check: `trial|active|suspended|expired|canceled`)
+- `plan_code` (text, nullable, default: `'standard'`, check longitud 2..64)
+- `operational_lock` (boolean, NOT NULL, default: `false`)
+- `lock_reason` (text, nullable, check longitud 1..280 cuando existe)
+- `status_reason` (text, nullable, check longitud 1..280 cuando existe)
+- `activated_at` (timestamptz, nullable)
+- `suspended_at` (timestamptz, nullable)
+- `archived_at` (timestamptz, nullable)
+- `created_at` (timestamptz, NOT NULL, default: `now()`)
+- `created_by` (uuid, nullable, FK `auth.users.id`)
+- `updated_at` (timestamptz, NOT NULL, default: `now()`)
+- `updated_by` (uuid, nullable, FK `auth.users.id`)
+
+### Relaciones
+- `conjunto_id` → `conjuntos.id` (`ON DELETE CASCADE`)
+- `created_by` → `auth.users.id` (`ON DELETE SET NULL`)
+- `updated_by` → `auth.users.id` (`ON DELETE SET NULL`)
+
+### Índices
+- PK: `conjunto_id`
+- índice: `(lifecycle_status)`
+- índice parcial: `(license_status) where license_status is not null`
+
+### RLS / permisos
+- RLS habilitado y forzado.
+- `anon`: sin privilegios directos.
+- `authenticated`: solo `SELECT` mediante policy `tenant_lifecycle_select_platform` para `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')`.
+- Sin policies `INSERT`, `UPDATE` ni `DELETE` para `authenticated`; usuarios tenant no pueden escribir lifecycle directamente.
+- Mutaciones lifecycle quedan reservadas para backend con `service_role` o RPC controlada en FASE 5.2.
+
+### Backfill FASE 5.1
+- La migración inserta una fila por cada `public.conjuntos` existente que aún no tenga lifecycle.
+- Estado inicial documentado para DEV: `lifecycle_status = 'active'`, `license_status = 'active'`, `plan_code = 'standard'`, `activated_at = now()`.
+
+---
+
+## 8. incidentes
 **Descripción:** incidentes o novedades de seguridad.
 
 ### Campos
@@ -976,6 +1020,7 @@ Tablas con FK directa a `conjuntos.id`:
 - apartamentos
 - comunicados
 - config_pagos
+- tenant_lifecycle
 - incidentes
 - multas
 - pagos
@@ -1093,6 +1138,7 @@ Patrones de control vistos en las políticas:
 - multas
 - notificaciones
 - operational_events
+- tenant_lifecycle
 - pagos
 - pagos_eventos
 - paquetes
