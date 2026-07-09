@@ -27,6 +27,8 @@ La vista solo muestra agregados:
 - total abierto/pendiente por dominio.
 - conteos agrupados por estado.
 
+Para `pagos`, el resumen usa estado financiero efectivo antes de agrupar: mantiene `pagado` y `en_revision`; agrupa como `vencido` los pagos `pendiente` o `rechazado` con `fecha_vencimiento` vencida, alineado con `obtenerEstadoFinancieroReal()` del frontend y con la documentación de schema que indica que no hay job automático de normalización en DB.
+
 No se muestran personas, documentos, placas, teléfonos, comprobantes, descripciones, notas, direcciones residenciales ni URLs de evidencia.
 
 ## Fuera de alcance
@@ -61,6 +63,7 @@ Checklist manual:
 - [ ] Superadmin ve la sección **Operación** en `/superadmin`.
 - [ ] Puede navegar entre **Resumen plataforma**, **Tenants**, **Usuarios/Memberships** y **Operación**.
 - [ ] KPIs de DEV muestran los valores esperados del precheck.
+- [ ] Pagos por estado usa estado financiero efectivo/derivado antes de agrupar.
 - [ ] El resumen por estado se renderiza sin PII.
 - [ ] Usuario sin `platform_membership` activa sigue sin entrar a `/superadmin`.
 

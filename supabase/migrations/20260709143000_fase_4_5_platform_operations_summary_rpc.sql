@@ -51,10 +51,19 @@ begin
 
     select
       'pagos'::text as domain,
-      coalesce(pg.estado, 'sin_estado')::text as estado,
+      pago_estado.estado_efectivo as estado,
       pg.created_at::timestamp with time zone as created_at,
-      (pg.estado in ('pendiente', 'vencido', 'en_revision', 'rechazado')) as is_open
+      (pago_estado.estado_efectivo in ('pendiente', 'vencido', 'en_revision', 'rechazado')) as is_open
     from public.pagos pg
+    cross join lateral (
+      select case
+        when lower(trim(coalesce(pg.estado, ''))) in ('pendiente', 'rechazado')
+          and pg.fecha_vencimiento is not null
+          and pg.fecha_vencimiento < now()
+          then 'vencido'::text
+        else coalesce(nullif(lower(trim(pg.estado)), ''), 'sin_estado')::text
+      end as estado_efectivo
+    ) pago_estado
 
     union all
 

@@ -1072,7 +1072,7 @@ Patrones de control vistos en las políticas:
 ### `fn_platform_operations_summary()`
 - tipo: RPC `SECURITY DEFINER` para Operación Superadmin read-only.
 - autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`).
-- retorno: filas agregadas por `domain` (`visitas`, `paquetes`, `pagos`, `incidentes`) y `estado`, con contadores `total`, `total_30d` y `open_total`.
+- retorno: filas agregadas por `domain` (`visitas`, `paquetes`, `pagos`, `incidentes`) y `estado`, con contadores `total`, `total_30d` y `open_total`. En `pagos`, el `estado` es financiero efectivo: `pendiente`/`rechazado` con `fecha_vencimiento < now()` se agrupa como `vencido`, porque no existe job automático que normalice ese estado en DB.
 - privacidad: no retorna registros individuales, personas, documentos, placas, comprobantes, teléfonos, descripciones, notas ni PII detallada; solo señales operativas agregadas cross-tenant.
 - permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. El frontend debe invocarla con la sesión autenticada del usuario plataforma, nunca con `service_role`.
 
