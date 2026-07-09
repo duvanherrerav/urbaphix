@@ -112,6 +112,14 @@ export const getSuperadminTenantsSummary = async () => {
   }
 };
 
+const normalizeOperationRow = (row) => ({
+  domain: row?.domain || '',
+  estado: row?.estado || 'sin_estado',
+  total: normalizeMetricValue(row?.total),
+  total30d: normalizeMetricValue(row?.total_30d),
+  openTotal: normalizeMetricValue(row?.open_total)
+});
+
 export const getSuperadminMembershipsSummary = async () => {
   const generatedAt = new Date().toISOString();
 
@@ -141,6 +149,37 @@ export const getSuperadminMembershipsSummary = async () => {
 
     return {
       data: { platform: [], tenant: [] },
+      error,
+      generatedAt
+    };
+  }
+};
+
+
+export const getSuperadminOperationsSummary = async () => {
+  const generatedAt = new Date().toISOString();
+
+  try {
+    const { data, error } = await supabase.rpc('fn_platform_operations_summary');
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      data: (Array.isArray(data) ? data : []).map(normalizeOperationRow),
+      error: null,
+      generatedAt
+    };
+  } catch (error) {
+    logger.error('No se pudo cargar resumen operativo plataforma', error, {
+      module: 'superadmin',
+      action: 'load_platform_operations_summary',
+      rpc: 'fn_platform_operations_summary'
+    });
+
+    return {
+      data: [],
       error,
       generatedAt
     };
