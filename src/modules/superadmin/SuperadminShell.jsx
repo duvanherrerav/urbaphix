@@ -45,6 +45,32 @@ const formatDateTime = (value) => (value
   ? new Date(value).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
   : '—');
 
+const sectionGeneratedAt = {
+  summary: (state) => state.metrics.generatedAt,
+  tenants: (state) => state.tenants.generatedAt,
+  memberships: (state) => state.memberships.generatedAt,
+  operations: (state) => state.operations.generatedAt,
+  audit: (state) => state.audit.generatedAt
+};
+
+const getStatusBadgeClass = (status) => {
+  if (status === 'active') return 'app-badge-success';
+  if (status === 'suspended' || status === 'revoked') return 'app-badge-warning';
+  return 'app-badge-info';
+};
+
+function DataMessage({ tone = 'warning', children }) {
+  const toneClass = tone === 'error'
+    ? 'border-state-error/30 bg-state-error/10 text-state-error'
+    : 'border-state-warning/30 bg-state-warning/10 text-state-warning';
+
+  return (
+    <div className={`m-5 rounded-2xl border px-5 py-4 text-sm ${toneClass}`} role={tone === 'error' ? 'alert' : 'status'}>
+      {children}
+    </div>
+  );
+}
+
 function MetricSkeleton() {
   return (
     <article className="app-surface-muted animate-pulse p-4">
@@ -244,8 +270,17 @@ function SuperadminShell({ user, platformMembership }) {
     };
   }), [auditState.data]);
 
-  const generatedAtLabel = metricsState.generatedAt
-    ? new Date(metricsState.generatedAt).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
+  const stateBySection = useMemo(() => ({
+    metrics: metricsState,
+    tenants: tenantsState,
+    memberships: membershipsState,
+    operations: operationsState,
+    audit: auditState
+  }), [auditState, membershipsState, metricsState, operationsState, tenantsState]);
+
+  const activeGeneratedAt = sectionGeneratedAt[activeSection]?.(stateBySection) || metricsState.generatedAt;
+  const generatedAtLabel = activeGeneratedAt
+    ? new Date(activeGeneratedAt).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
     : 'Pendiente';
 
   return (
@@ -267,7 +302,7 @@ function SuperadminShell({ user, platformMembership }) {
                 key={item.label}
                 type="button"
                 onClick={() => item.key && setActiveSection(item.key)}
-                className={`app-sidebar-item w-full ${activeSection === item.key ? 'app-sidebar-item-active' : ''}`}
+                className={`app-sidebar-item w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/60 ${activeSection === item.key ? 'app-sidebar-item-active' : ''}`}
                 aria-current={activeSection === item.key ? 'page' : undefined}
               >
                 <span aria-hidden="true">{item.icon}</span>
@@ -284,12 +319,12 @@ function SuperadminShell({ user, platformMembership }) {
               <h1 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-app-text-primary">Dashboard Superadmin</h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <div className="text-right">
                 <p className="text-sm font-semibold text-app-text-primary">{displayName}</p>
                 <p className="text-xs text-app-text-secondary">{roleName}</p>
               </div>
-              <button type="button" onClick={() => supabase.auth.signOut()} className="app-btn app-btn-secondary">
+              <button type="button" onClick={() => supabase.auth.signOut()} className="app-btn app-btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/60" aria-label="Cerrar sesión Superadmin">
                 Cerrar sesión
               </button>
             </div>
@@ -358,9 +393,9 @@ function SuperadminShell({ user, platformMembership }) {
               </div>
 
               {tenantsState.status === 'error' && (
-                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                <DataMessage tone="error">
                   No fue posible cargar el listado de tenants con la sesión actual. Verifica RLS/membership activa y vuelve a intentar.
-                </div>
+                </DataMessage>
               )}
 
               {tenantsState.status === 'loading' && (
@@ -370,9 +405,9 @@ function SuperadminShell({ user, platformMembership }) {
               )}
 
               {tenantsState.status === 'success' && tenantsState.data.length === 0 && (
-                <div className="m-5 rounded-2xl border border-state-warning/30 bg-state-warning/10 px-5 py-4 text-sm text-state-warning">
+                <DataMessage>
                   No hay conjuntos disponibles para mostrar todavía.
-                </div>
+                </DataMessage>
               )}
 
               {tenantsState.status === 'success' && tenantsState.data.length > 0 && (
@@ -420,9 +455,9 @@ function SuperadminShell({ user, platformMembership }) {
               </div>
 
               {membershipsState.status === 'error' && (
-                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                <DataMessage tone="error">
                   No fue posible cargar Usuarios/Memberships con la sesión actual. Verifica RLS/membership plataforma activa y vuelve a intentar.
-                </div>
+                </DataMessage>
               )}
 
               {membershipsState.status === 'loading' && (
@@ -464,7 +499,7 @@ function SuperadminShell({ user, platformMembership }) {
                                   {showTenant && <td className="whitespace-nowrap px-4 py-3">{membership.conjuntoNombre}</td>}
                                   <td className="whitespace-nowrap px-4 py-3">{membership.email}</td>
                                   <td className="whitespace-nowrap px-4 py-3">{membership.roleName}</td>
-                                  <td className="whitespace-nowrap px-4 py-3">{membership.status}</td>
+                                  <td className="whitespace-nowrap px-4 py-3"><span className={getStatusBadgeClass(membership.status)}>{membership.status}</span></td>
                                   <td className="whitespace-nowrap px-4 py-3 text-app-text-secondary">{formatDateTime(membership.createdAt)}</td>
                                   <td className="whitespace-nowrap px-4 py-3 text-app-text-secondary">{formatDateTime(membership.updatedAt)}</td>
                                   <td className="whitespace-nowrap px-4 py-3 text-app-text-secondary">{formatDateTime(membership.revokedAt)}</td>
@@ -493,9 +528,9 @@ function SuperadminShell({ user, platformMembership }) {
               </div>
 
               {operationsState.status === 'error' && (
-                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                <DataMessage tone="error">
                   No fue posible cargar Operación con la sesión actual. Verifica RLS/membership plataforma activa y vuelve a intentar.
-                </div>
+                </DataMessage>
               )}
 
               {operationsState.status === 'loading' && (
@@ -505,9 +540,9 @@ function SuperadminShell({ user, platformMembership }) {
               )}
 
               {operationsState.status === 'success' && operationsState.data.length === 0 && (
-                <div className="m-5 rounded-2xl border border-state-warning/30 bg-state-warning/10 px-5 py-4 text-sm text-state-warning">
+                <DataMessage>
                   No hay señales operativas agregadas para mostrar todavía.
-                </div>
+                </DataMessage>
               )}
 
               {operationsState.status === 'success' && operationsState.data.length > 0 && (
@@ -557,9 +592,9 @@ function SuperadminShell({ user, platformMembership }) {
               </div>
 
               {auditState.status === 'error' && (
-                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                <DataMessage tone="error">
                   No fue posible cargar Auditoría con la sesión actual. Verifica RLS/membership plataforma activa y vuelve a intentar.
-                </div>
+                </DataMessage>
               )}
 
               {auditState.status === 'loading' && (
@@ -569,9 +604,9 @@ function SuperadminShell({ user, platformMembership }) {
               )}
 
               {auditState.status === 'success' && auditState.data.length === 0 && (
-                <div className="m-5 rounded-2xl border border-state-warning/30 bg-state-warning/10 px-5 py-4 text-sm text-state-warning">
+                <DataMessage>
                   No hay señales de auditoría agregadas para mostrar todavía.
-                </div>
+                </DataMessage>
               )}
 
               {auditState.status === 'success' && auditState.data.length > 0 && (
