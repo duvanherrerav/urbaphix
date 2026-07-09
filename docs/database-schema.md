@@ -1076,6 +1076,14 @@ Patrones de control vistos en las políticas:
 - privacidad: no retorna registros individuales, personas, documentos, placas, comprobantes, teléfonos, descripciones, notas ni PII detallada; solo señales operativas agregadas cross-tenant.
 - permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. El frontend debe invocarla con la sesión autenticada del usuario plataforma, nunca con `service_role`.
 
+
+### `fn_platform_audit_summary()`
+- tipo: RPC `SECURITY DEFINER` para Auditoría Superadmin read-only.
+- autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`).
+- retorno: filas agregadas por `source` (`operational_events`, `pagos_eventos`, `reservas_eventos`, `notificaciones`, `incidentes`), `dimension` (`fuente`, `tipo`, `estado`, `severidad`, `evento`, `accion`, `nivel`) y `value`, con contadores `total` y `total_30d`.
+- privacidad: no retorna eventos individuales, metadata, mensajes, errores, títulos, detalles, usuarios, documentos, placas, teléfonos, comprobantes, URLs ni PII; además sanitiza/bucketiza labels antes de agruparlos y cualquier valor fuera de whitelist se devuelve como `otro`. Solo expone señales agregadas cross-tenant.
+- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. El frontend debe invocarla con la sesión autenticada del usuario plataforma, nunca con `service_role`.
+
 ## Tablas con políticas visibles
 - accesos
 - archivos
