@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BrandLogo from '../../components/brand/BrandLogo';
 import { supabase } from '../../services/supabaseClient';
-import { getSuperadminMembershipsSummary, getSuperadminMetrics, getSuperadminTenantsSummary } from './superadminMetricsService';
+import { getSuperadminMembershipsSummary, getSuperadminMetrics, getSuperadminOperationsSummary, getSuperadminTenantsSummary } from './superadminMetricsService';
 
 const navItems = [
   { key: 'summary', label: 'Resumen plataforma', icon: '📡', description: 'KPIs agregados read-only de la operación SaaS.' },
   { key: 'tenants', label: 'Tenants', icon: '🏢', description: 'Inventario agregado de conjuntos y métricas operativas.' },
   { key: 'memberships', label: 'Usuarios/Memberships', icon: '🔐', description: 'Memberships plataforma y tenant read-only.' },
-  { label: 'Operación', icon: '🛠️', description: 'Señales operativas sin CRUD ni datos sensibles.' },
+  { key: 'operations', label: 'Operación', icon: '🛠️', description: 'Señales operativas sin CRUD ni datos sensibles.' },
   { label: 'Auditoría', icon: '🧾', description: 'Trazabilidad futura de eventos de plataforma.' }
 ];
 
@@ -21,6 +21,14 @@ const metricCards = [
   { key: 'paquetesPendientes', label: 'Paquetes pendientes', icon: '📦', description: 'Entregas pendientes sin detalle personal.' },
   { key: 'pagosPendientes', label: 'Pagos pendientes', icon: '💳', description: 'Obligaciones pendientes agregadas.' },
   { key: 'incidentesAbiertos', label: 'Incidentes abiertos', icon: '🚨', description: 'Incidentes nuevos o en gestión.' }
+];
+
+
+const operationDomains = [
+  { key: 'visitas', label: 'Visitas', icon: '🚪', openLabel: 'Pendientes' },
+  { key: 'paquetes', label: 'Paquetes', icon: '📦', openLabel: 'Pendientes' },
+  { key: 'pagos', label: 'Pagos', icon: '💳', openLabel: 'Pendientes / revisión' },
+  { key: 'incidentes', label: 'Incidentes', icon: '🚨', openLabel: 'Abiertos' }
 ];
 
 const formatMetric = (value) => new Intl.NumberFormat('es-CO').format(value ?? 0);
@@ -60,8 +68,10 @@ function SuperadminShell({ user, platformMembership }) {
   const [metricsState, setMetricsState] = useState({ status: 'loading', data: null, error: null, generatedAt: null });
   const [tenantsState, setTenantsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
   const [membershipsState, setMembershipsState] = useState({ status: 'idle', data: { platform: [], tenant: [] }, error: null, generatedAt: null });
+  const [operationsState, setOperationsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
   const tenantsRequestStartedRef = useRef(false);
   const membershipsRequestStartedRef = useRef(false);
+  const operationsRequestStartedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -141,10 +151,50 @@ function SuperadminShell({ user, platformMembership }) {
     };
   }, [activeSection]);
 
+
+  useEffect(() => {
+    if (activeSection !== 'operations' || operationsRequestStartedRef.current) return undefined;
+
+    let isMounted = true;
+    operationsRequestStartedRef.current = true;
+
+    const loadOperations = async () => {
+      setOperationsState({ status: 'loading', data: [], error: null, generatedAt: null });
+      const result = await getSuperadminOperationsSummary();
+
+      if (!isMounted) return;
+
+      setOperationsState({
+        status: result.error ? 'error' : 'success',
+        data: result.data,
+        error: result.error,
+        generatedAt: result.generatedAt
+      });
+    };
+
+    loadOperations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeSection]);
+
   const hasNoData = useMemo(() => {
     if (metricsState.status !== 'success' || !metricsState.data) return false;
     return metricCards.every((metric) => Number(metricsState.data[metric.key] || 0) === 0);
   }, [metricsState]);
+
+
+  const operationsByDomain = useMemo(() => operationDomains.map((domain) => {
+    const rows = operationsState.data.filter((row) => row.domain === domain.key);
+    return {
+      ...domain,
+      rows,
+      total: rows.reduce((sum, row) => sum + row.total, 0),
+      total30d: rows.reduce((sum, row) => sum + row.total30d, 0),
+      openTotal: rows.reduce((sum, row) => sum + row.openTotal, 0)
+    };
+  }), [operationsState.data]);
 
   const generatedAtLabel = metricsState.generatedAt
     ? new Date(metricsState.generatedAt).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
@@ -377,6 +427,70 @@ function SuperadminShell({ user, platformMembership }) {
                         </div>
                       )}
                     </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+
+          {activeSection === 'operations' && (
+            <section className="app-surface-primary overflow-hidden p-0 shadow-app" aria-busy={operationsState.status === 'loading'}>
+              <div className="border-b border-app-border px-5 py-4">
+                <p className="app-badge-info mb-3 inline-flex">Operación · read-only</p>
+                <h2 className="text-xl font-semibold text-app-text-primary">Señales operativas cross-tenant</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-app-text-secondary">
+                  KPIs y resumen por estado para visitas, paquetes, pagos e incidentes. La fuente es agregada, autorizada para roles plataforma y no lista personas, documentos, placas, comprobantes ni teléfonos.
+                </p>
+              </div>
+
+              {operationsState.status === 'error' && (
+                <div className="m-5 rounded-2xl border border-state-error/30 bg-state-error/10 px-5 py-4 text-sm text-state-error" role="alert">
+                  No fue posible cargar Operación con la sesión actual. Verifica RLS/membership plataforma activa y vuelve a intentar.
+                </div>
+              )}
+
+              {operationsState.status === 'loading' && (
+                <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+                  {operationDomains.map((domain) => <MetricSkeleton key={domain.key} />)}
+                </div>
+              )}
+
+              {operationsState.status === 'success' && operationsState.data.length === 0 && (
+                <div className="m-5 rounded-2xl border border-state-warning/30 bg-state-warning/10 px-5 py-4 text-sm text-state-warning">
+                  No hay señales operativas agregadas para mostrar todavía.
+                </div>
+              )}
+
+              {operationsState.status === 'success' && operationsState.data.length > 0 && (
+                <div className="grid gap-4 p-5 xl:grid-cols-2">
+                  {operationsByDomain.map((domain) => (
+                    <article key={domain.key} className="overflow-hidden rounded-2xl border border-app-border bg-app-bg-alt">
+                      <div className="border-b border-app-border p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="flex items-center gap-2 font-semibold text-app-text-primary"><span aria-hidden="true">{domain.icon}</span>{domain.label}</h3>
+                          <span className="app-badge-info">{formatMetric(domain.total)} total</span>
+                        </div>
+                        <dl className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="rounded-2xl border border-app-border bg-black/10 p-3">
+                            <dt className="text-xs text-app-text-secondary">30 días</dt>
+                            <dd className="mt-1 text-lg font-bold text-app-text-primary">{formatMetric(domain.total30d)}</dd>
+                          </div>
+                          <div className="rounded-2xl border border-app-border bg-black/10 p-3">
+                            <dt className="text-xs text-app-text-secondary">{domain.openLabel}</dt>
+                            <dd className="mt-1 text-lg font-bold text-app-text-primary">{formatMetric(domain.openTotal)}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                      <div className="divide-y divide-app-border">
+                        {domain.rows.map((row) => (
+                          <div key={`${domain.key}-${row.estado}`} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+                            <span className="font-medium text-app-text-primary">{row.estado}</span>
+                            <span className="text-app-text-secondary">{formatMetric(row.total)} registros</span>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
                   ))}
                 </div>
               )}
