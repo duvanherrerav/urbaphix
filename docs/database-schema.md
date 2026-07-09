@@ -1062,6 +1062,13 @@ Patrones de control vistos en las políticas:
 - privacidad: no retorna documentos, placas, comprobantes, emails, teléfonos ni PII detallada; solo identificación básica del tenant y métricas operativas agregadas por conjunto.
 - permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. El frontend debe invocarla con la sesión autenticada del usuario plataforma, nunca con `service_role`.
 
+### `fn_platform_memberships_summary()`
+- tipo: RPC `SECURITY DEFINER` para Usuarios/Memberships Superadmin read-only.
+- autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`).
+- retorno: una fila por membership plataforma o tenant con campos seguros `membership_scope`, `membership_id`, `user_id`, `email`, `conjunto_id`, `conjunto_nombre`, `role_name`, `status`, `created_at`, `updated_at`, `revoked_at`.
+- privacidad: retorna email como identificador mínimo operativo cuando es necesario, pero no retorna teléfonos, documentos, placas, comprobantes, direcciones residenciales ni PII adicional.
+- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. El frontend debe invocarla con la sesión autenticada del usuario plataforma, nunca con `service_role`.
+
 ## Tablas con políticas visibles
 - accesos
 - archivos

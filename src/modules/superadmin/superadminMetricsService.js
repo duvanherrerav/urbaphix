@@ -36,6 +36,20 @@ const normalizeTenant = (row) => ({
   pagosPendientes: normalizeMetricValue(row?.pagos_pendientes)
 });
 
+const normalizeMembership = (row) => ({
+  id: row?.membership_id || '',
+  scope: row?.membership_scope || '',
+  userId: row?.user_id || '',
+  email: row?.email || 'Sin email',
+  conjuntoId: row?.conjunto_id || null,
+  conjuntoNombre: row?.conjunto_nombre || 'Sin conjunto',
+  roleName: row?.role_name || 'Sin rol',
+  status: row?.status || 'Sin estado',
+  createdAt: row?.created_at || null,
+  updatedAt: row?.updated_at || null,
+  revokedAt: row?.revoked_at || null
+});
+
 export const getSuperadminMetrics = async () => {
   const generatedAt = new Date().toISOString();
 
@@ -92,6 +106,41 @@ export const getSuperadminTenantsSummary = async () => {
 
     return {
       data: [],
+      error,
+      generatedAt
+    };
+  }
+};
+
+export const getSuperadminMembershipsSummary = async () => {
+  const generatedAt = new Date().toISOString();
+
+  try {
+    const { data, error } = await supabase.rpc('fn_platform_memberships_summary');
+
+    if (error) {
+      throw error;
+    }
+
+    const memberships = (Array.isArray(data) ? data : []).map(normalizeMembership);
+
+    return {
+      data: {
+        platform: memberships.filter((membership) => membership.scope === 'platform'),
+        tenant: memberships.filter((membership) => membership.scope === 'tenant')
+      },
+      error: null,
+      generatedAt
+    };
+  } catch (error) {
+    logger.error('No se pudo cargar resumen de memberships plataforma', error, {
+      module: 'superadmin',
+      action: 'load_platform_memberships_summary',
+      rpc: 'fn_platform_memberships_summary'
+    });
+
+    return {
+      data: { platform: [], tenant: [] },
       error,
       generatedAt
     };
