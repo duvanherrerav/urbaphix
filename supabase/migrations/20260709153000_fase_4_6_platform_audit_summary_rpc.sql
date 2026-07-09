@@ -2,6 +2,7 @@
 --
 -- Expone únicamente agregados de trazabilidad para roles plataforma autorizados.
 -- No retorna metadata, mensajes, errores, títulos, detalles, usuarios ni PII.
+-- Bucketiza labels libres con whitelist segura; valores fuera de whitelist se agrupan como otro.
 -- No modifica policies RLS ni habilita CRUD.
 
 create or replace function public.fn_platform_audit_summary()
@@ -35,7 +36,11 @@ begin
     select
       'operational_events'::text as source,
       'severidad'::text as dimension,
-      coalesce(oe.severity, 'sin_severidad')::text as value,
+      case
+        when nullif(lower(trim(oe.severity)), '') is null then 'sin_severidad'
+        when lower(trim(oe.severity)) in ('info', 'warn', 'error') then lower(trim(oe.severity))
+        else 'otro'
+      end as value,
       oe.created_at::timestamp with time zone as created_at
     from public.operational_events oe
 
@@ -44,7 +49,11 @@ begin
     select
       'operational_events'::text as source,
       'fuente'::text as dimension,
-      coalesce(oe.source, 'sin_fuente')::text as value,
+      case
+        when nullif(lower(trim(oe.source)), '') is null then 'sin_fuente'
+        when lower(trim(oe.source)) in ('frontend', 'edge_function') then lower(trim(oe.source))
+        else 'otro'
+      end as value,
       oe.created_at::timestamp with time zone as created_at
     from public.operational_events oe
 
@@ -53,7 +62,11 @@ begin
     select
       'operational_events'::text as source,
       'tipo'::text as dimension,
-      coalesce(oe.event_type, 'sin_tipo')::text as value,
+      case
+        when nullif(lower(trim(oe.event_type)), '') is null then 'sin_tipo'
+        when lower(trim(oe.event_type)) in ('aborterror', 'invalidstateerror', 'error', 'unknownerror') then lower(trim(oe.event_type))
+        else 'otro'
+      end as value,
       oe.created_at::timestamp with time zone as created_at
     from public.operational_events oe
 
@@ -62,7 +75,11 @@ begin
     select
       'pagos_eventos'::text as source,
       'evento'::text as dimension,
-      coalesce(pe.evento, 'sin_evento')::text as value,
+      case
+        when nullif(lower(trim(pe.evento)), '') is null then 'sin_evento'
+        when lower(trim(pe.evento)) in ('cobro_creado', 'comprobante_subido', 'comprobante_reemplazado', 'pago_aprobado', 'comprobante_rechazado', 'pago_vencido') then lower(trim(pe.evento))
+        else 'otro'
+      end as value,
       pe.created_at::timestamp with time zone as created_at
     from public.pagos_eventos pe
 
@@ -71,7 +88,11 @@ begin
     select
       'pagos_eventos'::text as source,
       'estado'::text as dimension,
-      coalesce(pe.estado_nuevo, 'sin_estado')::text as value,
+      case
+        when nullif(lower(trim(pe.estado_nuevo)), '') is null then 'sin_estado'
+        when lower(trim(pe.estado_nuevo)) in ('pendiente', 'pagado', 'en_revision', 'rechazado', 'vencido') then lower(trim(pe.estado_nuevo))
+        else 'otro'
+      end as value,
       pe.created_at::timestamp with time zone as created_at
     from public.pagos_eventos pe
 
@@ -80,7 +101,11 @@ begin
     select
       'reservas_eventos'::text as source,
       'accion'::text as dimension,
-      coalesce(re.accion, 'sin_accion')::text as value,
+      case
+        when nullif(lower(trim(re.accion)), '') is null then 'sin_accion'
+        when lower(trim(re.accion)) in ('pendiente', 'aprobada', 'rechazada', 'cancelada', 'finalizada', 'check_in', 'check_out') then lower(trim(re.accion))
+        else 'otro'
+      end as value,
       re.created_at::timestamp with time zone as created_at
     from public.reservas_eventos re
 
@@ -89,7 +114,11 @@ begin
     select
       'notificaciones'::text as source,
       'tipo'::text as dimension,
-      coalesce(n.tipo, 'sin_tipo')::text as value,
+      case
+        when nullif(lower(trim(n.tipo)), '') is null then 'sin_tipo'
+        when lower(trim(n.tipo)) in ('visita_ingreso', 'seguridad_alerta', 'alerta_critica', 'paquete_entregado', 'nuevo_cobro', 'recordatorio_pago', 'pago_aprobado', 'pago_rechazado', 'comprobante_subido') then lower(trim(n.tipo))
+        else 'otro'
+      end as value,
       n.created_at::timestamp with time zone as created_at
     from public.notificaciones n
 
@@ -107,7 +136,11 @@ begin
     select
       'incidentes'::text as source,
       'estado'::text as dimension,
-      coalesce(i.estado, 'sin_estado')::text as value,
+      case
+        when nullif(lower(trim(i.estado)), '') is null then 'sin_estado'
+        when lower(trim(i.estado)) in ('nuevo', 'en_gestion', 'resuelto', 'cerrado') then lower(trim(i.estado))
+        else 'otro'
+      end as value,
       i.created_at::timestamp with time zone as created_at
     from public.incidentes i
 
@@ -116,7 +149,11 @@ begin
     select
       'incidentes'::text as source,
       'tipo'::text as dimension,
-      coalesce(i.tipo, 'sin_tipo')::text as value,
+      case
+        when nullif(lower(trim(i.tipo)), '') is null then 'sin_tipo'
+        when lower(trim(i.tipo)) in ('seguridad', 'convivencia', 'infraestructura', 'acceso') then lower(trim(i.tipo))
+        else 'otro'
+      end as value,
       i.created_at::timestamp with time zone as created_at
     from public.incidentes i
 
@@ -125,7 +162,11 @@ begin
     select
       'incidentes'::text as source,
       'nivel'::text as dimension,
-      coalesce(i.nivel, 'sin_nivel')::text as value,
+      case
+        when nullif(lower(trim(i.nivel)), '') is null then 'sin_nivel'
+        when lower(trim(i.nivel)) in ('alto', 'medio', 'bajo') then lower(trim(i.nivel))
+        else 'otro'
+      end as value,
       i.created_at::timestamp with time zone as created_at
     from public.incidentes i
   )
