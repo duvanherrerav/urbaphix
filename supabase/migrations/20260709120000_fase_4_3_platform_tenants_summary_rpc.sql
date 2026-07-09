@@ -48,36 +48,36 @@ begin
     coalesce(pg.total, 0)::bigint as pagos_pendientes
   from public.conjuntos c
   left join (
-    select conjunto_id, count(*)::bigint as total
-    from public.usuarios_app
-    where conjunto_id is not null
-    group by conjunto_id
+    select ua_src.conjunto_id, count(*)::bigint as total
+    from public.usuarios_app ua_src
+    where ua_src.conjunto_id is not null
+    group by ua_src.conjunto_id
   ) ua on ua.conjunto_id = c.id
   left join (
-    select conjunto_id, count(*)::bigint as total
-    from public.residentes
-    where conjunto_id is not null
-    group by conjunto_id
+    select r_src.conjunto_id, count(*)::bigint as total
+    from public.residentes r_src
+    where r_src.conjunto_id is not null
+    group by r_src.conjunto_id
   ) r on r.conjunto_id = c.id
   left join (
-    select conjunto_id, count(*)::bigint as total
-    from public.registro_visitas
-    where created_at >= now() - interval '30 days'
-    group by conjunto_id
+    select rv_src.conjunto_id, count(*)::bigint as total
+    from public.registro_visitas rv_src
+    where rv_src.created_at >= now() - interval '30 days'
+    group by rv_src.conjunto_id
   ) rv on rv.conjunto_id = c.id
   left join (
-    select conjunto_id, count(*)::bigint as total
-    from public.paquetes
-    where estado = 'pendiente'
-      and conjunto_id is not null
-    group by conjunto_id
+    select pq_src.conjunto_id, count(*)::bigint as total
+    from public.paquetes pq_src
+    where pq_src.estado = 'pendiente'
+      and pq_src.conjunto_id is not null
+    group by pq_src.conjunto_id
   ) pq on pq.conjunto_id = c.id
   left join (
-    select conjunto_id, count(*)::bigint as total
-    from public.pagos
-    where estado = 'pendiente'
-      and conjunto_id is not null
-    group by conjunto_id
+    select pg_src.conjunto_id, count(*)::bigint as total
+    from public.pagos pg_src
+    where pg_src.estado = 'pendiente'
+      and pg_src.conjunto_id is not null
+    group by pg_src.conjunto_id
   ) pg on pg.conjunto_id = c.id
   order by c.created_at desc nulls last, c.nombre asc;
 end;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BrandLogo from '../../components/brand/BrandLogo';
 import { supabase } from '../../services/supabaseClient';
 import { getSuperadminMetrics, getSuperadminTenantsSummary } from './superadminMetricsService';
@@ -54,6 +54,7 @@ function SuperadminShell({ user, platformMembership }) {
   const roleName = platformMembership?.role_name || 'platform';
   const [metricsState, setMetricsState] = useState({ status: 'loading', data: null, error: null, generatedAt: null });
   const [tenantsState, setTenantsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
+  const tenantsRequestStartedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -80,9 +81,10 @@ function SuperadminShell({ user, platformMembership }) {
   }, []);
 
   useEffect(() => {
-    if (activeSection !== 'tenants' || tenantsState.status !== 'idle') return;
+    if (activeSection !== 'tenants' || tenantsRequestStartedRef.current) return undefined;
 
     let isMounted = true;
+    tenantsRequestStartedRef.current = true;
 
     const loadTenants = async () => {
       setTenantsState({ status: 'loading', data: [], error: null, generatedAt: null });
@@ -103,7 +105,7 @@ function SuperadminShell({ user, platformMembership }) {
     return () => {
       isMounted = false;
     };
-  }, [activeSection, tenantsState.status]);
+  }, [activeSection]);
 
   const hasNoData = useMemo(() => {
     if (metricsState.status !== 'success' || !metricsState.data) return false;
