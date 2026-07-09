@@ -10,7 +10,7 @@ Esta fase estabiliza el módulo Superadmin existente de las FASES 4.1 a 4.6 sin 
 - Se consolidó un componente local para mensajes de error/empty state, reutilizando estilos existentes y roles ARIA (`alert`/`status`) sin cambiar comportamiento funcional.
 - Se reforzó navegación por teclado con foco visible en navegación lateral y cierre de sesión.
 - Se uniformaron badges de estado para memberships usando clases existentes.
-- Se ajustó el indicador `Actualizado` para reflejar la sección activa cuando sus datos ya fueron cargados.
+- Se ajustó el indicador `Actualizado` para reflejar únicamente el timestamp propio de la sección activa cuando sus datos ya fueron cargados, sin heredar el timestamp de Resumen en secciones lazy pendientes o fallidas.
 
 ## Checklist por sección
 

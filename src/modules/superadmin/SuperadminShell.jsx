@@ -278,7 +278,7 @@ function SuperadminShell({ user, platformMembership }) {
     audit: auditState
   }), [auditState, membershipsState, metricsState, operationsState, tenantsState]);
 
-  const activeGeneratedAt = sectionGeneratedAt[activeSection]?.(stateBySection) || metricsState.generatedAt;
+  const activeGeneratedAt = sectionGeneratedAt[activeSection]?.(stateBySection) || null;
   const generatedAtLabel = activeGeneratedAt
     ? new Date(activeGeneratedAt).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
     : 'Pendiente';
