@@ -55,6 +55,7 @@ No se implementan `insert`, `update` ni `delete` directos sobre `tenant_lifecycl
 - No se usa `service_role` en frontend.
 - No se expone `actor_user_id` ni metadata de auditoría en esta fase.
 - `platform_ops` no ve acción `archive` en la UI.
+- Si un usuario tiene memberships activas `superadmin` y `platform_ops`, el rol efectivo de UI se resuelve explícitamente como `superadmin`, sin depender de `created_at` ni orden alfabético.
 - La validación real de permisos, transición terminal `archived` y matriz de estados se conserva server-side en la RPC FASE 5.2.
 - No se implementa gestión de plan/licencia ni bloqueo operativo en módulos tenant.
 
@@ -63,6 +64,8 @@ No se implementan `insert`, `update` ni `delete` directos sobre `tenant_lifecycl
 - [ ] Superadmin ve campos lifecycle de cada tenant.
 - [ ] Platform ops ve campos lifecycle de cada tenant.
 - [ ] Platform ops no ve botón `Archivar`.
+- [ ] Usuario con memberships activas `superadmin` y `platform_ops`, sin importar `created_at`, ve botón `Archivar` y muestra rol efectivo `superadmin`.
+- [ ] Usuario sin roles plataforma activos mantiene acceso denegado.
 - [ ] Superadmin puede ejecutar `active -> suspended` con razón.
 - [ ] Superadmin puede ejecutar `suspended -> active` con razón.
 - [ ] Superadmin puede ejecutar `onboarding|active|suspended -> archived` con razón.
