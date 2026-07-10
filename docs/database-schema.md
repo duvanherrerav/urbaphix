@@ -1157,6 +1157,14 @@ Patrones de control vistos en las políticas:
 - privacidad: no retorna documentos, placas, comprobantes, emails, teléfonos ni PII detallada; solo identificación básica del tenant y métricas operativas agregadas por conjunto.
 - permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. El frontend debe invocarla con la sesión autenticada del usuario plataforma, nunca con `service_role`.
 
+### `fn_platform_tenants_lifecycle_summary()`
+- tipo: RPC `SECURITY DEFINER` read-only complementaria para Backoffice Superadmin FASE 5.3.
+- motivo: exponer lifecycle SaaS sin cambiar la firma de `fn_platform_tenants_summary()` ni romper consumidores existentes.
+- autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`).
+- retorno: una fila por `tenant_lifecycle` con `conjunto_id`, `lifecycle_status`, `license_status`, `plan_code`, `operational_lock`, `lock_reason`, `status_reason`, `activated_at`, `suspended_at`, `archived_at`, `updated_at`.
+- privacidad: no retorna `actor_user_id`, `created_by`, `updated_by`, metadata de auditoría ni eventos lifecycle; las razones se exponen como campos operativos acotados por constraints de 280 caracteres.
+- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. El frontend debe invocarla con la sesión autenticada del usuario plataforma, nunca con `service_role`.
+
 ### `fn_platform_memberships_summary()`
 - tipo: RPC `SECURITY DEFINER` para Usuarios/Memberships Superadmin read-only.
 - autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`).
