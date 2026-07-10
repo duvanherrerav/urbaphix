@@ -46,6 +46,7 @@ Tablas detectadas en `public`:
 - notificaciones
 - operational_events
 - tenant_lifecycle
+- tenant_lifecycle_events
 - pagos
 - pagos_eventos
 - paquetes
@@ -252,15 +253,56 @@ Tablas detectadas en `public`:
 - `anon`: sin privilegios directos.
 - `authenticated`: solo `SELECT` mediante policy `tenant_lifecycle_select_platform` para `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')`.
 - Sin policies `INSERT`, `UPDATE` ni `DELETE` para `authenticated`; usuarios tenant no pueden escribir lifecycle directamente.
-- Mutaciones lifecycle quedan reservadas para backend con `service_role` o RPC controlada en FASE 5.2.
+- Mutaciones lifecycle expuestas solo por RPC `fn_platform_transition_tenant_lifecycle(uuid, text, text)`, `SECURITY DEFINER`, con `search_path = public, pg_temp`, `EXECUTE` para `authenticated` y `service_role`, y sin `EXECUTE` para `anon`/`public`.
+- La RPC exige `auth.uid()` y rol plataforma activo `superadmin` o `platform_ops`; `active -> archived` queda limitado a `superadmin`.
+- Transiciones permitidas FASE 5.2: `onboarding -> active`, `onboarding -> archived`, `active -> suspended`, `suspended -> active`, `suspended -> archived`, `active -> archived` solo `superadmin`; `archived` es terminal.
+- La razón es obligatoria para suspender, reactivar desde `suspended` y archivar; opcional para activar desde `onboarding`; longitud máxima 280.
 
 ### Backfill FASE 5.1
 - La migración inserta una fila por cada `public.conjuntos` existente que aún no tenga lifecycle.
 - Estado inicial documentado para DEV: `lifecycle_status = 'active'`, `license_status = 'active'`, `plan_code = 'standard'`, `activated_at = now()`.
 
+
 ---
 
-## 8. incidentes
+## 8. tenant_lifecycle_events
+**Descripción:** bitácora append-only dedicada para auditoría de transiciones lifecycle ejecutadas por la RPC de FASE 5.2. Se crea como tabla separada porque `operational_events.source` solo admite `frontend` o `edge_function`, y forzar `source = 'rpc'` requeriría cambiar el constraint y mezclar semánticas de auditoría operacional con lifecycle SaaS crítico.
+
+### Campos
+- `id` (uuid, NOT NULL, PK, default: `gen_random_uuid()`)
+- `created_at` (timestamptz, NOT NULL, default: `now()`)
+- `conjunto_id` (uuid, NOT NULL, FK `conjuntos.id`)
+- `actor_user_id` (uuid, NOT NULL, FK `auth.users.id`)
+- `actor_platform_role` (text, NOT NULL, check: `superadmin|platform_ops`)
+- `previous_status` (text, NOT NULL, check: `onboarding|active|suspended|archived`)
+- `lifecycle_status` (text, NOT NULL, check: `onboarding|active|suspended|archived`)
+- `reason` (text, nullable, check longitud 1..280 cuando existe)
+- `source` (text, NOT NULL, default: `'rpc'`, check fijo `rpc`)
+- `metadata` (jsonb, NOT NULL, default: `{}`, check objeto)
+
+### Relaciones
+- `conjunto_id` → `conjuntos.id` (`ON DELETE RESTRICT`)
+- `actor_user_id` → `auth.users.id` (`ON DELETE RESTRICT`)
+
+### Índices
+- PK: `id`
+- índice: `(conjunto_id, created_at desc)`
+- índice: `(actor_user_id, created_at desc)`
+
+### RLS / permisos
+- RLS habilitado y forzado.
+- `anon`: sin privilegios directos.
+- `authenticated`: solo `SELECT` mediante policy `tenant_lifecycle_events_select_platform` para `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')`.
+- Sin grants `INSERT`, `UPDATE` ni `DELETE` para `authenticated`; la escritura ocurre únicamente dentro de `fn_platform_transition_tenant_lifecycle` en la misma transacción que actualiza `tenant_lifecycle`.
+- `service_role`: `ALL` para operación backend controlada.
+
+### RPC relacionada
+- `fn_platform_transition_tenant_lifecycle(p_conjunto_id uuid, p_target_status text, p_reason text)` retorna `conjunto_id`, `previous_status`, `lifecycle_status`, `operational_lock`, `updated_at`.
+- La RPC registra una fila append-only con actor, rol plataforma efectivo, tenant, estado anterior, estado nuevo, razón, timestamp y metadata técnica sin PII.
+
+---
+
+## 9. incidentes
 **Descripción:** incidentes o novedades de seguridad.
 
 ### Campos
@@ -1092,6 +1134,14 @@ Patrones de control vistos en las políticas:
 - `fn_has_platform_role(target_role_name)`
 
 ## RPCs operativas autorizadas
+
+### `fn_platform_transition_tenant_lifecycle(p_conjunto_id uuid, p_target_status text, p_reason text)`
+- tipo: RPC `SECURITY DEFINER` para mutaciones controladas de lifecycle SaaS de tenants.
+- `search_path`: `public, pg_temp`.
+- autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`); la transición `active -> archived` requiere `superadmin`.
+- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa.
+- retorno: `conjunto_id`, `previous_status`, `lifecycle_status`, `operational_lock`, `updated_at`.
+- auditoría: inserta en `tenant_lifecycle_events` en la misma transacción, sin PII y con `source = 'rpc'`.
 
 ### `fn_platform_dashboard_metrics()`
 - tipo: RPC `SECURITY DEFINER` para Dashboard plataforma MVP read-only.
