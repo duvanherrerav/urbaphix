@@ -53,9 +53,9 @@ Notas conservadoras:
 
 ## Diseño técnico
 
-La función se implementa como `plpgsql STABLE` con `search_path = public, pg_temp`.
+La función se implementa como `plpgsql STABLE SECURITY INVOKER` con `search_path = public, pg_temp`.
 
-Se usa `SECURITY DEFINER` de forma acotada porque `public.tenant_lifecycle` tiene RLS forzado y lectura `authenticated` limitada a roles plataforma. Si el helper fuera `SECURITY INVOKER`, futuras RPC/policies invocadas por usuarios tenant podrían evaluar falsos negativos al no poder leer la fila lifecycle, aunque el propósito del helper es solo determinar estado operativo y no autorización del actor.
+Se usa `SECURITY INVOKER` para no elevar privilegios ni permitir que un cliente autenticado salte la policy `SELECT` de `public.tenant_lifecycle` mediante inferencia de booleanos. En FASE 5.4.1 el helper no queda expuesto directamente a `authenticated`; queda disponible para owners, `service_role` y futuras RPCs `SECURITY DEFINER` autorizadas que lo invoquen internamente.
 
 Mitigaciones aplicadas:
 
@@ -64,16 +64,17 @@ Mitigaciones aplicadas:
 - No escribe datos.
 - No registra auditoría.
 - No concede privilegios directos nuevos sobre `tenant_lifecycle`.
-- `anon` y `public` quedan sin `EXECUTE`.
-- `authenticated` y `service_role` reciben `EXECUTE` para permitir uso desde RPC/policies llamantes y validaciones controladas.
+- `anon`, `public` y `authenticated` quedan sin `EXECUTE` directo.
+- `service_role` recibe `EXECUTE`; futuras RPCs autorizadas podrán invocarlo internamente sin exponerlo como API directa.
 
 ## Grants
 
 - `revoke all on function public.fn_tenant_is_operational(uuid, text) from public`.
 - `revoke execute on function public.fn_tenant_is_operational(uuid, text) from anon`.
-- `grant execute on function public.fn_tenant_is_operational(uuid, text) to authenticated, service_role`.
+- `revoke execute on function public.fn_tenant_is_operational(uuid, text) from authenticated`.
+- `grant execute on function public.fn_tenant_is_operational(uuid, text) to service_role`.
 
-La decisión evita exponer capacidades a `anon` y mantiene el helper reusable para código autenticado y backend controlado. La autorización de negocio sigue siendo responsabilidad de la RLS o RPC que invoque el helper.
+La decisión evita exponer capacidades a `anon` o `authenticated` en esta fase y mantiene el helper reusable para backend controlado. La autorización de negocio sigue siendo responsabilidad de la RLS o RPC que invoque el helper.
 
 ## Validación DEV/QA
 
@@ -85,13 +86,14 @@ supabase/validation/fase_5_4_1_fn_tenant_is_operational_validation.sql
 
 El script valida:
 
-1. Existencia, volatilidad `STABLE`, `SECURITY DEFINER` y `search_path` seguro.
-2. Grants de función: `anon`/`public` sin execute, `authenticated`/`service_role` con execute.
-3. Ausencia de nuevas capacidades directas sobre `public.tenant_lifecycle` para `anon` y escrituras `authenticated`.
-4. Matriz completa de estados/operaciones.
-5. Tenant sin fila lifecycle usando UUID generado sin fila asociada.
-6. `operational_lock=true` incoherente en `active` y `onboarding` dentro de transacción con `rollback`.
-7. Casos comentados de errores controlados para parámetros inválidos.
+1. Existencia, volatilidad `STABLE`, `SECURITY INVOKER` (`prosecdef = false`) y `search_path` seguro.
+2. Grants de función: `anon`/`public`/`authenticated` sin execute directo y `service_role` con execute.
+3. Validación negativa documentada: un rol/JWT `authenticated` normal no puede invocar directamente el helper.
+4. Ausencia de nuevas capacidades directas sobre `public.tenant_lifecycle` para `anon` y escrituras `authenticated`.
+5. Matriz completa de estados/operaciones.
+6. Tenant sin fila lifecycle usando UUID generado sin fila asociada.
+7. `operational_lock=true` incoherente en `active` y `onboarding` dentro de transacción con `rollback`.
+8. Casos comentados de errores controlados para parámetros inválidos.
 
 Las validaciones de matriz actualizan temporalmente una fila lifecycle existente dentro de una transacción y ejecutan `rollback`, por lo que no dejan cambios persistentes.
 

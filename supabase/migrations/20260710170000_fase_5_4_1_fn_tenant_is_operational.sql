@@ -11,7 +11,7 @@ create or replace function public.fn_tenant_is_operational(
 returns boolean
 language plpgsql
 stable
-security definer
+security invoker
 set search_path = public, pg_temp
 as $$
 declare
@@ -97,4 +97,5 @@ comment on function public.fn_tenant_is_operational(uuid, text) is
 
 revoke all on function public.fn_tenant_is_operational(uuid, text) from public;
 revoke execute on function public.fn_tenant_is_operational(uuid, text) from anon;
-grant execute on function public.fn_tenant_is_operational(uuid, text) to authenticated, service_role;
+revoke execute on function public.fn_tenant_is_operational(uuid, text) from authenticated;
+grant execute on function public.fn_tenant_is_operational(uuid, text) to service_role;

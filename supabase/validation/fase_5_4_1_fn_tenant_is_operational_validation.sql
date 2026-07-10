@@ -7,11 +7,11 @@
 -- Reemplazar si se desea validar un tenant concreto:
 --   \set tenant_id '<tenant uuid with tenant_lifecycle row>'
 
--- 1) Helper exists, is STABLE, SECURITY DEFINER and has secure search_path.
+-- 1) Helper exists, is STABLE, SECURITY INVOKER and has secure search_path.
 select
   p.proname,
   p.provolatile = 's' as is_stable,
-  p.prosecdef as security_definer,
+  p.prosecdef = false as security_invoker,
   p.proconfig::text as config
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
@@ -19,14 +19,19 @@ where n.nspname = 'public'
   and p.proname = 'fn_tenant_is_operational'
   and pg_get_function_identity_arguments(p.oid) = 'p_conjunto_id uuid, p_operation text';
 
--- 2) anon/public have no EXECUTE; authenticated/service_role can execute.
+-- 2) anon/public/authenticated have no EXECUTE; service_role can execute.
 select
   has_function_privilege('anon', 'public.fn_tenant_is_operational(uuid,text)', 'execute') as anon_execute,
   has_function_privilege('public', 'public.fn_tenant_is_operational(uuid,text)', 'execute') as public_execute,
   has_function_privilege('authenticated', 'public.fn_tenant_is_operational(uuid,text)', 'execute') as authenticated_execute,
   has_function_privilege('service_role', 'public.fn_tenant_is_operational(uuid,text)', 'execute') as service_role_execute;
 
--- 3) No new direct table capabilities for anon/authenticated.
+-- 3) Negative direct invocation check for authenticated.
+-- Run this statement with a normal authenticated database role/JWT; it must fail
+-- with permission denied for function fn_tenant_is_operational.
+-- select public.fn_tenant_is_operational(gen_random_uuid(), 'tenant_mutation');
+
+-- 4) No new direct table capabilities for anon/authenticated.
 select
   has_table_privilege('anon', 'public.tenant_lifecycle', 'select') as anon_select,
   has_table_privilege('anon', 'public.tenant_lifecycle', 'insert') as anon_insert,
@@ -34,7 +39,7 @@ select
   has_table_privilege('authenticated', 'public.tenant_lifecycle', 'update') as authenticated_update,
   has_table_privilege('authenticated', 'public.tenant_lifecycle', 'delete') as authenticated_delete;
 
--- 4) Matrix completa por estado/operacion, incluyendo operational_lock=true
+-- 5) Matrix completa por estado/operacion, incluyendo operational_lock=true
 --    incoherente para active/onboarding. Todo ocurre dentro de una transaccion
 --    con rollback para no cambiar lifecycle existente.
 begin;
@@ -132,7 +137,7 @@ select bool_and(pass) as all_matrix_assertions_pass from fase_5_4_1_results;
 
 rollback;
 
--- 5) Errores controlados esperados. Ejecutar individualmente; deben fallar.
+-- 6) Errores controlados esperados. Ejecutar individualmente; deben fallar.
 -- select public.fn_tenant_is_operational(null, 'tenant_mutation');
 -- select public.fn_tenant_is_operational(gen_random_uuid(), null);
 -- select public.fn_tenant_is_operational(gen_random_uuid(), '');

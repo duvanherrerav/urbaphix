@@ -254,7 +254,7 @@ Tablas detectadas en `public`:
 - `authenticated`: solo `SELECT` mediante policy `tenant_lifecycle_select_platform` para `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')`.
 - Sin policies `INSERT`, `UPDATE` ni `DELETE` para `authenticated`; usuarios tenant no pueden escribir lifecycle directamente.
 - Mutaciones lifecycle expuestas solo por RPC `fn_platform_transition_tenant_lifecycle(uuid, text, text)`, `SECURITY DEFINER`, con `search_path = public, pg_temp`, `EXECUTE` para `authenticated` y `service_role`, y sin `EXECUTE` para `anon`/`public`.
-- Helper read-only FASE 5.4.1: `fn_tenant_is_operational(uuid, text)` evalúa `lifecycle_status` y `operational_lock` para operaciones permitidas sin cambiar datos ni validar identidad/rol del actor.
+- Helper read-only FASE 5.4.1: `fn_tenant_is_operational(uuid, text)` evalúa `lifecycle_status` y `operational_lock` para operaciones permitidas sin cambiar datos, sin validar identidad/rol del actor y sin `EXECUTE` directo para `authenticated` en esta fase.
 - La RPC exige `auth.uid()` y rol plataforma activo `superadmin` o `platform_ops`; cualquier transición hacia `archived` queda limitada a `superadmin`.
 - Transiciones permitidas FASE 5.2: `onboarding -> active`, `active -> suspended` y `suspended -> active` para `superadmin` o `platform_ops`; `onboarding -> archived`, `active -> archived` y `suspended -> archived` solo para `superadmin`; `archived` es terminal.
 - La razón es obligatoria para suspender, reactivar desde `suspended` y archivar; opcional para activar desde `onboarding`; longitud máxima 280.
@@ -1141,13 +1141,13 @@ Patrones de control vistos en las políticas:
 ### `fn_tenant_is_operational(p_conjunto_id uuid, p_operation text default 'tenant_mutation')`
 - tipo: helper read-only `STABLE` FASE 5.4.1 para validación operativa centralizada por lifecycle SaaS de tenant.
 - `search_path`: `public, pg_temp`.
-- seguridad: `SECURITY DEFINER` para que futuras RPC/policies puedan evaluar `tenant_lifecycle` de forma determinística aunque la tabla solo sea visible para plataforma; no retorna filas ni datos lifecycle, solo booleano.
+- seguridad: `SECURITY INVOKER` para no elevar privilegios ni permitir inferencia directa de lifecycle por clientes autenticados; no retorna filas ni datos lifecycle, solo booleano.
 - alcance de autorización: no valida identidad ni rol del actor; la autorización continúa en RLS/RPC llamante con `auth.uid()`, `conjunto_id`, `residente_id` y roles existentes.
 - operaciones reconocidas: `tenant_read`, `tenant_mutation`, `tenant_terminal_close`, `tenant_onboarding_config`, `platform_read`.
 - errores controlados: `p_conjunto_id` nulo, `p_operation` nula/vacía u operación no reconocida fallan con excepción.
 - ausencia de lifecycle: retorna `false` para operaciones tenant y `true` para `platform_read`; no asume `active`.
 - matriz: `active` permite `tenant_read`, `tenant_terminal_close`, `platform_read` y `tenant_mutation` solo sin `operational_lock`; `onboarding` permite `tenant_read`, `platform_read` y `tenant_onboarding_config` solo sin `operational_lock`; `suspended` permite `tenant_read`, `tenant_terminal_close` y `platform_read`; `archived` solo permite `platform_read`.
-- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa. No concede acceso directo adicional sobre `tenant_lifecycle` y no registra auditoría por ser evaluación read-only.
+- permisos: `EXECUTE` solo para `service_role`; `anon`/`public`/`authenticated` sin ejecución directa. No concede acceso directo adicional sobre `tenant_lifecycle` y no registra auditoría por ser evaluación read-only.
 
 ### `fn_platform_transition_tenant_lifecycle(p_conjunto_id uuid, p_target_status text, p_reason text)`
 - tipo: RPC `SECURITY DEFINER` para mutaciones controladas de lifecycle SaaS de tenants.
