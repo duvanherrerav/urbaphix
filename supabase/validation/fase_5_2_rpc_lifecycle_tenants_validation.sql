@@ -52,6 +52,15 @@ rollback;
 -- 7) Reason required for suspended/reactivated/archived transitions.
 -- select public.fn_platform_transition_tenant_lifecycle(:'tenant_id'::uuid, 'suspended', null);
 
--- 8) archived terminal: archived -> active must fail.
+-- 8) platform_ops cannot archive from any state, including the bypass path
+-- active -> suspended -> archived. Run with a platform_ops session and a disposable
+-- tenant row currently in suspended state; this must fail without mutation.
+-- select public.fn_platform_transition_tenant_lifecycle(:'tenant_id'::uuid, 'archived', 'Debe fallar para platform_ops');
+
+-- 9) superadmin can archive from onboarding/active/suspended according to the approved matrix.
+-- Run each case with disposable DEV/QA tenants prepared in the corresponding status.
+-- select public.fn_platform_transition_tenant_lifecycle(:'tenant_id'::uuid, 'archived', 'Validacion superadmin archive');
+
+-- 10) archived terminal: archived -> active must fail.
 -- Prepare a disposable tenant lifecycle row in archived state in DEV/QA, then run:
 -- select public.fn_platform_transition_tenant_lifecycle(:'tenant_id'::uuid, 'active', 'Debe fallar por terminal');

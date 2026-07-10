@@ -254,8 +254,8 @@ Tablas detectadas en `public`:
 - `authenticated`: solo `SELECT` mediante policy `tenant_lifecycle_select_platform` para `fn_is_platform_superadmin()` o `fn_has_platform_role('platform_ops')`.
 - Sin policies `INSERT`, `UPDATE` ni `DELETE` para `authenticated`; usuarios tenant no pueden escribir lifecycle directamente.
 - Mutaciones lifecycle expuestas solo por RPC `fn_platform_transition_tenant_lifecycle(uuid, text, text)`, `SECURITY DEFINER`, con `search_path = public, pg_temp`, `EXECUTE` para `authenticated` y `service_role`, y sin `EXECUTE` para `anon`/`public`.
-- La RPC exige `auth.uid()` y rol plataforma activo `superadmin` o `platform_ops`; `active -> archived` queda limitado a `superadmin`.
-- Transiciones permitidas FASE 5.2: `onboarding -> active`, `onboarding -> archived`, `active -> suspended`, `suspended -> active`, `suspended -> archived`, `active -> archived` solo `superadmin`; `archived` es terminal.
+- La RPC exige `auth.uid()` y rol plataforma activo `superadmin` o `platform_ops`; cualquier transición hacia `archived` queda limitada a `superadmin`.
+- Transiciones permitidas FASE 5.2: `onboarding -> active`, `active -> suspended` y `suspended -> active` para `superadmin` o `platform_ops`; `onboarding -> archived`, `active -> archived` y `suspended -> archived` solo para `superadmin`; `archived` es terminal.
 - La razón es obligatoria para suspender, reactivar desde `suspended` y archivar; opcional para activar desde `onboarding`; longitud máxima 280.
 
 ### Backfill FASE 5.1
@@ -1138,7 +1138,7 @@ Patrones de control vistos en las políticas:
 ### `fn_platform_transition_tenant_lifecycle(p_conjunto_id uuid, p_target_status text, p_reason text)`
 - tipo: RPC `SECURITY DEFINER` para mutaciones controladas de lifecycle SaaS de tenants.
 - `search_path`: `public, pg_temp`.
-- autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`); la transición `active -> archived` requiere `superadmin`.
+- autorización: requiere sesión autenticada y rol plataforma activo `superadmin` (`fn_is_platform_superadmin()`) o `platform_ops` (`fn_has_platform_role('platform_ops')`); cualquier transición hacia `archived` requiere `superadmin`.
 - permisos: `EXECUTE` para `authenticated` y `service_role`; `anon`/`public` sin ejecución directa.
 - retorno: `conjunto_id`, `previous_status`, `lifecycle_status`, `operational_lock`, `updated_at`.
 - auditoría: inserta en `tenant_lifecycle_events` en la misma transacción, sin PII y con `source = 'rpc'`.

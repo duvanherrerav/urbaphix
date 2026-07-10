@@ -130,10 +130,10 @@ begin
   end if;
 
   if not (
-    (v_previous_status = 'onboarding' and p_target_status in ('active', 'archived'))
+    (v_previous_status = 'onboarding' and p_target_status = 'active')
+    or (v_previous_status in ('onboarding', 'active', 'suspended') and p_target_status = 'archived' and v_actor_role = 'superadmin')
     or (v_previous_status = 'active' and p_target_status = 'suspended')
-    or (v_previous_status = 'suspended' and p_target_status in ('active', 'archived'))
-    or (v_previous_status = 'active' and p_target_status = 'archived' and v_actor_role = 'superadmin')
+    or (v_previous_status = 'suspended' and p_target_status = 'active')
   ) then
     raise exception 'lifecycle transition is not allowed' using errcode = '42501';
   end if;

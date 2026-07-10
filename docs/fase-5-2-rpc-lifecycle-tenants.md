@@ -35,10 +35,10 @@ Propiedades:
 | Desde | Hacia | Autorización | Razón |
 | --- | --- | --- | --- |
 | `onboarding` | `active` | `superadmin` o `platform_ops` | Opcional |
-| `onboarding` | `archived` | `superadmin` o `platform_ops` | Obligatoria |
+| `onboarding` | `archived` | Solo `superadmin` | Obligatoria |
 | `active` | `suspended` | `superadmin` o `platform_ops` | Obligatoria |
 | `suspended` | `active` | `superadmin` o `platform_ops` | Obligatoria |
-| `suspended` | `archived` | `superadmin` o `platform_ops` | Obligatoria |
+| `suspended` | `archived` | Solo `superadmin` | Obligatoria |
 | `active` | `archived` | Solo `superadmin` | Obligatoria |
 | `archived` | Cualquiera | No permitido | N/A |
 
@@ -83,4 +83,6 @@ Checklist cubierto:
 - Transición inválida falla sin mutar.
 - Razón obligatoria se valida.
 - Auditoría queda registrada en la misma transacción.
+- `platform_ops` no puede archivar desde ningún estado.
+- `platform_ops` no puede usar `active -> suspended -> archived` como bypass.
 - `archived` permanece terminal.
