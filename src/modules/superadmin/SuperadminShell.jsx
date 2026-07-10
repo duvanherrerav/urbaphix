@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import BrandLogo from '../../components/brand/BrandLogo';
 import { supabase } from '../../services/supabaseClient';
 import { getSuperadminAuditSummary, getSuperadminMembershipsSummary, getSuperadminMetrics, getSuperadminOperationsSummary, getSuperadminTenantsSummary } from './superadminMetricsService';
+import { transitionSuperadminTenantLifecycle } from './superadminLifecycleService';
 
 const navItems = [
   { key: 'summary', label: 'Resumen plataforma', icon: '📡', description: 'KPIs agregados read-only de la operación SaaS.' },
@@ -55,14 +56,40 @@ const sectionGeneratedAt = {
 
 const getStatusBadgeClass = (status) => {
   if (status === 'active') return 'app-badge-success';
-  if (status === 'suspended' || status === 'revoked') return 'app-badge-warning';
+  if (status === 'suspended' || status === 'revoked' || status === 'expired' || status === 'canceled') return 'app-badge-warning';
+  if (status === 'archived') return 'app-badge-error';
   return 'app-badge-info';
 };
+
+const lifecycleActionLabels = Object.freeze({
+  active: 'Activar',
+  suspended: 'Suspender',
+  archived: 'Archivar'
+});
+
+const getLifecycleActions = (status, roleName) => {
+  const actions = [];
+
+  if (status === 'onboarding') actions.push('active');
+  if (status === 'active') actions.push('suspended');
+  if (status === 'suspended') actions.push('active');
+  if (['onboarding', 'active', 'suspended'].includes(status) && roleName === 'superadmin') actions.push('archived');
+
+  return actions;
+};
+
+const lifecycleRequiresReason = (currentStatus, targetStatus) => targetStatus === 'suspended'
+  || targetStatus === 'archived'
+  || (currentStatus === 'suspended' && targetStatus === 'active');
+
+const formatRpcError = (error) => error?.message || 'La RPC rechazó la transición lifecycle.';
 
 function DataMessage({ tone = 'warning', children }) {
   const toneClass = tone === 'error'
     ? 'border-state-error/30 bg-state-error/10 text-state-error'
-    : 'border-state-warning/30 bg-state-warning/10 text-state-warning';
+    : tone === 'success'
+      ? 'border-state-success/30 bg-state-success/10 text-state-success'
+      : 'border-state-warning/30 bg-state-warning/10 text-state-warning';
 
   return (
     <div className={`m-5 rounded-2xl border px-5 py-4 text-sm ${toneClass}`} role={tone === 'error' ? 'alert' : 'status'}>
@@ -104,6 +131,8 @@ function SuperadminShell({ user, platformMembership }) {
   const [membershipsState, setMembershipsState] = useState({ status: 'idle', data: { platform: [], tenant: [] }, error: null, generatedAt: null });
   const [operationsState, setOperationsState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
   const [auditState, setAuditState] = useState({ status: 'idle', data: [], error: null, generatedAt: null });
+  const [lifecycleFeedback, setLifecycleFeedback] = useState({ tone: null, message: null });
+  const [lifecycleSubmitting, setLifecycleSubmitting] = useState(null);
   const tenantsRequestStartedRef = useRef(false);
   const membershipsRequestStartedRef = useRef(false);
   const operationsRequestStartedRef = useRef(false);
@@ -242,6 +271,66 @@ function SuperadminShell({ user, platformMembership }) {
       isMounted = false;
     };
   }, [activeSection]);
+
+  const refreshTenants = async () => {
+    setTenantsState((previousState) => ({ ...previousState, status: 'loading', error: null }));
+    const result = await getSuperadminTenantsSummary();
+
+    setTenantsState({
+      status: result.error ? 'error' : 'success',
+      data: result.data,
+      error: result.error,
+      generatedAt: result.generatedAt
+    });
+  };
+
+  const handleTenantLifecycleTransition = async (tenant, targetStatus) => {
+    if (lifecycleSubmitting) return;
+
+    const requiresReason = lifecycleRequiresReason(tenant.lifecycle.lifecycleStatus, targetStatus);
+    const label = lifecycleActionLabels[targetStatus] || targetStatus;
+    const reason = window.prompt(
+      requiresReason
+        ? `Escribe una razón para ${label.toLowerCase()} ${tenant.nombre} (obligatoria, máximo 280 caracteres).`
+        : `Razón opcional para ${label.toLowerCase()} ${tenant.nombre} (máximo 280 caracteres).`,
+      ''
+    );
+
+    if (reason === null) return;
+
+    const trimmedReason = reason.trim();
+    if (requiresReason && !trimmedReason) {
+      setLifecycleFeedback({ tone: 'error', message: 'La razón es obligatoria para esta transición lifecycle.' });
+      return;
+    }
+
+    if (trimmedReason.length > 280) {
+      setLifecycleFeedback({ tone: 'error', message: 'La razón no puede superar 280 caracteres.' });
+      return;
+    }
+
+    const confirmed = window.confirm(`Confirma transición lifecycle: ${tenant.nombre} de ${tenant.lifecycle.lifecycleStatus} a ${targetStatus}.`);
+    if (!confirmed) return;
+
+    setLifecycleSubmitting(`${tenant.id}-${targetStatus}`);
+    setLifecycleFeedback({ tone: null, message: null });
+
+    const result = await transitionSuperadminTenantLifecycle({
+      tenantId: tenant.id,
+      targetStatus,
+      reason: trimmedReason
+    });
+
+    if (result.error) {
+      setLifecycleFeedback({ tone: 'error', message: formatRpcError(result.error) });
+      setLifecycleSubmitting(null);
+      return;
+    }
+
+    await refreshTenants();
+    setLifecycleFeedback({ tone: 'success', message: `Transición ejecutada: ${tenant.nombre} ahora está en ${targetStatus}.` });
+    setLifecycleSubmitting(null);
+  };
 
   const hasNoData = useMemo(() => {
     if (metricsState.status !== 'success' || !metricsState.data) return false;
@@ -385,12 +474,18 @@ function SuperadminShell({ user, platformMembership }) {
           {activeSection === 'tenants' && (
             <section className="app-surface-primary overflow-hidden p-0 shadow-app" aria-busy={tenantsState.status === 'loading'}>
               <div className="border-b border-app-border px-5 py-4">
-                <p className="app-badge-info mb-3 inline-flex">Tenants · read-only</p>
+                <p className="app-badge-info mb-3 inline-flex">Tenants · lifecycle controlado por RPC</p>
                 <h2 className="text-xl font-semibold text-app-text-primary">Gestión de conjuntos / tenants</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-app-text-secondary">
-                  Inventario seguro de conjuntos con métricas agregadas por tenant. No incluye documentos, placas, comprobantes, teléfonos ni datos personales detallados.
+                  Inventario seguro de conjuntos con métricas agregadas y lifecycle SaaS. Las mutaciones usan únicamente la RPC autorizada fn_platform_transition_tenant_lifecycle.
                 </p>
               </div>
+
+              {lifecycleFeedback.message && (
+                <DataMessage tone={lifecycleFeedback.tone === 'error' ? 'error' : 'success'}>
+                  {lifecycleFeedback.message}
+                </DataMessage>
+              )}
 
               {tenantsState.status === 'error' && (
                 <DataMessage tone="error">
@@ -423,20 +518,68 @@ function SuperadminShell({ user, platformMembership }) {
                         </p>
                       </div>
 
-                      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5 lg:min-w-[34rem]">
-                        {[
-                          ['Usuarios', tenant.usuarios],
-                          ['Residentes', tenant.residentes],
-                          ['Visitas 30d', tenant.visitas30d],
-                          ['Paquetes pendientes', tenant.paquetesPendientes],
-                          ['Pagos pendientes', tenant.pagosPendientes]
-                        ].map(([label, value]) => (
-                          <div key={label} className="rounded-2xl border border-app-border bg-app-bg-alt p-3">
-                            <dt className="text-xs text-app-text-secondary">{label}</dt>
-                            <dd className="mt-1 text-lg font-bold text-app-text-primary">{formatMetric(value)}</dd>
+                      <div className="space-y-4 lg:min-w-[38rem]">
+                        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                          {[
+                            ['Usuarios', tenant.usuarios],
+                            ['Residentes', tenant.residentes],
+                            ['Visitas 30d', tenant.visitas30d],
+                            ['Paquetes pendientes', tenant.paquetesPendientes],
+                            ['Pagos pendientes', tenant.pagosPendientes]
+                          ].map(([label, value]) => (
+                            <div key={label} className="rounded-2xl border border-app-border bg-app-bg-alt p-3">
+                              <dt className="text-xs text-app-text-secondary">{label}</dt>
+                              <dd className="mt-1 text-lg font-bold text-app-text-primary">{formatMetric(value)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+
+                        <div className="rounded-2xl border border-app-border bg-app-bg-alt p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={getStatusBadgeClass(tenant.lifecycle.lifecycleStatus)}>Lifecycle: {tenant.lifecycle.lifecycleStatus}</span>
+                            <span className={getStatusBadgeClass(tenant.lifecycle.licenseStatus)}>Licencia: {tenant.lifecycle.licenseStatus}</span>
+                            <span className="app-badge-info">Plan: {tenant.lifecycle.planCode}</span>
+                            <span className={tenant.lifecycle.operationalLock ? 'app-badge-warning' : 'app-badge-success'}>
+                              Lock: {tenant.lifecycle.operationalLock ? 'activo' : 'inactivo'}
+                            </span>
                           </div>
-                        ))}
-                      </dl>
+
+                          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                            <div>
+                              <dt className="text-app-text-secondary">Razón lock</dt>
+                              <dd className="mt-1 text-app-text-primary">{tenant.lifecycle.lockReason || '—'}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-app-text-secondary">Razón estado</dt>
+                              <dd className="mt-1 text-app-text-primary">{tenant.lifecycle.statusReason || '—'}</dd>
+                            </div>
+                            <div><dt className="text-app-text-secondary">Activado</dt><dd className="text-app-text-primary">{formatDateTime(tenant.lifecycle.activatedAt)}</dd></div>
+                            <div><dt className="text-app-text-secondary">Suspendido</dt><dd className="text-app-text-primary">{formatDateTime(tenant.lifecycle.suspendedAt)}</dd></div>
+                            <div><dt className="text-app-text-secondary">Archivado</dt><dd className="text-app-text-primary">{formatDateTime(tenant.lifecycle.archivedAt)}</dd></div>
+                            <div><dt className="text-app-text-secondary">Actualizado</dt><dd className="text-app-text-primary">{formatDateTime(tenant.lifecycle.updatedAt)}</dd></div>
+                          </dl>
+
+                          <div className="mt-4 flex flex-wrap gap-2" aria-label={`Acciones lifecycle para ${tenant.nombre}`}>
+                            {getLifecycleActions(tenant.lifecycle.lifecycleStatus, roleName).length === 0 && (
+                              <span className="text-sm text-app-text-secondary">Sin acciones lifecycle disponibles.</span>
+                            )}
+                            {getLifecycleActions(tenant.lifecycle.lifecycleStatus, roleName).map((targetStatus) => {
+                              const submitKey = `${tenant.id}-${targetStatus}`;
+                              return (
+                                <button
+                                  key={targetStatus}
+                                  type="button"
+                                  onClick={() => handleTenantLifecycleTransition(tenant, targetStatus)}
+                                  disabled={Boolean(lifecycleSubmitting)}
+                                  className="app-btn app-btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/60 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {lifecycleSubmitting === submitKey ? 'Ejecutando…' : lifecycleActionLabels[targetStatus]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </article>
                   ))}
                 </div>

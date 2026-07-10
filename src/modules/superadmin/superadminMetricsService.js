@@ -1,5 +1,6 @@
 import { supabase } from '../../services/supabaseClient';
 import { logger } from '../../utils/logger';
+import { emptyTenantLifecycle, getSuperadminTenantsLifecycleSummary } from './superadminLifecycleService';
 
 const METRIC_KEY_MAP = Object.freeze({
   conjuntos: 'conjuntos',
@@ -23,7 +24,7 @@ const normalizeMetrics = (row) => Object.entries(METRIC_KEY_MAP).reduce((acc, [r
   [uiKey]: normalizeMetricValue(row?.[rpcKey])
 }), {});
 
-const normalizeTenant = (row) => ({
+const normalizeTenant = (row, lifecycleByTenant = new Map()) => ({
   id: row?.conjunto_id || '',
   nombre: row?.nombre || 'Sin nombre',
   ciudad: row?.ciudad || 'Sin ciudad',
@@ -33,7 +34,8 @@ const normalizeTenant = (row) => ({
   residentes: normalizeMetricValue(row?.residentes),
   visitas30d: normalizeMetricValue(row?.visitas_30d),
   paquetesPendientes: normalizeMetricValue(row?.paquetes_pendientes),
-  pagosPendientes: normalizeMetricValue(row?.pagos_pendientes)
+  pagosPendientes: normalizeMetricValue(row?.pagos_pendientes),
+  lifecycle: lifecycleByTenant.get(row?.conjunto_id) || emptyTenantLifecycle
 });
 
 const normalizeMembership = (row) => ({
@@ -86,14 +88,25 @@ export const getSuperadminTenantsSummary = async () => {
   const generatedAt = new Date().toISOString();
 
   try {
-    const { data, error } = await supabase.rpc('fn_platform_tenants_summary');
+    const [{ data, error }, lifecycleResult] = await Promise.all([
+      supabase.rpc('fn_platform_tenants_summary'),
+      getSuperadminTenantsLifecycleSummary()
+    ]);
 
     if (error) {
       throw error;
     }
 
+    if (lifecycleResult.error) {
+      throw lifecycleResult.error;
+    }
+
+    const lifecycleByTenant = new Map(
+      lifecycleResult.data.map((lifecycle) => [lifecycle.conjuntoId, lifecycle])
+    );
+
     return {
-      data: (Array.isArray(data) ? data : []).map(normalizeTenant),
+      data: (Array.isArray(data) ? data : []).map((row) => normalizeTenant(row, lifecycleByTenant)),
       error: null,
       generatedAt
     };
@@ -101,7 +114,7 @@ export const getSuperadminTenantsSummary = async () => {
     logger.error('No se pudo cargar resumen de tenants plataforma', error, {
       module: 'superadmin',
       action: 'load_platform_tenants_summary',
-      rpc: 'fn_platform_tenants_summary'
+      rpc: 'fn_platform_tenants_summary/fn_platform_tenants_lifecycle_summary'
     });
 
     return {
