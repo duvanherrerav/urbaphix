@@ -642,7 +642,12 @@ Tablas detectadas en `public`:
 
 ### Permisos / grants
 - FASE 3D.36: se revocan privilegios heredados de `anon` sobre `public.registro_visitas` para reducir exposición GraphQL/PostgREST sin modificar `authenticated`, `service_role` ni policies RLS.
+- FASE 5.4.2A: las RPC `fn_registrar_ingreso_visita(text, uuid)` y `fn_registrar_salida_visita(uuid, uuid)` revocan `EXECUTE` a `public`/`anon` y mantienen ejecución solo para `authenticated` y `service_role`.
 - El flujo funcional de residentes, vigilancia, admin de conjunto, QR y realtime debe continuar usando sesión autenticada y controles RLS por `conjunto_id`, `residente_id` y `auth.uid()`.
+
+### RPC operativas FASE 5.4.2A
+- `fn_registrar_ingreso_visita(p_qr_code text, p_vigilante_id uuid)` conserva firma y retorno (`registro_id`, `estado`), pero valida `auth.uid()`, exige que `p_vigilante_id` coincida con la identidad autenticada y autoriza solo actores same-tenant de portería/admin antes de mutar. Resuelve `conjunto_id` desde `registro_visitas` y exige `fn_tenant_is_operational(conjunto_id, 'tenant_mutation')`; si el tenant no permite nuevas mutaciones falla con el código lógico `TENANT_OPERATIONAL_LOCKED` sin exponer datos de lifecycle. Mantiene el fallo de QR inválido/usado y solo ingresa registros `pendiente`.
+- `fn_registrar_salida_visita(p_registro_id uuid, p_vigilante_id uuid)` conserva firma y retorno (`registro_id`, `estado`, `hora_salida`), valida `auth.uid()`, exige identidad coincidente con `p_vigilante_id` y autoriza solo actores same-tenant de portería/admin. Resuelve `conjunto_id` desde el registro objetivo y exige `fn_tenant_is_operational(conjunto_id, 'tenant_terminal_close')`; permite cerrar únicamente visitas realmente `ingresado`, rechaza `pendiente`, y repetir salida sobre `salido` retorna la fila existente sin actualizar `hora_salida`. Según la matriz actual del helper, tenants `suspended` permiten cierre terminal y tenants `archived` lo bloquean; cualquier excepción futura requiere diseño explícito.
 
 ---
 
