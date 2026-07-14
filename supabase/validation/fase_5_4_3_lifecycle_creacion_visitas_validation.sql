@@ -100,6 +100,32 @@ begin
     insert into fase_5_4_3_results values ('5 p_apartamento_id ajeno/cross-tenant -> rechazo', sqlerrm = 'FORBIDDEN', sqlerrm);
   end;
 
+  update public.tenant_memberships
+  set status = 'suspended', updated_at = now()
+  where user_id = v_user_a
+    and conjunto_id = v_tenant_a
+    and residente_id = v_res_a
+    and role_name = 'residente';
+
+  begin
+    perform * from public.fn_crear_o_reutilizar_visitante_y_registro(v_tenant_a, v_res_a, v_apt_a, 'Membership suspendida', 'CC', '543004A', null, null, current_date);
+    insert into fase_5_4_3_results values ('5a membership no activa + legacy presente -> FORBIDDEN', false, 'no falló');
+  exception when others then
+    insert into fase_5_4_3_results values ('5a membership no activa + legacy presente -> FORBIDDEN', sqlerrm = 'FORBIDDEN', sqlerrm);
+  end;
+
+  delete from public.tenant_memberships
+  where user_id = v_user_a
+    and conjunto_id = v_tenant_a
+    and residente_id = v_res_a
+    and role_name = 'residente';
+
+  select * into v_result from public.fn_crear_o_reutilizar_visitante_y_registro(v_tenant_a, v_res_a, v_apt_a, 'Legacy permitido', 'CC', '543004B', null, null, current_date);
+  insert into fase_5_4_3_results values ('5b sin membership + legacy válido -> permitido', v_result.visitante_id is not null and v_result.registro_id is not null, v_result::text);
+
+  insert into public.tenant_memberships (user_id, conjunto_id, role_name, residente_id, status)
+  values (v_user_a, v_tenant_a, 'residente', v_res_a, 'active');
+
   select count(*) into v_visitante_count_before from public.visitantes where conjunto_id = v_tenant_a;
   select count(*) into v_registro_count_before from public.registro_visitas where conjunto_id = v_tenant_a;
   update public.tenant_lifecycle set lifecycle_status = 'suspended', operational_lock = true where conjunto_id = v_tenant_a;

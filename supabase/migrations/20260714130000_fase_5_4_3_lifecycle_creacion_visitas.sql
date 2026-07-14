@@ -45,7 +45,17 @@ begin
           and tm.role_name = 'residente'
           and tm.status = 'active'
       )
-      or r.usuario_id = v_actor_id
+      or (
+        r.usuario_id = v_actor_id
+        and not exists (
+          select 1
+          from public.tenant_memberships tm_any
+          where tm_any.user_id = v_actor_id
+            and tm_any.conjunto_id = r.conjunto_id
+            and tm_any.residente_id = r.id
+            and tm_any.role_name = 'residente'
+        )
+      )
     )
   limit 1;
 

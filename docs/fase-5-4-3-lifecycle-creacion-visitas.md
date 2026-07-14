@@ -8,7 +8,7 @@ Endurecer la RPC `public.fn_crear_o_reutilizar_visitante_y_registro(uuid, uuid, 
 - La función sigue siendo `SECURITY DEFINER` para mantener la operación atómica, pero ahora usa `SET search_path = public, pg_temp` y referencias schema-qualified.
 - Se exige sesión autenticada con `auth.uid()`; si no existe sesión falla con `AUTH_REQUIRED`.
 - Se resuelve el residente real desde `public.residentes` y se valida que:
-  - `p_residente_id` corresponde al usuario autenticado por membresía activa `tenant_memberships.role_name = 'residente'` o por vínculo legacy `residentes.usuario_id`.
+  - `p_residente_id` corresponde al usuario autenticado por membresía activa `tenant_memberships.role_name = 'residente'`; el vínculo legacy `residentes.usuario_id` solo autoriza cuando no existe ninguna membership para el mismo usuario, residente, tenant y rol `residente`.
   - `p_conjunto_id` coincide con el `conjunto_id` real del residente.
 - Si `p_apartamento_id` viene informado, se valida que coincide con el apartamento asociado al residente y que el apartamento pertenece al mismo tenant.
 - Antes de cualquier `INSERT` o `UPDATE`, se invoca `public.fn_tenant_is_operational(v_conjunto_id, 'tenant_mutation')`.
