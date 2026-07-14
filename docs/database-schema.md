@@ -643,9 +643,11 @@ Tablas detectadas en `public`:
 ### Permisos / grants
 - FASE 3D.36: se revocan privilegios heredados de `anon` sobre `public.registro_visitas` para reducir exposición GraphQL/PostgREST sin modificar `authenticated`, `service_role` ni policies RLS.
 - FASE 5.4.2A: las RPC `fn_registrar_ingreso_visita(text, uuid)` y `fn_registrar_salida_visita(uuid, uuid)` revocan `EXECUTE` a `public`/`anon` y mantienen ejecución solo para `authenticated` y `service_role`.
+- FASE 5.4.3: la RPC `fn_crear_o_reutilizar_visitante_y_registro(uuid, uuid, uuid, text, text, text, text, text, date)` revoca `EXECUTE` a `public`/`anon` y mantiene ejecución solo para `authenticated` y `service_role`.
 - El flujo funcional de residentes, vigilancia, admin de conjunto, QR y realtime debe continuar usando sesión autenticada y controles RLS por `conjunto_id`, `residente_id` y `auth.uid()`.
 
-### RPC operativas FASE 5.4.2A
+### RPC operativas FASE 5.4.2A / 5.4.3
+- `fn_crear_o_reutilizar_visitante_y_registro(p_conjunto_id uuid, p_residente_id uuid, p_apartamento_id uuid, p_nombre text, p_tipo_documento text, p_documento text, p_tipo_vehiculo text, p_placa text, p_fecha_visita date)` conserva firma y retorno (`visitante_id`, `registro_id`, `qr_code`), valida `auth.uid()`, resuelve el residente real desde `residentes` y exige ownership por `tenant_memberships` activa `role_name='residente'` o vínculo legacy `residentes.usuario_id`. Rechaza `p_conjunto_id`, `p_residente_id` y `p_apartamento_id` que no correspondan al mismo tenant/residente autenticado. Antes de reutilizar/actualizar `visitantes` o insertar `registro_visitas`, exige `fn_tenant_is_operational(conjunto_id, 'tenant_mutation')`; si el tenant no permite mutaciones falla con `TENANT_OPERATIONAL_LOCKED` sin exponer lifecycle, lock ni PII. La reutilización queda acotada al mismo `conjunto_id` + `residente_id` + tipo/documento validados, y la operación permanece atómica.
 - `fn_registrar_ingreso_visita(p_qr_code text, p_vigilante_id uuid)` conserva firma y retorno (`registro_id`, `estado`), pero valida `auth.uid()`, exige que `p_vigilante_id` coincida con la identidad autenticada y autoriza solo actores same-tenant de portería/admin antes de mutar. Resuelve `conjunto_id` desde `registro_visitas` y exige `fn_tenant_is_operational(conjunto_id, 'tenant_mutation')`; si el tenant no permite nuevas mutaciones falla con el código lógico `TENANT_OPERATIONAL_LOCKED` sin exponer datos de lifecycle. Mantiene el fallo de QR inválido/usado y solo ingresa registros `pendiente`.
 - `fn_registrar_salida_visita(p_registro_id uuid, p_vigilante_id uuid)` conserva firma y retorno (`registro_id`, `estado`, `hora_salida`), valida `auth.uid()`, exige identidad coincidente con `p_vigilante_id` y autoriza solo actores same-tenant de portería/admin. Resuelve `conjunto_id` desde el registro objetivo y exige `fn_tenant_is_operational(conjunto_id, 'tenant_terminal_close')`; permite cerrar únicamente visitas realmente `ingresado`, rechaza `pendiente`, y repetir salida sobre `salido` retorna la fila existente sin actualizar `hora_salida` ni consultar lifecycle después de validar actor/same-tenant. Según la matriz actual del helper, tenants `suspended` permiten cierre terminal y tenants `archived` bloquean nuevas salidas terminales de registros aún `ingresado`; los retries de registros ya `salido` siguen siendo idempotentes.
 
@@ -1142,6 +1144,15 @@ Patrones de control vistos en las políticas:
 
 ## RPCs operativas autorizadas
 
+### `fn_crear_o_reutilizar_visitante_y_registro(p_conjunto_id uuid, p_residente_id uuid, p_apartamento_id uuid, p_nombre text, p_tipo_documento text, p_documento text, p_tipo_vehiculo text, p_placa text, p_fecha_visita date)`
+- tipo: RPC `SECURITY DEFINER` FASE 5.4.3 para crear/reutilizar visitante y crear el registro de visita de forma atómica.
+- retorno: `TABLE(visitante_id uuid, registro_id uuid, qr_code text)` sin cambios de shape para el frontend.
+- `search_path`: `public, pg_temp`; no incluye `auth` y usa `auth.uid()` explícito.
+- autorización: requiere sesión autenticada; valida que el actor sea el residente indicado por membresía activa `tenant_memberships.role_name='residente'` o fallback legacy `residentes.usuario_id`, y que `p_conjunto_id` corresponda al tenant real del residente.
+- validación de apartamento: si `p_apartamento_id` no es nulo, debe coincidir con `residentes.apartamento_id` y pertenecer al mismo `conjunto_id`.
+- lifecycle: antes de cualquier escritura invoca `fn_tenant_is_operational(conjunto_id, 'tenant_mutation')`; si retorna falso falla con `TENANT_OPERATIONAL_LOCKED` fail-closed y sin exponer detalles de lifecycle.
+- reutilización: limitada a visitante del mismo `conjunto_id`, `residente_id`, `tipo_documento` y `documento` validados.
+- permisos: `EXECUTE` solo para `authenticated` y `service_role`; `public`/`anon` sin ejecución directa.
 
 ### `fn_tenant_is_operational(p_conjunto_id uuid, p_operation text default 'tenant_mutation')`
 - tipo: helper read-only `STABLE` FASE 5.4.1 para validación operativa centralizada por lifecycle SaaS de tenant.
