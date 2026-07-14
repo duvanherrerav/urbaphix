@@ -25,15 +25,16 @@ No incluye cambios frontend, creación de visitas, paquetes, RLS de tablas exist
 | --- | --- | --- | --- | --- |
 | Ingreso de visita pendiente | `tenant_mutation` | Permitido si no hay `operational_lock` | Bloqueado | Bloqueado |
 | Salida de visita ya ingresada | `tenant_terminal_close` | Permitido | Permitido | Bloqueado |
+| Reintento de salida ya cerrada | No ejecuta helper; no muta | Permitido | Permitido | Permitido |
 
-La salida terminal en `archived` falla porque la matriz vigente del helper no permite `tenant_terminal_close` para tenants archivados. Cualquier excepción futura para cierres en `archived` requiere un diseño explícito y una nueva fase.
+La salida terminal en `archived` falla porque la matriz vigente del helper no permite `tenant_terminal_close` para tenants archivados cuando el registro aún está `ingresado`. Los reintentos sobre registros ya `salido` se resuelven después de validar identidad/autorización same-tenant y antes de consultar lifecycle, porque no realizan mutación ni exponen lifecycle. Cualquier excepción futura para nuevos cierres en `archived` requiere un diseño explícito y una nueva fase.
 
 ## Comportamientos preservados/endurecidos
 
 - QR inválido o ya usado sigue fallando.
 - Ingreso evita doble ingreso porque solo muta registros `pendiente`.
 - Salida sobre `pendiente` falla: no se convierte una visita no iniciada en cierre terminal.
-- Repetir salida sobre un registro `salido` es idempotente: retorna la fila existente y no actualiza `hora_salida`.
+- Repetir salida sobre un registro `salido` es idempotente incluso si el tenant está `archived`: después de validar actor/same-tenant retorna la fila existente y no consulta lifecycle ni actualiza `hora_salida`.
 - Usuarios cross-tenant no pueden ingresar ni cerrar visitas ajenas.
 - `p_vigilante_id` distinto de `auth.uid()` falla con `FORBIDDEN` y evita suplantación.
 - `public`/`anon` no tienen `EXECUTE`; `authenticated` y `service_role` conservan ejecución.
@@ -50,10 +51,11 @@ Casos cubiertos por el script:
 2. Tenant `suspended`: nuevo ingreso falla con `TENANT_OPERATIONAL_LOCKED` y no cambia datos.
 3. Visita ingresada antes de suspensión: salida funciona y queda `salido` con `hora_salida`.
 4. Tenant `archived`: ingreso falla.
-5. Tenant `archived`: salida terminal falla según matriz actual del helper.
-6. Usuario cross-tenant no puede ingresar ni cerrar visita ajena.
-7. `p_vigilante_id` distinto de la identidad autenticada no permite suplantación.
-8. QR inválido/usado sigue fallando.
-9. Salida sobre `pendiente` falla.
-10. Repetir salida no genera efectos adicionales.
-11. `anon`/`public` sin `EXECUTE`.
+5. Tenant `archived`: salida terminal de visita aún `ingresado` falla según matriz actual del helper.
+6. Tenant `archived`: retry de visita ya `salido` retorna estado/hora_salida existentes sin mutación.
+7. Usuario cross-tenant no puede ingresar ni cerrar visita ajena.
+8. `p_vigilante_id` distinto de la identidad autenticada no permite suplantación.
+9. QR inválido/usado sigue fallando.
+10. Salida sobre `pendiente` falla.
+11. Repetir salida no genera efectos adicionales.
+12. `anon`/`public` sin `EXECUTE`.

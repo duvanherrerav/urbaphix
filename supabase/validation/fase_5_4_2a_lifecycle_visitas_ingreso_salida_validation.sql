@@ -28,10 +28,14 @@ select
 -- 3) Visita ingresada antes de suspensión: salida funciona y queda salido/hora_salida.
 -- select * from public.fn_registrar_salida_visita('<registro_ingresado_suspended>'::uuid, '<vigilancia_user_id>'::uuid);
 
--- 4) Archived: ingreso falla y salida terminal sigue la matriz del helper y falla.
+-- 4) Archived: ingreso falla; salida terminal de visita ingresada falla; retry de visita ya salida es idempotente.
 -- update public.tenant_lifecycle set lifecycle_status = 'archived', operational_lock = false where conjunto_id = '<tenant_id>'::uuid;
 -- select * from public.fn_registrar_ingreso_visita('<qr_pendiente_archived>', '<vigilancia_user_id>'::uuid);
 -- select * from public.fn_registrar_salida_visita('<registro_ingresado_archived>'::uuid, '<vigilancia_user_id>'::uuid);
+-- select hora_salida as archived_before_retry from public.registro_visitas where id = '<registro_salido_archived>'::uuid;
+-- select pg_sleep(1);
+-- select * from public.fn_registrar_salida_visita('<registro_salido_archived>'::uuid, '<vigilancia_user_id>'::uuid);
+-- select hora_salida as archived_after_retry from public.registro_visitas where id = '<registro_salido_archived>'::uuid; -- debe coincidir
 
 -- 5) Cross-tenant y suplantación: ambos deben fallar FORBIDDEN.
 -- select * from public.fn_registrar_ingreso_visita('<qr_otro_tenant>', '<vigilancia_user_id>'::uuid);

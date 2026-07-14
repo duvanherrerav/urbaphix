@@ -136,11 +136,6 @@ begin
       using errcode = '42501';
   end if;
 
-  if not public.fn_tenant_is_operational(v_conjunto_id, 'tenant_terminal_close') then
-    raise exception 'TENANT_OPERATIONAL_LOCKED'
-      using errcode = 'P0001';
-  end if;
-
   if v_estado = 'salido' then
     registro_id := p_registro_id;
     estado := v_estado;
@@ -150,6 +145,11 @@ begin
 
   if v_estado <> 'ingresado' then
     raise exception 'No se pudo registrar salida: registro no encontrado o estado inválido';
+  end if;
+
+  if not public.fn_tenant_is_operational(v_conjunto_id, 'tenant_terminal_close') then
+    raise exception 'TENANT_OPERATIONAL_LOCKED'
+      using errcode = 'P0001';
   end if;
 
   update public.registro_visitas rv
