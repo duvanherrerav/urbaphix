@@ -83,9 +83,10 @@ Las siguientes consultas representan las verificaciones ejecutadas/contrastadas 
 
 ```sql
 -- Estado lifecycle inicial/final del tenant de prueba
-select id, nombre, lifecycle_status, operational_lock
-from public.conjuntos
-where id = 'a80af441-80f9-4a6c-8d3b-b8408c97dbe2';
+select c.id, c.nombre, tl.lifecycle_status, tl.operational_lock
+from public.conjuntos c
+join public.tenant_lifecycle tl on tl.conjunto_id = c.id
+where c.id = 'a80af441-80f9-4a6c-8d3b-b8408c97dbe2';
 ```
 
 ```sql
@@ -101,11 +102,17 @@ order by id;
 
 ```sql
 -- Auditoría lifecycle del tenant de prueba
-select conjunto_id, previous_status, new_status, actor_role, source, reason, created_at
+select conjunto_id,
+       previous_status,
+       lifecycle_status,
+       actor_platform_role,
+       source,
+       reason,
+       created_at
 from public.tenant_lifecycle_events
 where conjunto_id = 'a80af441-80f9-4a6c-8d3b-b8408c97dbe2'
   and previous_status in ('active', 'suspended')
-  and new_status in ('suspended', 'active')
+  and lifecycle_status in ('suspended', 'active')
 order by created_at desc;
 ```
 
