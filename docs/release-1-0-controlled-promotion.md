@@ -52,6 +52,16 @@ git status --short --branch
 git log --oneline --decorate -n 20 origin/develop
 git log --oneline --decorate -n 20 origin/qa
 git log --oneline --decorate -n 20 origin/main
+
+# Auditoría bidireccional de commits exclusivos antes de reconciliar.
+git log --left-right --cherry-pick --oneline origin/qa...origin/develop
+git log --left-right --cherry-pick --oneline origin/main...origin/qa
+
+# Diff tip-to-tip para ver diferencias acumuladas entre puntas reales.
+git diff --stat origin/qa origin/develop
+git diff --stat origin/main origin/qa
+
+# Diff contra merge-base opcional para revisar el candidato del lado derecho.
 git diff --stat origin/qa...origin/develop
 git diff --stat origin/main...origin/qa
 ```
@@ -60,6 +70,8 @@ Criterios:
 
 - `develop` contiene el candidato estable hasta FASE 5.4.3.
 - `qa` y `main` pueden estar divergidos, pero no deben reconciliarse reescribiendo historia.
+- Los commits exclusivos de ambos lados (`<` y `>`) deben revisarse explícitamente antes de reconciliar y promover.
+- El diff tip-to-tip debe revisarse junto con el diff opcional contra merge-base; usar solo `A...B` puede ocultar cambios exclusivos del destino.
 - El diff debe excluir secretos, archivos `.env` reales, seeds, fixtures y scripts DEV no autorizados.
 
 ### 2. Reconciliación sin reescritura de historia
