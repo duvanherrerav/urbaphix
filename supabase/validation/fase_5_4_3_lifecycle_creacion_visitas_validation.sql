@@ -27,6 +27,8 @@ declare
   v_after_registros bigint;
   v_signature_ok boolean;
   v_grants_ok boolean;
+  v_role_residente_existed boolean;
+  v_tipo_documento_cc_existed boolean;
   v_cleanup_error text;
 begin
   begin
@@ -35,6 +37,18 @@ begin
       (v_user_a, 'authenticated', 'authenticated', 'fase543-a@example.invalid', now(), now()),
       (v_user_b, 'authenticated', 'authenticated', 'fase543-b@example.invalid', now(), now()),
       (v_user_legacy, 'authenticated', 'authenticated', 'fase543-legacy@example.invalid', now(), now());
+
+    select exists (
+      select 1
+      from public.roles
+      where id = 'residente'
+    ) into v_role_residente_existed;
+
+    select exists (
+      select 1
+      from public.tipos_documento
+      where codigo = 'CC'
+    ) into v_tipo_documento_cc_existed;
 
     insert into public.roles (id, nombre)
     values ('residente', 'Residente')
@@ -285,6 +299,12 @@ begin
     where id in (v_tenant_a, v_tenant_b, v_tenant_legacy);
     delete from auth.users
     where id in (v_user_a, v_user_b, v_user_legacy);
+    delete from public.tipos_documento
+    where codigo = 'CC'
+      and v_tipo_documento_cc_existed is false;
+    delete from public.roles
+    where id = 'residente'
+      and v_role_residente_existed is false;
 
     raise notice 'FASE_5_4_3_ALL_ASSERTIONS_PASS';
   exception when others then
@@ -310,6 +330,12 @@ begin
       where id in (v_tenant_a, v_tenant_b, v_tenant_legacy);
       delete from auth.users
       where id in (v_user_a, v_user_b, v_user_legacy);
+      delete from public.tipos_documento
+      where codigo = 'CC'
+        and v_tipo_documento_cc_existed is false;
+      delete from public.roles
+      where id = 'residente'
+        and v_role_residente_existed is false;
     exception when others then
       v_cleanup_error := sqlerrm;
       raise exception '%; además falló limpieza: %', v_err, v_cleanup_error;
