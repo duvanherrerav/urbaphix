@@ -101,7 +101,7 @@ begin
       and p.prorettype = 'record'::regtype
       and p.prosecdef
       and p.proconfig @> array['search_path=public, pg_temp']
-      and pg_get_function_arguments(p.oid) = ''
+      and pg_get_function_identity_arguments(p.oid) = ''
   ) then
     raise exception 'postcheck failed: fn_platform_tenants_summary definition mismatch';
   end if;
