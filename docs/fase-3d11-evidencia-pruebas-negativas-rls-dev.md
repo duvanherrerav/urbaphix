@@ -107,4 +107,3 @@ Permitido registrar:
 | No se modificaron `.env` ni `.env.*` |  |
 | No se tocó Vercel |  |
 | No se expusieron secretos |  |
-
