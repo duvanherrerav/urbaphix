@@ -111,7 +111,7 @@ Este manifest prepara la revisión del lote pendiente para Supabase QA (`tjbdtor
 - **Dependencias:** tablas legacy `operational_events`, `trasteos`, `vehiculos`.
 - **Objetos afectados:** RLS forzado, revokes y policies deny-client.
 - **Riesgo:** bajo, tablas fuera de flujos activos según migración.
-- **Precheck SQL:** `select tablename, rowsecurity, forcerowsecurity from pg_tables where schemaname='public' and tablename in ('operational_events','trasteos','vehiculos');`
+- **Precheck SQL:** `select c.relname as tablename, c.relrowsecurity as rowsecurity, c.relforcerowsecurity as forcerowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r','p') and c.relname in ('operational_events','trasteos','vehiculos') order by c.relname;`
 - **Postcheck SQL:** `select tablename, policyname, qual from pg_policies where schemaname='public' and tablename in ('operational_events','trasteos','vehiculos') order by tablename;`
 - **Rollback/contingencia:** quitar force RLS o restaurar grants solo si QA confirma flujo activo no documentado.
 
@@ -196,7 +196,7 @@ Este manifest prepara la revisión del lote pendiente para Supabase QA (`tjbdtor
 - **Objetos afectados:** tabla `tenant_lifecycle`, índices, comments, RLS, grants, policy platform y backfill inicial desde `conjuntos`.
 - **Riesgo:** alto, introduce estructura base de lifecycle y backfill.
 - **Precheck SQL:** `select count(*) as conjuntos from public.conjuntos; select to_regclass('public.tenant_lifecycle') as tenant_lifecycle;`
-- **Postcheck SQL:** `select count(*) as lifecycle_rows from public.tenant_lifecycle; select tablename, rowsecurity, forcerowsecurity from pg_tables where schemaname='public' and tablename='tenant_lifecycle';`
+- **Postcheck SQL:** `select count(*) as lifecycle_rows from public.tenant_lifecycle; select c.relname as tablename, c.relrowsecurity as rowsecurity, c.relforcerowsecurity as forcerowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r','p') and c.relname = 'tenant_lifecycle';`
 - **Rollback/contingencia:** si falla antes de uso funcional, retirar tabla/índices con migración de rollback aprobada; no borrar datos sin validación explícita.
 
 ### 20. `20260710120000_fase_5_2_rpc_lifecycle_tenants.sql`
@@ -204,7 +204,7 @@ Este manifest prepara la revisión del lote pendiente para Supabase QA (`tjbdtor
 - **Objetos afectados:** tabla `tenant_lifecycle_events`, índices, RLS/grants/policy y RPC `fn_platform_transition_tenant_lifecycle(uuid,text,text)`.
 - **Riesgo:** alto, habilita transición controlada de estado por RPC.
 - **Precheck SQL:** `select to_regclass('public.tenant_lifecycle') as tenant_lifecycle, to_regclass('public.tenant_lifecycle_events') as events;`
-- **Postcheck SQL:** `select tablename, rowsecurity, forcerowsecurity from pg_tables where schemaname='public' and tablename in ('tenant_lifecycle','tenant_lifecycle_events'); select routine_name from information_schema.routines where routine_schema='public' and routine_name='fn_platform_transition_tenant_lifecycle';`
+- **Postcheck SQL:** `select c.relname as tablename, c.relrowsecurity as rowsecurity, c.relforcerowsecurity as forcerowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r','p') and c.relname in ('tenant_lifecycle','tenant_lifecycle_events') order by c.relname; select routine_name from information_schema.routines where routine_schema='public' and routine_name='fn_platform_transition_tenant_lifecycle';`
 - **Rollback/contingencia:** revocar EXECUTE de la RPC si las transiciones fallan; conservar eventos para auditoría salvo aprobación destructiva.
 
 ### 21. `20260710150000_fase_5_3_platform_tenants_lifecycle_summary_rpc.sql`
