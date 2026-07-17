@@ -5,6 +5,7 @@ import {
   isMembershipResolverEnabled,
   resolveUserMembershipProfile
 } from './services/membershipResolver';
+import { resolvePlatformAccess } from './services/platformAccess';
 import BrandLogo from './components/brand/BrandLogo';
 import ModuleIcon from './components/ui/ModuleIcon';
 
@@ -117,8 +118,21 @@ function App() {
       }
     };
 
+    const redirectToSuperadmin = () => {
+      if (typeof window === 'undefined') return;
+      if (isSuperadminRoute) return;
+      window.location.assign('/superadmin');
+    };
+
     const obtenerUsuario = async (authenticatedUser) => {
       try {
+        if (isSuperadminRoute) {
+          if (isMounted) {
+            setErrorPerfil('');
+            setUsuarioApp(null);
+          }
+          return;
+        }
         const membershipResolverEnabled = isMembershipResolverEnabled();
         traceResolverFlag(membershipResolverEnabled);
 
@@ -127,6 +141,17 @@ function App() {
           : await obtenerUsuarioLegacy(authenticatedUser?.id);
 
         if (!perfil) {
+          const platformAccess = await resolvePlatformAccess(authenticatedUser);
+
+          if (platformAccess.allowed) {
+            if (isMounted) {
+              setErrorPerfil('');
+              setUsuarioApp(null);
+            }
+            redirectToSuperadmin();
+            return;
+          }
+
           if (isMounted) {
             setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
             setUsuarioApp(null);
@@ -204,7 +229,7 @@ function App() {
       listener.subscription.unsubscribe();
     };
 
-  }, []);
+  }, [isSuperadminRoute]);
 
   useEffect(() => {
     const onPointerDown = (event) => {
