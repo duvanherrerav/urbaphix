@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { isMembershipResolverEnabled, resolveUserMembership } from '../../services/membershipResolver';
+import { resolvePlatformAccess } from '../../services/platformAccess';
 import { logger } from '../../utils/logger';
 import { getAuthErrorMessage } from '../../utils/errorMessages';
 
@@ -60,6 +61,15 @@ export default function Login() {
               });
             }
             rolId = resolution?.profile?.rol_id || null;
+
+            if (!resolution?.profile) {
+              const platformAccess = await resolvePlatformAccess(data.user);
+              if (platformAccess.allowed) {
+                setInfoMsg('Acceso concedido. Redirigiendo a Superadmin...');
+                window.location.assign('/superadmin');
+                return;
+              }
+            }
           } else {
             const { data: perfil, error: perfilError } = await supabase
               .from('usuarios_app')
@@ -69,6 +79,15 @@ export default function Login() {
 
             if (perfilError) logger.error('Login: no se pudo cargar rol del perfil legacy', perfilError);
             rolId = perfil?.rol_id || null;
+
+            if (!perfil) {
+              const platformAccess = await resolvePlatformAccess(data.user);
+              if (platformAccess.allowed) {
+                setInfoMsg('Acceso concedido. Redirigiendo a Superadmin...');
+                window.location.assign('/superadmin');
+                return;
+              }
+            }
           }
 
           setInfoMsg(`Acceso concedido. Redirigiendo a ${getRolLabel(rolId || null)}...`);
