@@ -74,7 +74,7 @@ function App() {
         .from('usuarios_app')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
