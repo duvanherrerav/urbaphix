@@ -115,11 +115,12 @@ export const crearNotificacionPago = async ({ usuarioId, tipo, titulo, mensaje }
 export const notificarAdminsPago = async ({ conjuntoId, tipo, titulo, mensaje }) => {
   if (!conjuntoId || !tipo || !titulo || !mensaje) return { ok: false, error: null };
 
-  const { data: admins, error } = await supabase
-    .from('usuarios_app')
-    .select('id')
-    .eq('conjunto_id', conjuntoId)
-    .eq('rol_id', 'admin');
+  const { data: admins, error } = await supabase.rpc(
+    'fn_notification_admin_recipient_ids',
+    {
+      p_conjunto_id: conjuntoId
+    }
+  );
 
   if (error) {
     logger.error('Error consultando admins para notificación de pago', error);
@@ -127,7 +128,7 @@ export const notificarAdminsPago = async ({ conjuntoId, tipo, titulo, mensaje })
   }
 
   const notificaciones = (admins || []).map((admin) => ({
-    usuario_id: admin.id,
+    usuario_id: admin.user_id,
     tipo,
     titulo,
     mensaje
