@@ -36,7 +36,7 @@ const resolverApartamento = (reserva) => (
 );
 
 export const getReservaResidenteLabel = (reserva) => {
-    const nombre = reserva?.residentes?.usuarios_app?.nombre?.trim();
+    const nombre = reserva?.residentes?.nombre?.trim();
     return nombre || 'Residente registrado';
 };
 

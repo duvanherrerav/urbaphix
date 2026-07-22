@@ -7,6 +7,7 @@ import { ModuleTitle } from '../../../components/ui/ModuleIcon';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
 import { formatFechaBogota } from '../../../utils/dateFormatters';
 import { ESTADOS_CARTERA_ACTIVA, ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getResumenEstadosPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
+import { obtenerPerfilesUsuariosPagos } from '../services/pagosEventosService';
 
 const FILTROS_ESTADO = [
   { value: 'todos', label: 'Todos' },
@@ -80,7 +81,7 @@ export default function EstadoCuenta({ usuarioApp }) {
         id, valor, estado, created_at, concepto, tipo_pago, fecha_vencimiento, fecha_pago, dias_mora,
         residentes (
           id,
-          usuarios_app ( nombre ),
+          usuario_id,
           apartamentos ( numero, torres!fk_apartamento_torre ( nombre ) )
         )
       `)
@@ -99,10 +100,20 @@ export default function EstadoCuenta({ usuarioApp }) {
     }
 
     const pagosBase = data || [];
+    const { perfilesPorUsuario, error: perfilesError } = await obtenerPerfilesUsuariosPagos(
+      pagosBase.map((pago) => pago.id)
+    );
+
+    if (perfilesError) {
+      logger.error('No se pudieron resolver perfiles de pagos autorizados', perfilesError);
+      alert('No fue posible generar el reporte. Intenta nuevamente.');
+      return;
+    }
+
     const pagos = pagosBase
       .map((pago) => ({
         ...pago,
-        residente: pago.residentes?.usuarios_app?.nombre || 'Residente',
+        residente: perfilesPorUsuario[pago.residentes?.usuario_id]?.nombre || 'Residente',
         apartamento: pago.residentes?.apartamentos?.numero || '-',
         torre: pago.residentes?.apartamentos?.torres?.nombre || '-'
       }))
