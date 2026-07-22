@@ -996,11 +996,21 @@ begin
         'fn_platform_memberships_summary', 'fn_platform_operations_summary',
         'fn_platform_tenants_lifecycle_summary', 'fn_platform_tenants_summary',
         'fn_platform_transition_tenant_lifecycle',
-        'fn_reservas_zonas_ocupacion_disponibilidad', 'get_user_residente_id'
+        'fn_reservas_zonas_ocupacion_disponibilidad'
       )
       and (not p.prosecdef or p.proconfig is null or not p.proconfig @> array['search_path=public, pg_temp'])
   ) then
     raise exception 'postcheck failed: SECURITY DEFINER or search_path mismatch';
+  end if;
+
+  -- This legacy helper's QA/PRD-canonical SECURITY DEFINER search_path is
+  -- intentionally `public, auth`, unlike the hardened RPCs above.
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'get_user_residente_id'
+      and (not p.prosecdef or p.proconfig is null or not p.proconfig @> array['search_path=public, auth'])
+  ) then
+    raise exception 'postcheck failed: get_user_residente_id attributes mismatch';
   end if;
 
   if exists (
