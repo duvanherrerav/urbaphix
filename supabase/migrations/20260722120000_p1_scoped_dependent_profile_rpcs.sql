@@ -69,7 +69,6 @@ begin
    and r.conjunto_id = rv.conjunto_id
   join public.usuarios_app recipient
     on recipient.id = r.usuario_id
-   and recipient.conjunto_id = rv.conjunto_id
   where rv.id = p_registro_id
     and rv.conjunto_id = v_conjunto_id
     and coalesce(recipient.activo, true);
@@ -169,6 +168,15 @@ begin
   if to_regprocedure('public.fn_visit_push_recipient(uuid)') is null
     or to_regprocedure('public.fn_payment_related_user_profiles(uuid[])') is null then
     raise exception 'Postcheck failed: scoped dependent-profile RPC missing';
+  end if;
+
+  if position(
+    'recipient.conjunto_id' in pg_get_functiondef(
+      'public.fn_visit_push_recipient(uuid)'::regprocedure
+    )
+  ) > 0 then
+    raise exception
+      'Postcheck failed: visit recipient RPC still requires legacy usuarios_app.conjunto_id';
   end if;
 
   if has_function_privilege('anon', 'public.fn_visit_push_recipient(uuid)', 'EXECUTE')

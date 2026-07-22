@@ -1177,7 +1177,7 @@ Patrones de control vistos en las políticas:
 - tipo: RPC read-only `STABLE`, `SECURITY DEFINER`, con `search_path = public, pg_temp`.
 - objetivo: resolver exclusivamente el `user_id` y `fcm_token` del residente destinatario de una visita concreta.
 - autorización: requiere sesión autenticada y rol operativo same-tenant (`admin_conjunto`/`vigilancia`/`vigilante` activo, o fallback legacy equivalente); valida el tenant desde `registro_visitas` antes de retornar datos.
-- privacidad: solo resuelve el residente ligado al registro solicitado; no permite lectura genérica de `usuarios_app` ni retorna nombre, email, teléfono o rol.
+- privacidad: solo resuelve el residente ligado al registro solicitado mediante `registro_visitas → visitantes → residentes`; no depende de `usuarios_app.conjunto_id`, que es legacy y puede ser nulo, ni permite lectura genérica de perfiles. No retorna nombre, email, teléfono o rol.
 - permisos: `EXECUTE` para `authenticated` y `service_role`; `anon` y `public` sin ejecución.
 
 ### `fn_payment_related_user_profiles(p_pago_ids uuid[])`
