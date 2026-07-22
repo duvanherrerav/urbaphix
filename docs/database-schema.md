@@ -1184,8 +1184,16 @@ Patrones de control vistos en las políticas:
 
 - tipo: RPC read-only `STABLE`, `SECURITY DEFINER`, con `search_path = public, pg_temp`.
 - objetivo: resolver únicamente `user_id` y `nombre` de los residentes y actores vinculados a los pagos solicitados.
-- autorización: requiere sesión autenticada; cada pago solicitado debe pertenecer a un tenant autorizado para `superadmin`, membresía activa `admin_conjunto`/`contador`, o fallback legacy admin del mismo tenant.
+- autorización: requiere sesión autenticada; cada `pago_id` solicitado debe existir y pertenecer a un tenant autorizado para `superadmin`, membresía activa `admin_conjunto`/`contador`, o fallback legacy admin del mismo tenant. Un residente autenticado también puede solicitar el lookup únicamente cuando **todos** los pagos pertenecen a su propio `residente_id` (por membresía activa o relación legacy directa).
 - privacidad: retorna solo perfiles asociados a `pagos.residente_id` o `pagos_eventos.usuario_id` de los pagos autorizados; no habilita lectura same-tenant genérica de `usuarios_app`.
+- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon` y `public` sin ejecución.
+
+### `fn_reservation_related_user_profiles(p_reserva_ids uuid[])`
+
+- tipo: RPC read-only `STABLE`, `SECURITY DEFINER`, con `search_path = public, pg_temp`.
+- objetivo: resolver exclusivamente `user_id` y `nombre` del residente asociado a reservas concretas, para no embeber `residentes ( usuarios_app ( nombre ) )` en consultas REST.
+- autorización: requiere sesión autenticada y valida **cada** reserva solicitada. Permite superadmin, roles operativos activos del mismo tenant (`admin_conjunto`, `contador`, `vigilancia`/`vigilante`) o fallback legacy equivalente; un residente solo puede solicitar sus propias reservas mediante `residente_id` coincidente.
+- privacidad: no habilita lectura genérica de `usuarios_app`, no retorna email, teléfono, rol, token, tenant ni perfiles de reservas fuera del conjunto o residente autorizado.
 - permisos: `EXECUTE` para `authenticated` y `service_role`; `anon` y `public` sin ejecución.
 
 ### `fn_crear_o_reutilizar_visitante_y_registro(p_conjunto_id uuid, p_residente_id uuid, p_apartamento_id uuid, p_nombre text, p_tipo_documento text, p_documento text, p_tipo_vehiculo text, p_placa text, p_fecha_visita date)`
