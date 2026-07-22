@@ -127,69 +127,48 @@ export default function EscanearQR({ usuarioApp }) {
           toast.error('No fue posible registrar el ingreso. Intenta nuevamente.');
         }
       } else {
-        // 🔔 resolver usuario real del residente y notificar sin romper el ingreso
-        if (!visitaNormalizada.residente_id) {
-          logger.warn('EscanearQR: visita sin residente_id para notificación', {
+        // 🔔 La RPC valida actor operativo y tenant antes de exponer el token del destinatario.
+        const { data: destinatario, error: errorDestinatario } = await supabase
+          .rpc('fn_visit_push_recipient', { p_registro_id: visitaNormalizada.id })
+          .maybeSingle();
+
+        if (errorDestinatario) {
+          logger.warn('EscanearQR: no se pudo resolver destinatario push de visita', errorDestinatario);
+        } else if (!destinatario?.user_id) {
+          logger.warn('EscanearQR: visita sin destinatario push autorizado', {
             visita_id: visitaNormalizada.id
           });
         } else {
-          let residenteQuery = supabase
-            .from('residentes')
-            .select('id, usuario_id')
-            .eq('id', visitaNormalizada.residente_id);
+          const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
+            usuario_id: destinatario.user_id,
+            tipo: 'visita_ingreso',
+            titulo: "Visita ingresó",
+            mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
+          }]);
 
-          if (visitaNormalizada.conjunto_id) {
-            residenteQuery = residenteQuery.eq('conjunto_id', visitaNormalizada.conjunto_id);
+          if (errorNotificacion) {
+            logger.warn('EscanearQR: no se pudo crear notificación de ingreso', errorNotificacion);
           }
 
-          const { data: residente, error: errorResidente } = await residenteQuery.maybeSingle();
-
-          if (errorResidente) {
-            logger.warn('EscanearQR: no se pudo consultar residente para notificación', errorResidente);
-          } else if (!residente?.usuario_id) {
-            logger.warn('EscanearQR: residente sin usuario_id para notificación', {
-              residente_id: visitaNormalizada.residente_id
+          if (!destinatario.fcm_token) {
+            logger.warn('EscanearQR: usuario sin fcm_token para push de visita', {
+              usuario_id: destinatario.user_id
             });
           } else {
-            const { error: errorNotificacion } = await supabase.from('notificaciones').insert([{
-              usuario_id: residente.usuario_id,
-              tipo: 'visita_ingreso',
-              titulo: "Visita ingresó",
-              mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
-            }]);
-
-            if (errorNotificacion) {
-              logger.warn('EscanearQR: no se pudo crear notificación de ingreso', errorNotificacion);
-            }
-
-            const { data: usuario, error: errorUsuario } = await supabase
-              .from('usuarios_app')
-              .select('fcm_token')
-              .eq('id', residente.usuario_id)
-              .maybeSingle();
-
-            if (errorUsuario) {
-              logger.warn('EscanearQR: no se pudo consultar fcm_token del usuario', errorUsuario);
-            } else if (!usuario?.fcm_token) {
-              logger.warn('EscanearQR: usuario sin fcm_token para push de visita', {
-                usuario_id: residente.usuario_id
+            try {
+              await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enviar-notificacion`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  token: destinatario.fcm_token,
+                  titulo: '🚗 Visita ingresó',
+                  mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
+                })
               });
-            } else {
-              try {
-                await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enviar-notificacion`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    token: usuario.fcm_token,
-                    titulo: '🚗 Visita ingresó',
-                    mensaje: `${visitaNormalizada.nombre_visitante} ha ingresado`
-                  })
-                });
-              } catch (errorPush) {
-                logger.warn('EscanearQR: no se pudo enviar push de ingreso', errorPush);
-              }
+            } catch (errorPush) {
+              logger.warn('EscanearQR: no se pudo enviar push de ingreso', errorPush);
             }
           }
         }
