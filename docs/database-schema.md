@@ -963,6 +963,7 @@ Tablas detectadas en `public`:
 - `nombre` (text, nullable)
 - `email` (text, nullable)
 - `telefono` (text, nullable)
+- `fcm_token` (text, nullable; token de push, no disponible por lectura directa de perfiles ajenos)
 - `rol_id` (text, nullable)
 - `conjunto_id` (uuid, nullable)
 
@@ -971,15 +972,27 @@ Tablas detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- `lectura usuarios`
-  - comando: `SELECT`
-  - condición: `true`
+
 - `usuario puede verse`
   - comando: `SELECT`
+  - roles: `authenticated`
   - condición: `id = auth.uid()`
+  - alcance: cada usuario autenticado solo puede leer su propia fila.
+
 - `usuarios actualizar su info`
   - comando: `UPDATE`
   - condición: `id = auth.uid()`
+
+- Se eliminan las variantes amplias:
+  - `lectura usuarios`
+  - `usuarios mismo conjunto`
+
+- La consulta de destinatarios administrativos para notificaciones no
+  utiliza lectura directa amplia de `usuarios_app`; usa la RPC
+  `fn_notification_admin_recipient_ids(uuid)`, que retorna únicamente
+  UUID de administradores del tenant autorizado.
+- Los consumidores de visitas y pagos tampoco embeben perfiles ajenos:
+  usan RPCs con autorización específica y retornos mínimos.
 
 ### Grants
 - FASE 3D.32 revoca `ALL PRIVILEGES` de `anon` sobre `public.usuarios_app` para reducir exposición GraphQL/PostgREST heredada.
@@ -1143,6 +1156,37 @@ Patrones de control vistos en las políticas:
 - `fn_tenant_is_operational(p_conjunto_id uuid, p_operation text default 'tenant_mutation')`
 
 ## RPCs operativas autorizadas
+
+### `fn_notification_admin_recipient_ids(p_conjunto_id uuid)`
+
+- tipo: RPC read-only `STABLE`, `SECURITY DEFINER`.
+- objetivo: resolver destinatarios administrativos para notificaciones
+  de pagos y alertas de seguridad sin exponer filas completas de
+  `usuarios_app`.
+- autorización: requiere sesión autenticada y acceso al tenant mediante
+  `fn_has_tenant_access`, superadmin o fallback legacy same-tenant activo.
+- retorno: únicamente `user_id uuid` de usuarios con `rol_id = 'admin'`
+  y estado activo.
+- privacidad: no retorna nombre, email, teléfono, rol, tenant ni
+  `fcm_token`.
+- permisos: `EXECUTE` para `authenticated` y `service_role`;
+  `anon` y `public` sin ejecución.
+
+### `fn_visit_push_recipient(p_registro_id uuid)`
+
+- tipo: RPC read-only `STABLE`, `SECURITY DEFINER`, con `search_path = public, pg_temp`.
+- objetivo: resolver exclusivamente el `user_id` y `fcm_token` del residente destinatario de una visita concreta.
+- autorización: requiere sesión autenticada y rol operativo same-tenant (`admin_conjunto`/`vigilancia`/`vigilante` activo, o fallback legacy equivalente); valida el tenant desde `registro_visitas` antes de retornar datos.
+- privacidad: solo resuelve el residente ligado al registro solicitado mediante `registro_visitas → visitantes → residentes`; no depende de `usuarios_app.conjunto_id`, que es legacy y puede ser nulo, ni permite lectura genérica de perfiles. No retorna nombre, email, teléfono o rol.
+- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon` y `public` sin ejecución.
+
+### `fn_payment_related_user_profiles(p_pago_ids uuid[])`
+
+- tipo: RPC read-only `STABLE`, `SECURITY DEFINER`, con `search_path = public, pg_temp`.
+- objetivo: resolver únicamente `user_id` y `nombre` de los residentes y actores vinculados a los pagos solicitados.
+- autorización: requiere sesión autenticada; cada pago solicitado debe pertenecer a un tenant autorizado para `superadmin`, membresía activa `admin_conjunto`/`contador`, o fallback legacy admin del mismo tenant.
+- privacidad: retorna solo perfiles asociados a `pagos.residente_id` o `pagos_eventos.usuario_id` de los pagos autorizados; no habilita lectura same-tenant genérica de `usuarios_app`.
+- permisos: `EXECUTE` para `authenticated` y `service_role`; `anon` y `public` sin ejecución.
 
 ### `fn_crear_o_reutilizar_visitante_y_registro(p_conjunto_id uuid, p_residente_id uuid, p_apartamento_id uuid, p_nombre text, p_tipo_documento text, p_documento text, p_tipo_vehiculo text, p_placa text, p_fecha_visita date)`
 - tipo: RPC `SECURITY DEFINER` FASE 5.4.3 para crear/reutilizar visitante y crear el registro de visita de forma atómica.
