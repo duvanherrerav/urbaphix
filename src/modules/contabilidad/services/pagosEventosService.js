@@ -21,6 +21,25 @@ export const EVENTOS_PAGO_LABELS = {
 
 const normalizarIds = (ids = []) => [...new Set(ids.filter(Boolean))];
 
+export const obtenerPerfilesUsuariosPagos = async (pagoIds = []) => {
+  const ids = normalizarIds(pagoIds);
+  if (ids.length === 0) return { perfilesPorUsuario: {}, error: null };
+
+  const { data, error } = await supabase.rpc('fn_payment_related_user_profiles', {
+    p_pago_ids: ids
+  });
+
+  if (error) return { perfilesPorUsuario: {}, error };
+
+  return {
+    perfilesPorUsuario: (data || []).reduce((perfiles, perfil) => {
+      perfiles[perfil.user_id] = perfil;
+      return perfiles;
+    }, {}),
+    error: null
+  };
+};
+
 export const getPagoEventoLabel = (evento) => EVENTOS_PAGO_LABELS[evento] || evento || 'Evento';
 
 export const agruparEventosPorPago = (eventos = []) => eventos.reduce((acc, evento) => {
@@ -36,15 +55,22 @@ export const obtenerEventosPorPagos = async (pagoIds = []) => {
 
   const { data, error } = await supabase
     .from('pagos_eventos')
-    .select(`
-      *,
-      usuarios_app ( nombre )
-    `)
+    .select('*')
     .in('pago_id', ids)
     .order('created_at', { ascending: false });
 
   if (error) return { eventos: [], error };
-  return { eventos: data || [], error: null };
+
+  const { perfilesPorUsuario, error: errorPerfiles } = await obtenerPerfilesUsuariosPagos(ids);
+  if (errorPerfiles) return { eventos: [], error: errorPerfiles };
+
+  return {
+    eventos: (data || []).map((evento) => ({
+      ...evento,
+      usuarios_app: perfilesPorUsuario[evento.usuario_id] || null
+    })),
+    error: null
+  };
 };
 
 export const adjuntarEventosAPagos = async (pagos = []) => {
@@ -115,11 +141,12 @@ export const crearNotificacionPago = async ({ usuarioId, tipo, titulo, mensaje }
 export const notificarAdminsPago = async ({ conjuntoId, tipo, titulo, mensaje }) => {
   if (!conjuntoId || !tipo || !titulo || !mensaje) return { ok: false, error: null };
 
-  const { data: admins, error } = await supabase
-    .from('usuarios_app')
-    .select('id')
-    .eq('conjunto_id', conjuntoId)
-    .eq('rol_id', 'admin');
+  const { data: admins, error } = await supabase.rpc(
+    'fn_notification_admin_recipient_ids',
+    {
+      p_conjunto_id: conjuntoId
+    }
+  );
 
   if (error) {
     logger.error('Error consultando admins para notificación de pago', error);
@@ -127,7 +154,7 @@ export const notificarAdminsPago = async ({ conjuntoId, tipo, titulo, mensaje })
   }
 
   const notificaciones = (admins || []).map((admin) => ({
-    usuario_id: admin.id,
+    usuario_id: admin.user_id,
     tipo,
     titulo,
     mensaje

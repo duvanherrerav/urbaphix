@@ -26,11 +26,48 @@ const BASE_RESERVA_SELECT = `
   created_at,
   updated_at,
   recursos_comunes ( id, nombre, tipo, requiere_aprobacion, tiempo_buffer_min ),
-  residentes ( id, apartamento_id, usuarios_app ( nombre ), apartamentos ( numero, torres ( nombre ) ) ),
+  residentes ( id, usuario_id, apartamento_id, apartamentos ( numero, torres ( nombre ) ) ),
   apartamentos ( numero, torres ( nombre ) )
 `;
 
 const ESTADOS_ACTIVOS_RESERVA = ['solicitada', 'aprobada', 'en_curso'];
+
+const obtenerPerfilesUsuariosReservas = async (reservaIds = []) => {
+    const ids = [...new Set(reservaIds.filter(Boolean))];
+    if (ids.length === 0) return { perfilesPorUsuario: {}, error: null };
+
+    const { data, error } = await supabase.rpc('fn_reservation_related_user_profiles', {
+        p_reserva_ids: ids
+    });
+
+    if (error) return { perfilesPorUsuario: {}, error };
+
+    return {
+        perfilesPorUsuario: (data || []).reduce((perfiles, perfil) => {
+            perfiles[perfil.user_id] = perfil;
+            return perfiles;
+        }, {}),
+        error: null
+    };
+};
+
+const adjuntarPerfilesAReservas = async (reservas = []) => {
+    const { perfilesPorUsuario, error } = await obtenerPerfilesUsuariosReservas(
+        reservas.map((reserva) => reserva?.id)
+    );
+    if (error) return { reservas, error };
+
+    return {
+        reservas: reservas.map((reserva) => ({
+            ...reserva,
+            residentes: reserva.residentes ? {
+                ...reserva.residentes,
+                nombre: perfilesPorUsuario[reserva.residentes.usuario_id]?.nombre || null
+            } : null
+        })),
+        error: null
+    };
+};
 const POLITICAS_CONFIRMACION_VALIDAS = Object.freeze([
     'confirmacion_automatica',
     'requiere_aprobacion_admin'
@@ -551,8 +588,12 @@ export const crearReserva = async ({
 
     if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo crear la reserva') };
 
+    const { reservas: reservasConPerfil, error: perfilesError } = await adjuntarPerfilesAReservas([data]);
+    if (perfilesError) return { ok: false, data: null, error: humanizeReservaError(perfilesError, 'No se pudo resolver el perfil de la reserva') };
+    const reservaConPerfil = reservasConPerfil[0];
+
     await registrarEventoReserva({
-        reserva_id: data.id,
+        reserva_id: reservaConPerfil.id,
         conjunto_id,
         actor_id: null,
         accion: 'crear',
@@ -564,7 +605,7 @@ export const crearReserva = async ({
 
     return {
         ok: true,
-        data,
+        data: reservaConPerfil,
         error: null,
         meta: {
             politica_confirmacion,
@@ -599,7 +640,10 @@ export const listarReservas = async ({
 
     const { data, error } = await q;
     if (error) return { ok: false, data: [], error: humanizeReservaError(error, 'No se pudieron cargar reservas') };
-    return { ok: true, data: data || [], error: null };
+
+    const { reservas, error: perfilesError } = await adjuntarPerfilesAReservas(data || []);
+    if (perfilesError) return { ok: false, data: [], error: humanizeReservaError(perfilesError, 'No se pudieron resolver perfiles de reservas') };
+    return { ok: true, data: reservas, error: null };
 };
 
 export const cambiarEstadoReserva = async ({
@@ -658,15 +702,19 @@ export const cambiarEstadoReserva = async ({
 
     if (error || !data) return { ok: false, data: null, error: humanizeReservaError(error, 'No se pudo actualizar estado') };
 
+    const { reservas: reservasConPerfil, error: perfilesError } = await adjuntarPerfilesAReservas([data]);
+    if (perfilesError) return { ok: false, data: null, error: humanizeReservaError(perfilesError, 'No se pudo resolver el perfil de la reserva') };
+    const reservaConPerfil = reservasConPerfil[0];
+
     await registrarEventoReserva({
         reserva_id,
-        conjunto_id: data.conjunto_id,
+        conjunto_id: reservaConPerfil.conjunto_id,
         actor_id: usuario_id,
         accion: estado,
         detalle: detalle || `Cambio de estado a ${estado}`
     });
 
-    return { ok: true, data, error: null };
+    return { ok: true, data: reservaConPerfil, error: null };
 };
 
 export const registrarEventoReserva = async ({ reserva_id, conjunto_id, actor_id = null, accion, detalle = null, metadata = {} }) => {
