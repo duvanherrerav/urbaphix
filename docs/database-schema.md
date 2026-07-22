@@ -1428,3 +1428,11 @@ Puede ampliarse más adelante con:
 ### Permisos / grants
 - FASE 3D.34: se revocan privilegios heredados de `anon` sobre `public.tenant_memberships` para reducir exposición GraphQL/PostgREST sin modificar `authenticated`, `service_role` ni policies RLS.
 - `membershipResolver`, login y bootstrap deben consultar esta tabla únicamente con sesión autenticada; el flujo anónimo no requiere acceso directo a memberships.
+
+---
+
+# Normalización canónica — Issue #307
+
+La migración `20260722130000_canonical_qa_prd_function_rls_reconciliation.sql` mantiene reproducibles en `develop` las definiciones QA/PRD auditadas de las RPCs de plataforma, lifecycle, disponibilidad de reservas y `get_user_residente_id()`. También reconcilia únicamente las policies `reservas_zonas_insert`, `reservas_zonas_update`, `visitantes_insert_residente` y `visitantes_update_residente`. Conserva owner `postgres`, volatilidad, `SECURITY DEFINER`/`SECURITY INVOKER`, `search_path` y grants canónicos; no crea tablas, columnas, relaciones ni datos.
+
+El hotfix histórico `20260715120000_hotfix_qa_fn_platform_tenants_summary_qualified_conjunto_id.sql` se conserva con el mismo contenido que QA/PRD. La aplicación se realiza primero en DEV y no forma parte de esta entrega aplicar QA o PRD. Las únicas diferencias admitidas por ambiente son datos, secretos y variables documentadas en `docs/issue-307-canonical-normalization.md`.
