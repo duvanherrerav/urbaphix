@@ -971,15 +971,25 @@ Tablas detectadas en `public`:
 - `conjunto_id` → `conjuntos.id`
 
 ### RLS
-- `lectura usuarios`
-  - comando: `SELECT`
-  - condición: `true`
+
 - `usuario puede verse`
   - comando: `SELECT`
+  - roles: `authenticated`
   - condición: `id = auth.uid()`
+  - alcance: cada usuario autenticado solo puede leer su propia fila.
+
 - `usuarios actualizar su info`
   - comando: `UPDATE`
   - condición: `id = auth.uid()`
+
+- Se eliminan las variantes amplias:
+  - `lectura usuarios`
+  - `usuarios mismo conjunto`
+
+- La consulta de destinatarios administrativos para notificaciones no
+  utiliza lectura directa amplia de `usuarios_app`; usa la RPC
+  `fn_notification_admin_recipient_ids(uuid)`, que retorna únicamente
+  UUID de administradores del tenant autorizado.
 
 ### Grants
 - FASE 3D.32 revoca `ALL PRIVILEGES` de `anon` sobre `public.usuarios_app` para reducir exposición GraphQL/PostgREST heredada.
@@ -1143,6 +1153,21 @@ Patrones de control vistos en las políticas:
 - `fn_tenant_is_operational(p_conjunto_id uuid, p_operation text default 'tenant_mutation')`
 
 ## RPCs operativas autorizadas
+
+### `fn_notification_admin_recipient_ids(p_conjunto_id uuid)`
+
+- tipo: RPC read-only `STABLE`, `SECURITY DEFINER`.
+- objetivo: resolver destinatarios administrativos para notificaciones
+  de pagos y alertas de seguridad sin exponer filas completas de
+  `usuarios_app`.
+- autorización: requiere sesión autenticada y acceso al tenant mediante
+  `fn_has_tenant_access`, superadmin o fallback legacy same-tenant activo.
+- retorno: únicamente `user_id uuid` de usuarios con `rol_id = 'admin'`
+  y estado activo.
+- privacidad: no retorna nombre, email, teléfono, rol, tenant ni
+  `fcm_token`.
+- permisos: `EXECUTE` para `authenticated` y `service_role`;
+  `anon` y `public` sin ejecución.
 
 ### `fn_crear_o_reutilizar_visitante_y_registro(p_conjunto_id uuid, p_residente_id uuid, p_apartamento_id uuid, p_nombre text, p_tipo_documento text, p_documento text, p_tipo_vehiculo text, p_placa text, p_fecha_visita date)`
 - tipo: RPC `SECURITY DEFINER` FASE 5.4.3 para crear/reutilizar visitante y crear el registro de visita de forma atómica.
