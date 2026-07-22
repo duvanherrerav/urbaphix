@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
-import { EVENTOS_PAGO, adjuntarEventosAPagos, crearNotificacionPago, getPagoEventoLabel, registrarPagoEvento } from '../services/pagosEventosService';
+import { EVENTOS_PAGO, adjuntarEventosAPagos, crearNotificacionPago, getPagoEventoLabel, obtenerPerfilesUsuariosPagos, registrarPagoEvento } from '../services/pagosEventosService';
 import AnaliticaFinancieraAvanzada from '../components/AnaliticaFinancieraAvanzada';
 import GraficaFinanciera from '../components/GraficaFinanciera';
 import { getTipoPagoLabel } from '../utils/pagosLabels';
@@ -51,8 +51,7 @@ export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' 
           apartamentos (
             numero,
             torres!fk_apartamento_torre ( nombre )
-          ),
-          usuarios_app ( nombre )
+          )
         )
       `)
             .eq('conjunto_id', conjuntoId)
@@ -61,9 +60,11 @@ export default function PanelPagosAdmin({ usuarioApp, vistaInicial = 'completa' 
         setLoading(false);
         if (error) return;
 
+        const { perfilesPorUsuario } = await obtenerPerfilesUsuariosPagos((data || []).map((pago) => pago.id));
+
         const pagosFormateados = (data || []).map((p) => ({
             ...p,
-            nombre: p.residentes?.usuarios_app?.nombre || 'Residente',
+            nombre: perfilesPorUsuario[p.residentes?.usuario_id]?.nombre || 'Residente',
             apartamento: p.residentes?.apartamentos?.numero || '-',
             torre: p.residentes?.apartamentos?.torres?.nombre || '-'
         }));

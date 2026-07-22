@@ -166,15 +166,23 @@ export const registrarIntentoQRInvalido = async ({ qrRaw, usuarioApp }) => {
 
   if (intentos < 3 || !usuarioApp?.conjunto_id) return intentos;
 
-  const { data: admins } = await supabase
-    .from('usuarios_app')
-    .select('id')
-    .eq('conjunto_id', usuarioApp.conjunto_id)
-    .eq('rol_id', 'admin');
+  const { data: admins, error: adminsError } = await supabase.rpc(
+    'fn_notification_admin_recipient_ids',
+    {
+      p_conjunto_id: usuarioApp.conjunto_id
+    }
+  );
+
+  if (adminsError) {
+    logger.error(
+      'Error consultando administradores para alerta QR',
+      adminsError
+    );
+  }
 
   if (admins?.length) {
     const notifs = admins.map((a) => ({
-      usuario_id: a.id,
+      usuario_id: a.user_id,
       tipo: 'seguridad_alerta',
       titulo: '⚠️ Intentos QR inválido',
       mensaje: `Se detectaron ${intentos} intentos inválidos en portería`
