@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { logger } from '../../../utils/logger';
 import { ESTADOS_PAGO, getDiasMoraPago, getEstadoPagoUi, getValorPago, obtenerEstadoFinancieroReal } from '../utils/pagosEstados';
+import { obtenerPerfilesUsuariosPagos } from '../services/pagosEventosService';
 
 const ESTADOS_CARTERA = [
   ESTADOS_PAGO.VENCIDO,
@@ -27,6 +28,7 @@ export default function CarteraResumen({ usuarioApp }) {
     const { data, error } = await supabase
       .from('pagos')
       .select(`
+        id,
         valor,
         estado,
         fecha_vencimiento,
@@ -39,9 +41,6 @@ export default function CarteraResumen({ usuarioApp }) {
             torres!fk_apartamento_torre (
               nombre
             )
-          ),
-          usuarios_app (
-            nombre
           )
         )
       `)
@@ -50,6 +49,15 @@ export default function CarteraResumen({ usuarioApp }) {
 
     if (error) {
       logger.error('No se pudo cargar cartera', error);
+      return;
+    }
+
+    const { perfilesPorUsuario, error: perfilesError } = await obtenerPerfilesUsuariosPagos(
+      (data || []).map((pago) => pago.id)
+    );
+
+    if (perfilesError) {
+      logger.error('No se pudieron resolver perfiles de cartera autorizados', perfilesError);
       return;
     }
 
@@ -65,7 +73,7 @@ export default function CarteraResumen({ usuarioApp }) {
       if (!mapa[id]) {
         mapa[id] = {
           usuario_id: residente?.usuario_id, // 🔥 CLAVE
-          nombre: residente?.usuarios_app?.nombre || 'Residente',
+          nombre: perfilesPorUsuario[residente?.usuario_id]?.nombre || 'Residente',
           apartamento: residente?.apartamentos?.numero || '-',
           torre: residente?.apartamentos?.torres?.nombre || '-',
           totalDeuda: 0,
