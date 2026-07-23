@@ -1,4 +1,4 @@
-﻿-- Completion migration for the partial QA execution recorded as
+-- Completion migration for the partial QA execution recorded as
 -- 20260723011740_promote_canonical_qa_prd_function_rls.
 --
 -- This forward-only migration reapplies the full audited canonical baseline.
