@@ -5,9 +5,16 @@ import {
   isMembershipResolverEnabled,
   resolveUserMembershipProfile
 } from './services/membershipResolver';
+import {
+  bootstrapSession,
+  getBootstrapLegacyProfile,
+  isSessionBootstrapEnabled,
+  setPreferredTenantId
+} from './services/sessionBootstrap';
 import { resolvePlatformAccess } from './services/platformAccess';
 import BrandLogo from './components/brand/BrandLogo';
 import ModuleIcon from './components/ui/ModuleIcon';
+import TenantSelector from './components/auth/TenantSelector';
 
 import Login from './modules/auth/Login';
 import { pedirPermiso } from './utils/push';
@@ -34,12 +41,27 @@ const PanelReservasAdmin = lazy(() => import('./modules/reservas/pages/PanelRese
 const PanelReservasVigilancia = lazy(() => import('./modules/reservas/pages/PanelReservasVigilancia'));
 const SuperadminGuard = lazy(() => import('./modules/superadmin/SuperadminGuard'));
 
+const BOOTSTRAP_STATUS_MESSAGES = {
+  USER_DISABLED: 'Tu usuario se encuentra deshabilitado.',
+  TENANT_SUSPENDED: 'El conjunto se encuentra suspendido temporalmente.',
+  TENANT_ARCHIVED: 'El conjunto ya no se encuentra operativo.',
+  TENANT_LICENSE_BLOCKED: 'La licencia del conjunto no permite el acceso en este momento.',
+  TENANT_OPERATIONALLY_LOCKED: 'El conjunto tiene un bloqueo operativo temporal.',
+  CONFIGURATION_ERROR: 'La configuración del conjunto requiere revisión administrativa.'
+};
+
+const getBootstrapStatusMessage = (status, fallback = 'No fue posible autorizar el acceso al conjunto.') => {
+  return BOOTSTRAP_STATUS_MESSAGES[status] || fallback;
+};
+
 function App() {
 
   const [user, setUser] = useState(null);
   const [usuarioApp, setUsuarioApp] = useState(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [errorPerfil, setErrorPerfil] = useState('');
+  const [tenantSelection, setTenantSelection] = useState(null);
+  const [isSelectingTenant, setIsSelectingTenant] = useState(false);
   const [openMenu, setOpenMenu] = useState(false);
   const [modulo, setModulo] = useState('');
   const [pagosTab, setPagosTab] = useState('bandejas');
@@ -50,12 +72,10 @@ function App() {
   const menuBtnClass = (target) => `app-sidebar-item ${moduloActual === target ? 'app-sidebar-item-active' : ''}`;
   const ROLES_VALIDOS = ['admin', 'vigilancia', 'residente'];
 
-  // 🔔 permisos
   useEffect(() => {
     pedirPermiso();
   }, []);
 
-  // 🔥 sesión
   useEffect(() => {
 
     let isMounted = true;
@@ -124,15 +144,76 @@ function App() {
       window.location.assign('/superadmin');
     };
 
+    const applyBootstrapResult = async (authenticatedUser, bootstrap) => {
+      if (bootstrap?.status === 'TENANT_SELECTION_REQUIRED') {
+        if (isMounted) {
+          setUsuarioApp(null);
+          setErrorPerfil('');
+          setTenantSelection(bootstrap);
+        }
+        return true;
+      }
+
+      if (bootstrap?.status === 'NO_MEMBERSHIP' && Array.isArray(bootstrap?.platformMemberships) && bootstrap.platformMemberships.length > 0) {
+        if (isMounted) {
+          setErrorPerfil('');
+          setUsuarioApp(null);
+          setTenantSelection(null);
+        }
+        redirectToSuperadmin();
+        return true;
+      }
+
+      const perfil = getBootstrapLegacyProfile(bootstrap);
+      if (perfil) {
+        if (isMounted) {
+          setErrorPerfil('');
+          setTenantSelection(null);
+          setUsuarioApp(perfil);
+        }
+        return true;
+      }
+
+      if (bootstrap?.status && bootstrap.status !== 'NO_MEMBERSHIP') {
+        if (isMounted) {
+          setUsuarioApp(null);
+          setTenantSelection(null);
+          setErrorPerfil(getBootstrapStatusMessage(bootstrap.status));
+        }
+        return true;
+      }
+
+      const platformAccess = await resolvePlatformAccess(authenticatedUser);
+      if (platformAccess.allowed) {
+        if (isMounted) {
+          setErrorPerfil('');
+          setUsuarioApp(null);
+          setTenantSelection(null);
+        }
+        redirectToSuperadmin();
+        return true;
+      }
+
+      return false;
+    };
+
     const obtenerUsuario = async (authenticatedUser) => {
       try {
         if (isSuperadminRoute) {
           if (isMounted) {
             setErrorPerfil('');
             setUsuarioApp(null);
+            setTenantSelection(null);
           }
           return;
         }
+
+        if (isSessionBootstrapEnabled()) {
+          const bootstrap = await bootstrapSession();
+          const handled = await applyBootstrapResult(authenticatedUser, bootstrap);
+          if (handled) return;
+        }
+
         const membershipResolverEnabled = isMembershipResolverEnabled();
         traceResolverFlag(membershipResolverEnabled);
 
@@ -147,6 +228,7 @@ function App() {
             if (isMounted) {
               setErrorPerfil('');
               setUsuarioApp(null);
+              setTenantSelection(null);
             }
             redirectToSuperadmin();
             return;
@@ -155,23 +237,30 @@ function App() {
           if (isMounted) {
             setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
             setUsuarioApp(null);
+            setTenantSelection(null);
           }
           return;
         }
 
         if (isMounted) {
           setErrorPerfil('');
+          setTenantSelection(null);
           setUsuarioApp(perfil);
         }
       } catch (error) {
         logger.error('No se pudo cargar perfil de usuario', error, {
           module: 'auth',
-          action: isMembershipResolverEnabled() ? 'load_membership_profile' : 'load_legacy_profile'
+          action: isSessionBootstrapEnabled()
+            ? 'load_session_bootstrap'
+            : isMembershipResolverEnabled()
+              ? 'load_membership_profile'
+              : 'load_legacy_profile'
         });
 
         if (isMounted) {
           setErrorPerfil('No pudimos cargar tu perfil. Intenta cerrar sesión y volver a ingresar.');
           setUsuarioApp(null);
+          setTenantSelection(null);
         }
       }
     };
@@ -196,6 +285,7 @@ function App() {
           setErrorPerfil('No pudimos verificar tu sesión. Revisa tu conexión e intenta nuevamente.');
           setUser(null);
           setUsuarioApp(null);
+          setTenantSelection(null);
         }
       } finally {
         if (isMounted) {
@@ -220,6 +310,7 @@ function App() {
         } else {
           setErrorPerfil('');
           setUsuarioApp(null);
+          setTenantSelection(null);
         }
       }
     );
@@ -230,6 +321,38 @@ function App() {
     };
 
   }, [isSuperadminRoute]);
+
+  const seleccionarTenant = async (tenantId) => {
+    if (!tenantId || !user || isSelectingTenant) return;
+
+    setIsSelectingTenant(true);
+    setErrorPerfil('');
+
+    try {
+      const bootstrap = await bootstrapSession({ preferredTenantId: tenantId });
+      const perfil = getBootstrapLegacyProfile(bootstrap);
+
+      if (!perfil) {
+        setErrorPerfil(getBootstrapStatusMessage(
+          bootstrap?.status,
+          'No fue posible activar el conjunto seleccionado. Intenta nuevamente.'
+        ));
+        return;
+      }
+
+      setPreferredTenantId(bootstrap.activeContext?.tenantId || tenantId);
+      setTenantSelection(null);
+      setUsuarioApp(perfil);
+    } catch (error) {
+      logger.error('No se pudo seleccionar el tenant activo', error, {
+        module: 'auth',
+        action: 'select_active_tenant'
+      });
+      setErrorPerfil('No fue posible activar el conjunto seleccionado. Intenta nuevamente.');
+    } finally {
+      setIsSelectingTenant(false);
+    }
+  };
 
   useEffect(() => {
     const onPointerDown = (event) => {
@@ -310,7 +433,6 @@ function App() {
     );
   }
 
-  // 🔐 LOGIN
   if (!user) {
     const loginFeatures = ['Control de visitas', 'Reservas', 'Pagos', 'Comunicados', 'Seguridad'];
 
@@ -395,6 +517,18 @@ function App() {
     );
   }
 
+  if (tenantSelection?.status === 'TENANT_SELECTION_REQUIRED') {
+    return (
+      <TenantSelector
+        tenants={tenantSelection.selectableTenants || []}
+        isSubmitting={isSelectingTenant}
+        error={errorPerfil}
+        onSelect={seleccionarTenant}
+        onSignOut={() => supabase.auth.signOut()}
+      />
+    );
+  }
+
   if (user && !usuarioApp) {
     return (
       <div className="app-shell flex items-center justify-center p-6">
@@ -420,11 +554,9 @@ function App() {
     );
   }
 
-  // 🚀 APP
   return (
     <div className="app-shell flex flex-col lg:flex-row">
 
-      {/* 🔥 SIDEBAR */}
       <aside className="app-sidebar w-full shrink-0 p-3 lg:min-h-screen lg:w-72 lg:p-4">
 
         <div className="mb-3 app-surface-primary px-4 py-3.5 lg:mb-4">
@@ -433,7 +565,6 @@ function App() {
 
         <nav className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
 
-          {/* ADMIN */}
           {usuarioApp?.rol_id === 'admin' && (
             <>
               <button type="button" onClick={() => seleccionarModulo('dashboard')} className={menuBtnClass('dashboard')}>
@@ -454,7 +585,6 @@ function App() {
             </>
           )}
 
-          {/* VIGILANCIA */}
           {usuarioApp?.rol_id === 'vigilancia' && (
             <>
               <button type="button" onClick={() => seleccionarModulo('visitas')} className={menuBtnClass('visitas')}>
@@ -475,7 +605,6 @@ function App() {
             </>
           )}
 
-          {/* RESIDENTE */}
           {usuarioApp?.rol_id === 'residente' && (
             <>
               <button type="button" onClick={() => seleccionarModulo('visitas')} className={menuBtnClass('visitas')}>
@@ -500,24 +629,20 @@ function App() {
 
       </aside>
 
-      {/* 🔥 CONTENIDO */}
       <div className="min-w-0 flex-1">
 
-        {/* HEADER */}
-        <header className="app-header px-4 py-3 sm:px-7 sm:py-4 flex justify-between items-center gap-4 relative z-50">
-
+        <header className="app-header sticky top-0 z-50 flex min-h-[64px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <ModuleIcon name={headerModulo.icon} className="h-8 w-8 rounded-xl" />
-            <h2 className="truncate text-lg font-semibold text-app-text-primary">
-              {headerModulo.label}
-            </h2>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-bg-alt text-brand-secondary">
+              <ModuleIcon name={headerModulo.icon} className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium uppercase tracking-[0.14em] text-app-text-secondary">Urbaphix</p>
+              <h1 className="truncate text-lg font-semibold text-app-text-primary">{headerModulo.label}</h1>
+            </div>
           </div>
 
-          {/* 👤 MENU */}
-          <div className="relative z-50 flex items-center gap-3" ref={menuRef}>
-
-            <BrandLogo variant="header" className="hidden max-w-[112px] sm:flex" alt="Urbaphix" />
-
+          <div className="relative" ref={menuRef}>
             <button
               onClick={() => setOpenMenu(!openMenu)}
               className="w-10 h-10 rounded-full border border-app-border bg-app-bg text-app-text-primary flex items-center justify-center font-bold"
@@ -559,7 +684,6 @@ function App() {
 
         </header>
 
-        {/* CONTENIDO DINÁMICO */}
         <div className="space-y-6 p-4 sm:p-6">
           {errorPerfil && (
             <div className="app-badge-error w-full rounded-xl px-4 py-3 text-sm">
@@ -574,7 +698,6 @@ function App() {
           )}
 
           <Suspense fallback={<div className="app-badge-info">Cargando módulo...</div>}>
-            {/* ADMIN */}
             {usuarioApp?.rol_id === 'admin' && (
               <>
                 {moduloActual === 'dashboard' && (
@@ -618,7 +741,6 @@ function App() {
               </>
             )}
 
-            {/* VIGILANCIA */}
             {usuarioApp?.rol_id === 'vigilancia' && (
               <>
                 {moduloActual === 'visitas' && (
@@ -649,7 +771,6 @@ function App() {
               </>
             )}
 
-            {/* RESIDENTE */}
             {usuarioApp?.rol_id === 'residente' && (
               <>
                 {moduloActual === 'visitas' && (
@@ -675,7 +796,6 @@ function App() {
 
       </div>
 
-      {/* 🔔 NOTIFICACIONES */}
       {usuarioApp && (
         <Suspense fallback={null}>
           <>
