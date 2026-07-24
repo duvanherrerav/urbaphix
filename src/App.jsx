@@ -41,6 +41,19 @@ const PanelReservasAdmin = lazy(() => import('./modules/reservas/pages/PanelRese
 const PanelReservasVigilancia = lazy(() => import('./modules/reservas/pages/PanelReservasVigilancia'));
 const SuperadminGuard = lazy(() => import('./modules/superadmin/SuperadminGuard'));
 
+const BOOTSTRAP_STATUS_MESSAGES = {
+  USER_DISABLED: 'Tu usuario se encuentra deshabilitado.',
+  TENANT_SUSPENDED: 'El conjunto se encuentra suspendido temporalmente.',
+  TENANT_ARCHIVED: 'El conjunto ya no se encuentra operativo.',
+  TENANT_LICENSE_BLOCKED: 'La licencia del conjunto no permite el acceso en este momento.',
+  TENANT_OPERATIONALLY_LOCKED: 'El conjunto tiene un bloqueo operativo temporal.',
+  CONFIGURATION_ERROR: 'La configuración del conjunto requiere revisión administrativa.'
+};
+
+const getBootstrapStatusMessage = (status, fallback = 'No fue posible autorizar el acceso al conjunto.') => {
+  return BOOTSTRAP_STATUS_MESSAGES[status] || fallback;
+};
+
 function App() {
 
   const [user, setUser] = useState(null);
@@ -162,19 +175,10 @@ function App() {
       }
 
       if (bootstrap?.status && bootstrap.status !== 'NO_MEMBERSHIP') {
-        const statusMessages = {
-          USER_DISABLED: 'Tu usuario se encuentra deshabilitado.',
-          TENANT_SUSPENDED: 'El conjunto se encuentra suspendido temporalmente.',
-          TENANT_ARCHIVED: 'El conjunto ya no se encuentra operativo.',
-          TENANT_LICENSE_BLOCKED: 'La licencia del conjunto no permite el acceso en este momento.',
-          TENANT_OPERATIONALLY_LOCKED: 'El conjunto tiene un bloqueo operativo temporal.',
-          CONFIGURATION_ERROR: 'La configuración del conjunto requiere revisión administrativa.'
-        };
-
         if (isMounted) {
           setUsuarioApp(null);
           setTenantSelection(null);
-          setErrorPerfil(statusMessages[bootstrap.status] || 'No fue posible autorizar el acceso al conjunto.');
+          setErrorPerfil(getBootstrapStatusMessage(bootstrap.status));
         }
         return true;
       }
@@ -329,7 +333,11 @@ function App() {
       const perfil = getBootstrapLegacyProfile(bootstrap);
 
       if (!perfil) {
-        throw new Error(`Tenant selection failed with status ${bootstrap?.status || 'unknown'}`);
+        setErrorPerfil(getBootstrapStatusMessage(
+          bootstrap?.status,
+          'No fue posible activar el conjunto seleccionado. Intenta nuevamente.'
+        ));
+        return;
       }
 
       setPreferredTenantId(bootstrap.activeContext?.tenantId || tenantId);
