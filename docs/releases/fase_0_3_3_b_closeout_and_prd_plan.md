@@ -144,7 +144,7 @@ No hacer push si existen conflictos o cambios inesperados.
 
 ```powershell
 npm install
-npm run build
+npm run build:prod
 npm run lint
 git diff --check
 git status
